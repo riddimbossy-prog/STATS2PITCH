@@ -3,8 +3,8 @@ import { mergeLifecycleBoard } from './lifecycle.js'
 
 const row=(overrides={})=>({fixtureId:1,match:'Alpha vs Beta',league:'Test',country:'Test',kickoff:'2026-08-09T18:00:00Z',kickoffLocal:'09 Aug, 18:00',selectedTeamId:1,selectedTeam:'Alpha',opponentTeamId:2,opponentTeam:'Beta',odds:2.40,drawOdds:3.30,market:'1X2',filterCount:3,familyCount:3,contradiction:'LOW',score:3,filters:['A','B','C'],filterCodes:['A','B','C'],negativeSignals:[],negativeSignalCodes:[],...overrides})
 const board=r=>({meta:{},groups:{single:[],two:[],threePlus:r?[r]:[]},priority:r?[r]:[],oddsByFixture:{},availableMarkets:[]})
-const baseHome={id:1,name:'Alpha',venue:'home',winRate:40,position:4,leagueSize:10,goalsConceded:1}
-const baseAway={id:2,name:'Beta',venue:'away',winRate:20,position:6,leagueSize:10,goalsConceded:1.2}
+const baseHome={id:1,name:'Alpha',venue:'home',winRate:40,seasonWinRate:40,played:5,position:4,leagueSize:10,goalsConceded:1}
+const baseAway={id:2,name:'Beta',venue:'away',winRate:20,seasonWinRate:20,played:5,position:6,leagueSize:10,goalsConceded:1.2}
 const fixture=(overrides={})=>({
   fixtureId:1,
   home:{...baseHome,...(overrides.home||{})},
@@ -26,9 +26,15 @@ out=applyWinSafety(board(row()),[fixture({away:{position:6,goalsConceded:2.31}})
 if(out.priority[0]?.market!=='1X2')throw new Error('Opponent conceding above 2.30 in AWAY split must allow the straight-win exception')
 
 out=applyWinSafety(board(row()),[fixture({home:{winRate:60,position:4}})])
-if(out.priority[0]?.market!=='1X2')throw new Error('60% HOME-split win rate must allow a straight win for a non-bottom-three selection')
+if(out.priority[0]?.market!=='1X2')throw new Error('60% HOME-split last-five win rate must allow a straight win for a non-bottom-three selection')
 
-out=applyWinSafety(board(row({odds:1.45})),[fixture({home:{winRate:100,position:8,goalsConceded:.5},away:{winRate:0,position:10,goalsConceded:3.4}})])
+out=applyWinSafety(board(row()),[fixture({home:{winRate:null,seasonWinRate:60,played:5,position:4}})])
+if(out.priority[0]?.market!=='1X2'||out.priority[0]?.winRateSource!=='season-split')throw new Error('Mature 60% HOME season-split rate must safely recover when recent split history is unavailable')
+
+out=applyWinSafety(board(row({odds:1.85})),[fixture({home:{winRate:null,seasonWinRate:75,played:4,position:4}})])
+if(out.priority.length!==0)throw new Error('Fewer than five venue games must not use season split as a 60% win fallback')
+
+out=applyWinSafety(board(row({odds:1.45})),[fixture({home:{winRate:100,seasonWinRate:100,played:8,position:8,goalsConceded:.5},away:{winRate:0,position:10,goalsConceded:3.4}})])
 if(out.priority.length!==0)throw new Error('Bottom-three HOME-split selected team must be vetoed regardless of form/odds/opponent')
 if(out.meta.bottom3TeamResultBlocked!==1)throw new Error('Bottom-three split veto must be counted')
 

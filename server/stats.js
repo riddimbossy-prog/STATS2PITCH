@@ -95,6 +95,7 @@ export function splitStandingMetrics(standings, teamId, venue){
   const overall=overallStandingMetrics(standings,teamId)
   if(!row)return{
     venue,position:null,played:null,ppg:null,goalsScored:null,goalsConceded:null,
+    seasonWinRate:null,seasonDrawRate:null,seasonLossRate:null,
     splitPoints:null,splitWins:null,splitDraws:null,splitLosses:null,
     overallPosition:overall.position,overallPlayed:overall.played,overallPpg:overall.ppg
   }
@@ -105,6 +106,9 @@ export function splitStandingMetrics(standings, teamId, venue){
     ppg:row.played?+(row.points/row.played).toFixed(2):null,
     goalsScored:row.played&&Number.isFinite(row.gf)?+(row.gf/row.played).toFixed(2):null,
     goalsConceded:row.played&&Number.isFinite(row.ga)?+(row.ga/row.played).toFixed(2):null,
+    seasonWinRate:row.played?pct(row.win,row.played):null,
+    seasonDrawRate:row.played?pct(row.draw,row.played):null,
+    seasonLossRate:row.played?pct(row.lose,row.played):null,
     splitPoints:row.points,
     splitWins:row.win,
     splitDraws:row.draw,
