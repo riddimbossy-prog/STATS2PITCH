@@ -1,5 +1,25 @@
 function pct(n,d){ return d ? Math.round((n/d)*100) : null }
 
+export const MIN_LEAGUE_GAMES = 10
+
+/**
+ * Count completed league matches from the standings table.
+ * Every completed match appears once in each team's `all.played`, so the
+ * league-wide total is the sum of those values divided by two.
+ */
+export function leagueGamesPlayed(standings) {
+  if (!Array.isArray(standings) || !standings.length) return 0
+  const teamAppearances = standings.reduce((sum,row) => {
+    const played = Number(row?.all?.played || 0)
+    return sum + (Number.isFinite(played) && played > 0 ? played : 0)
+  }, 0)
+  return Math.floor(teamAppearances / 2)
+}
+
+export function hasMinimumLeagueGames(standings, minimum=MIN_LEAGUE_GAMES) {
+  return leagueGamesPlayed(standings) >= Number(minimum || MIN_LEAGUE_GAMES)
+}
+
 export function deriveRecentStats(fixtures, teamId) {
   const allRows = fixtures
     .filter(f => f?.fixture?.status?.short === 'FT' || f?.fixture?.status?.long === 'Match Finished')
@@ -34,12 +54,13 @@ export function deriveRecentStats(fixtures, teamId) {
 
 export function standingMetrics(standings, teamId) {
   const row = standings.find(x => x.team.id === teamId)
-  if (!row) return { position:null, ppg:null, goalsScored:null, goalsConceded:null }
+  if (!row) return { position:null, played:null, ppg:null, goalsScored:null, goalsConceded:null }
   const played = Number(row.all?.played || 0)
   const gf = Number(row.all?.goals?.for)
   const ga = Number(row.all?.goals?.against)
   return {
     position:row.rank ?? null,
+    played,
     ppg:played ? +(Number(row.points || 0)/played).toFixed(2) : null,
     goalsScored:played && Number.isFinite(gf) ? +(gf/played).toFixed(2) : null,
     goalsConceded:played && Number.isFinite(ga) ? +(ga/played).toFixed(2) : null
