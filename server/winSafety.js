@@ -12,6 +12,12 @@ function fixtureSides(fixture,row){
   return{selected,opponent:isHome?fixture.away:fixture.home,isHome}
 }
 
+function isBottomThree(team){
+  const position=Number(team?.position)
+  const leagueSize=Number(team?.leagueSize)
+  return Number.isFinite(position)&&Number.isFinite(leagueSize)&&leagueSize>=3&&position>leagueSize-3
+}
+
 function market(fixture,key){return(fixture?.marketOdds||[]).find(m=>m?.marketKey===key)||null}
 function outcomePrice(marketRow,names){
   if(!marketRow)return null
@@ -32,12 +38,12 @@ function fallbackMarket(fixture,isHome,teamName){
   return null
 }
 
-export const WIN_SAFETY_POLICY='under60-exception-or-downgrade-v1'
+export const WIN_SAFETY_POLICY='bottom3-veto-under60-exception-or-downgrade-v2'
 
 export function applyWinSafety(board,fixtures){
   const byId=new Map((fixtures||[]).map(f=>[String(f.fixtureId),f]))
   const kept=[]
-  let straightWinsBlocked=0,downgraded=0,exceptionWins=0
+  let straightWinsBlocked=0,downgraded=0,exceptionWins=0,bottom3TeamResultBlocked=0
 
   for(const row of allRows(board)){
     if(row?.market!=='1X2'){kept.push(row);continue}
@@ -45,8 +51,17 @@ export function applyWinSafety(board,fixtures){
     const sides=fixtureSides(fixture,row)
     if(!fixture||!sides){straightWinsBlocked++;continue}
     const {selected,opponent,isHome}=sides
-    const winRate=Number(selected?.winRate)
 
+    // Absolute veto: a bottom-three team is never published in a team-result
+    // market. Odds, recent form, opponent weakness and all other exceptions are
+    // ignored. Do not downgrade the bottom-three team to DNB/1X/X2 either.
+    if(isBottomThree(selected)){
+      bottom3TeamResultBlocked++
+      straightWinsBlocked++
+      continue
+    }
+
+    const winRate=Number(selected?.winRate)
     if(Number.isFinite(winRate)&&winRate>=60){kept.push({...row,winSafety:'win-rate-60-plus'});continue}
 
     const opponentIsLast=Number.isFinite(Number(opponent?.position))&&Number.isFinite(Number(opponent?.leagueSize))&&Number(opponent.position)===Number(opponent.leagueSize)
@@ -77,7 +92,7 @@ export function applyWinSafety(board,fixtures){
   }
   return{
     ...board,
-    meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins},
+    meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins,bottom3TeamResultBlocked},
     groups,
     priority:[...kept].sort(sortPicks)
   }
