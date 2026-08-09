@@ -1,11 +1,22 @@
-STATS2PITCH.COM v1.3.0 — FULL REPLACE
+STATS2PITCH v1.4.0 — FULL REPLACEMENT BUILD
 
-1. Replace the old GitHub repository contents with this folder.
-2. Commit and push the changes.
-3. In Render, add STATS_API_KEY to the Environment settings.
-4. Make sure SUPABASE_URL starts with https://
-5. Keep the existing SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY and API_FOOTBALL_KEY values.
-6. Render -> Manual Deploy -> Clear build cache & deploy.
-7. Open /api/health and confirm version 1.3.0.
+Use this folder as the root of the GitHub repository. Do not upload it inside an older project folder.
 
-The visible website contains no admin/provider diagnostic panel. The Stats API key stays server-side.
+What changed:
+- New black / white / green Stats2Pitch brand across login, header, app icons and PWA.
+- New stadium-style sign-in screen.
+- Email/password only. No GitHub login.
+- Create Account uses the server-side confirmed-user flow, so users can enter immediately without email verification.
+- New Prediction Board based on the supplied UI reference.
+- Plain-English match reasons and labels.
+- Select filters, Match Any / Match All, remove filter chips, and prioritize one selected filter when sorting.
+- Priority list plus 3+ Filters / 2 Filters / Single Filter sections.
+- API-Football + TheStatsAPI odds-market enrichment preserved.
+- View Details shows available match-market prices without exposing provider/backend names.
+- Mobile, tablet and foldable layouts included.
+- Supabase URL is normalized automatically if Render is given the project hostname without https://.
+
+After pushing to GitHub:
+1. In Render, deploy the latest commit using Clear build cache & deploy.
+2. Confirm /api/health reports version 1.4.0.
+3. Hard-refresh the browser once after deployment.

@@ -38,7 +38,7 @@
 5. Keep `API_FOOTBALL_BASE=https://v3.football.api-sports.io`.
 6. Keep `STATS_API_BASE_URL=https://api.thestatsapi.com/api`.
 7. Deploy.
-8. Open `/api/health` on the Render domain. It should return JSON with `"ok": true` and version `1.3.0`.
+8. Open `/api/health` on the Render domain. It should return JSON with `"ok": true` and version `1.4.0`.
 9. Open the main site and use **Create account** or **Sign in**.
 
 ### Quick login test with no verification
@@ -84,3 +84,12 @@ After the Render service works on its temporary Render URL:
 `MAX_FIXTURES_PER_REFRESH` defaults to `60`. Reduce it if your API-Football plan has a lower request allowance. Identical API-Football requests are cached for `CACHE_TTL_SECONDS` (default `900`).
 
 TheStatsAPI defaults to `40` requests per minute and a `300ms` minimum spacing, with a `1800` second value cache. You can tune `STATS_API_REQUESTS_PER_MINUTE`, `STATS_API_MIN_INTERVAL_MS`, `STATS_VALUE_CACHE_TTL_SECONDS`, `STATS_API_COMPETITION_PAGES`, and `STATS_API_MAX_MATCH_PAGES` on Render if your plan needs different limits.
+
+
+## v1.4.0 UI and login notes
+
+The v1.4.0 build is email/password only and does not contain a GitHub login button. Account creation uses the server-side Supabase Admin endpoint with `email_confirm: true`, so a newly created account can sign in immediately without email verification. Keep `SUPABASE_SERVICE_ROLE_KEY` only in Render.
+
+The board UI intentionally hides provider, API, cache, snapshot and admin information. Users only see football-facing labels, filters, predictions, reasons and available market prices.
+
+After replacing an older frontend, use **Render → Manual Deploy → Clear build cache & deploy**. Then verify `/api/health` reports `1.4.0`.

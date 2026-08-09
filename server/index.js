@@ -10,17 +10,19 @@ const __dirname=path.dirname(fileURLToPath(import.meta.url));const publicDir=pat
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon','.webmanifest':'application/manifest+json; charset=utf-8'}
 function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data))}
 async function authed(req,res){const u=await verifyBearer(req.headers.authorization);if(!u){json(res,401,{error:'Authentication required.'});return null}return u}
-async function serve(req,res){let p=new URL(req.url,'http://local').pathname;if(p==='/')p='/index.html';const target=path.normalize(path.join(publicDir,p));if(!target.startsWith(publicDir)){res.writeHead(403);return res.end('Forbidden')}try{const body=await fs.readFile(target);const ext=path.extname(target);const noStore=['.html','.js','.css','.webmanifest'].includes(ext);res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':noStore?'no-store, max-age=0':'public, max-age=86400, immutable','X-Stats2Pitch-Version':'1.3.0'});res.end(body)}catch{try{const body=await fs.readFile(path.join(publicDir,'index.html'));res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store, max-age=0','X-Stats2Pitch-Version':'1.3.0'});res.end(body)}catch{res.writeHead(404);res.end('Not found')}}}
+async function serve(req,res){let p=new URL(req.url,'http://local').pathname;if(p==='/')p='/index.html';const target=path.normalize(path.join(publicDir,p));if(!target.startsWith(publicDir)){res.writeHead(403);return res.end('Forbidden')}try{const body=await fs.readFile(target);const ext=path.extname(target);const noStore=['.html','.js','.css','.webmanifest'].includes(ext);res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':noStore?'no-store, max-age=0':'public, max-age=86400, immutable','X-Stats2Pitch-Version':'1.4.0'});res.end(body)}catch{try{const body=await fs.readFile(path.join(publicDir,'index.html'));res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store, max-age=0','X-Stats2Pitch-Version':'1.4.0'});res.end(body)}catch{res.writeHead(404);res.end('Not found')}}}
 
 const signupBuckets=new Map();
 function clientIp(req){return String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'unknown').split(',')[0].trim()}
 function allowSignupAttempt(ip){const now=Date.now(),windowMs=60*60*1000,max=6;const item=signupBuckets.get(ip);if(!item||now-item.start>windowMs){signupBuckets.set(ip,{start:now,count:1});return true}if(item.count>=max)return false;item.count++;return true}
 async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>20_000)throw new Error('Request too large.')}try{return JSON.parse(raw||'{}')}catch{throw new Error('Invalid JSON.')}}
 
+const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'');return raw&&!/^https?:\/\//i.test(raw)?`https://${raw}`:raw}
+
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local');
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:'1.3.0',time:new Date().toISOString()})
- if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:'1.3.0',supabaseUrl:process.env.SUPABASE_URL||'',supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:'1.4.0',time:new Date().toISOString()})
+ if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:'1.4.0',supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/signup'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,403,{error:'Account creation is disabled.'});
   const ip=clientIp(req);if(!allowSignupAttempt(ip))return json(res,429,{error:'Too many account-creation attempts. Try again later.'});

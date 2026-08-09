@@ -1,4 +1,5 @@
-const url = process.env.SUPABASE_URL
+const rawUrl = String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
+const url = rawUrl && !/^https?:\/\//i.test(rawUrl) ? `https://${rawUrl}` : rawUrl
 const anon = process.env.SUPABASE_ANON_KEY
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY
 
