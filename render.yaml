@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: modular-football-agent
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.18.0
+      - key: PORT
+        value: 3000
+      - key: APP_TIMEZONE
+        value: UTC
+      - key: CACHE_TTL_SECONDS
+        value: 900
+      - key: MAX_FIXTURES_PER_REFRESH
+        value: 60
+      - key: ALLOW_MANUAL_REFRESH
+        value: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: API_FOOTBALL_KEY
+        sync: false
+      - key: API_FOOTBALL_BASE
+        value: https://v3.football.api-sports.io

@@ -1,0 +1,13 @@
+{
+  "name": "modular-football-agent",
+  "version": "1.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "check": "node server/selftest.js"
+  },
+  "engines": {
+    "node": ">=20.19.0 <23"
+  }
+}
