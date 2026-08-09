@@ -2,13 +2,16 @@ import http from 'node:http'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { verifyBearer, saveSnapshot, loadLatestSnapshot, createConfirmedUser, accountExists } from './supabaseAdmin.js'
+import { verifyBearer, saveSnapshot, loadLatestSnapshot, loadSnapshotByDate, createConfirmedUser, accountExists } from './supabaseAdmin.js'
 import { enrichDate } from './enrich.js'
+import { getFixturesByDateFresh } from './apiFootball.js'
 import { buildBoard } from './engine.js'
 import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
 import { MIN_LEAGUE_GAMES } from './stats.js'
+import { applyWinSafety, WIN_SAFETY_POLICY } from './winSafety.js'
+import { buildLifecycleMap, mergeLifecycleBoard } from './lifecycle.js'
 
-const VERSION='1.7.9'
+const VERSION='1.8.0'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -58,9 +61,28 @@ const server=http.createServer(async(req,res)=>{try{
   if(String(process.env.ALLOW_MANUAL_REFRESH||'true')!=='true')return json(res,403,{error:'Manual refresh is disabled.'})
   try{
     const requested=u.searchParams.get('date')||''
-    const {date,fixtures,rawCount,maturity={}}=await enrichDate(requested)
+    const {date,fixtures,rawCount}=await enrichDate(requested)
     const matureFixtures=filterMatureFixtures(fixtures)
-    const board=buildBoard(matureFixtures,{date,fixturesScanned:matureFixtures.length,sourceFixtures:rawCount,generatedAt:new Date().toISOString(),...maturity,maturityPolicy:EARLY_SEASON_POLICY,minLeagueGames:MIN_LEAGUE_GAMES})
+    const baseBoard=buildBoard(matureFixtures,{
+      date,
+      fixturesScanned:matureFixtures.length,
+      sourceFixtures:rawCount,
+      generatedAt:new Date().toISOString(),
+      earlySeasonPolicy:EARLY_SEASON_POLICY,
+      minimumLeagueGames:MIN_LEAGUE_GAMES,
+      maturityPolicy:EARLY_SEASON_POLICY,
+      minLeagueGames:MIN_LEAGUE_GAMES
+    })
+    const safeBoard=applyWinSafety(baseBoard,matureFixtures)
+
+    // Status/score truth bypasses the long enrichment cache so Live and Settled
+    // reflect the latest API-Football state whenever the user refreshes.
+    const statusFixtures=await getFixturesByDateFresh(date)
+    const lifecycleMap=buildLifecycleMap(statusFixtures)
+    const previous=await loadSnapshotByDate(date).catch(()=>null)
+    const compatiblePrevious=previous?.meta?.winSafetyPolicy===WIN_SAFETY_POLICY?previous:null
+    const board=mergeLifecycleBoard(safeBoard,compatiblePrevious,lifecycleMap)
+
     await saveSnapshot(board,date)
     return json(res,200,board)
   }catch(e){

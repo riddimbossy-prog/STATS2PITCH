@@ -14,6 +14,12 @@ export async function saveSnapshot(board,date){
 export async function loadLatestSnapshot(){
  need(); const r=await fetch(`${url}/rest/v1/prediction_snapshots?select=payload,generated_at,snapshot_date&order=generated_at.desc&limit=1`,{headers:{apikey:service,Authorization:`Bearer ${service}`}}); if(!r.ok)throw new Error(`Supabase snapshot read failed (${r.status})`); const rows=await r.json(); return rows?.[0]?.payload||null
 }
+export async function loadSnapshotByDate(date){
+ need(); const d=String(date||'').trim(); if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return null
+ const r=await fetch(`${url}/rest/v1/prediction_snapshots?select=payload&snapshot_date=eq.${encodeURIComponent(d)}&limit=1`,{headers:{apikey:service,Authorization:`Bearer ${service}`}})
+ if(!r.ok)throw new Error(`Supabase dated snapshot read failed (${r.status})`)
+ const rows=await r.json(); return rows?.[0]?.payload||null
+}
 export async function createConfirmedUser(email,password){
  need();
  const r=await fetch(`${url}/auth/v1/admin/users`,{
