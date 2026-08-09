@@ -1,5 +1,5 @@
 import { getFixturesByDate, getStandings, getRecent, getFixtureOdds } from './apiFootball.js'
-import { deriveRecentStats, standingMetrics, parse1x2Odds } from './stats.js'
+import { deriveRecentStats, standingMetrics, parse1x2Odds, leagueGamesPlayed, hasMinimumLeagueGames, MIN_LEAGUE_GAMES } from './stats.js'
 import { getStatsOddsForFixture, statsApiConfigured } from './statsApi.js'
 import { getStatsOddsFallback } from './statsFallback.js'
 import { buildVerifiedOdds } from './oddsV2.js'
@@ -54,9 +54,21 @@ export async function enrichDate(requestedDate){
   }
 
   const enriched=[]
+  let earlySeasonSkipped=0
   for (const f of fixtures) {
     try {
       const st=await standings(f.league.id,f.league.season)
+      const leagueGames=leagueGamesPlayed(st)
+
+      // EARLY-SEASON SAFETY GATE:
+      // A league must have at least 10 completed matches across the competition
+      // before any fixture from it is allowed into the prediction engine.
+      if (!hasMinimumLeagueGames(st, MIN_LEAGUE_GAMES)) {
+        earlySeasonSkipped++
+        console.log(`Skipping early-season fixture ${f.fixture?.id}: ${f.league?.name||'league'} has ${leagueGames}/${MIN_LEAGUE_GAMES} completed league games.`)
+        continue
+      }
+
       const leagueSize=st.length || null
       const [hr,ar,apiOddsRaw,statsOdds] = await Promise.all([
         recent(f.teams.home.id),
@@ -71,9 +83,6 @@ export async function enrichDate(requestedDate){
       const hm={...deriveRecentStats(hr,f.teams.home.id),...standingMetrics(st,f.teams.home.id)}
       const am={...deriveRecentStats(ar,f.teams.away.id),...standingMetrics(st,f.teams.away.id)}
 
-      // v1.6.1: one deterministic odds path. It keeps each market tied to a real
-      // bookmaker instead of mixing the highest home/draw/away prices from
-      // different books, and it understands nested TheStatsAPI goal lines.
       const verified=buildVerifiedOdds({apiPayload:apiOddsRaw,statsPayload:statsOdds?.payload,fixture:f})
       const api1x2=parse1x2Odds(apiOddsRaw) || {}
       const odds=withFallback(verified.canonical,api1x2)
@@ -88,6 +97,7 @@ export async function enrichDate(requestedDate){
         kickoffLocal:new Date(f.fixture.date).toLocaleString('en-GB',{timeZone:process.env.APP_TIMEZONE||'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),
         leagueLogo:f.league.logo||null,
         countryFlag:f.league.flag||null,
+        leagueGamesPlayed:leagueGames,
         home:{id:f.teams.home.id,name:f.teams.home.name,logo:f.teams.home.logo||null,leagueSize,...hm},
         away:{id:f.teams.away.id,name:f.teams.away.name,logo:f.teams.away.logo||null,leagueSize,...am},
         odds,
@@ -98,5 +108,5 @@ export async function enrichDate(requestedDate){
       console.warn('Skipping fixture',f.fixture?.id,e.message)
     }
   }
-  return {date, fixtures:enriched, rawCount:raw.length}
+  return {date, fixtures:enriched, rawCount:raw.length, earlySeasonSkipped}
 }
