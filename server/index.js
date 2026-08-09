@@ -6,7 +6,7 @@ import { verifyBearer, saveSnapshot, loadLatestSnapshot, createConfirmedUser, ac
 import { enrichDate } from './enrich.js'
 import { buildBoard } from './engine.js'
 
-const VERSION='1.7.2'
+const VERSION='1.7.3'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -24,6 +24,13 @@ function allowLookupAttempt(ip){return allowBucket(lookupBuckets,ip,20)}
 async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>20_000)throw new Error('Request too large.')}try{return JSON.parse(raw||'{}')}catch{throw new Error('Invalid JSON.')}}
 const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'');return raw&&!/^https?:\/\//i.test(raw)?`https://${raw}`:raw}
 
+// The browser only needs the odd attached to each chosen prediction. Full
+// bookmaker market grids stay server-side and are not sent to the normal board.
+function publicBoard(board){
+ if(!board)return{meta:{fixturesScanned:0,qualified:0,generatedAt:null},groups:{single:[],two:[],threePlus:[]},priority:[],oddsByFixture:{},availableMarkets:[]}
+ return{...board,oddsByFixture:{},availableMarkets:[]}
+}
+
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
  if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,time:new Date().toISOString()})
@@ -39,11 +46,11 @@ const server=http.createServer(async(req,res)=>{try{
   try{const body=await readJson(req);const email=String(body.email||'').trim().toLowerCase();const password=String(body.password||'');if(!/^\S+@\S+\.\S+$/.test(email))return json(res,400,{error:'Enter a valid email address.'});if(password.length<6)return json(res,400,{error:'Password must be at least 6 characters.'});const user=await createConfirmedUser(email,password);return json(res,201,{ok:true,userId:user.id,email:user.email,confirmed:true})}catch(e){const msg=String(e.message||'Signup failed.');const duplicate=/already|registered|exists/i.test(msg);return json(res,duplicate?409:400,{error:duplicate?'An account with this email already exists.':'Account could not be created right now. Please try again.'})}
  }
  if(u.pathname==='/api/me'){const user=await authed(req,res);if(user)return json(res,200,{id:user.id,email:user.email});return}
- if(u.pathname==='/api/board'){if(!await authed(req,res))return;const board=await loadLatestSnapshot();return json(res,200,board||{meta:{fixturesScanned:0,qualified:0,generatedAt:null},groups:{single:[],two:[],threePlus:[]},priority:[],oddsByFixture:{},availableMarkets:[]})}
+ if(u.pathname==='/api/board'){if(!await authed(req,res))return;const board=await loadLatestSnapshot();return json(res,200,publicBoard(board))}
  if(u.pathname==='/api/refresh'&&req.method==='POST'){
   if(!await authed(req,res))return
   if(String(process.env.ALLOW_MANUAL_REFRESH||'true')!=='true')return json(res,403,{error:'Manual refresh is disabled.'})
-  try{const requested=u.searchParams.get('date')||'';const {date,fixtures,rawCount}=await enrichDate(requested);const board=buildBoard(fixtures,{date,fixturesScanned:fixtures.length,sourceFixtures:rawCount,generatedAt:new Date().toISOString()});await saveSnapshot(board,date);return json(res,200,board)}catch(e){console.error(e);try{const previous=await loadLatestSnapshot();if(previous)return json(res,200,{...previous,meta:{...previous.meta,stale:true,refreshError:e.message}})}catch{}return json(res,500,{error:'Matches could not be updated right now. Please try again.'})}
+  try{const requested=u.searchParams.get('date')||'';const {date,fixtures,rawCount}=await enrichDate(requested);const board=buildBoard(fixtures,{date,fixturesScanned:fixtures.length,sourceFixtures:rawCount,generatedAt:new Date().toISOString()});await saveSnapshot(board,date);return json(res,200,publicBoard(board))}catch(e){console.error(e);try{const previous=await loadLatestSnapshot();if(previous)return json(res,200,publicBoard({...previous,meta:{...previous.meta,stale:true,refreshError:e.message}}))}catch{}return json(res,500,{error:'Matches could not be updated right now. Please try again.'})}
  }
  return serve(req,res)
 }catch(e){console.error(e);json(res,500,{error:e.message})}})
