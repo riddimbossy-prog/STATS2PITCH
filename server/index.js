@@ -6,7 +6,7 @@ import { verifyBearer, saveSnapshot, loadLatestSnapshot, createConfirmedUser, ac
 import { enrichDate } from './enrich.js'
 import { buildBoard } from './engine.js'
 
-const VERSION='1.6.0'
+const VERSION='1.6.1'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)

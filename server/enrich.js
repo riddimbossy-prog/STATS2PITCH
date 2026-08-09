@@ -1,8 +1,8 @@
 import { getFixturesByDate, getStandings, getRecent, getFixtureOdds } from './apiFootball.js'
 import { deriveRecentStats, standingMetrics, parse1x2Odds } from './stats.js'
-import { getStatsOddsForFixture, parseStatsApiMarkets, parseApiFootballMarkets, mergeMarkets, canonicalOddsFromMarkets, statsApiConfigured } from './statsApi.js'
+import { getStatsOddsForFixture, statsApiConfigured } from './statsApi.js'
 import { getStatsOddsFallback } from './statsFallback.js'
-import { recoverApiFootballMarkets, recoverGenericMarkets, mergeRecoveredMarkets } from './oddsEnhancer.js'
+import { buildVerifiedOdds } from './oddsV2.js'
 
 const sleep = ms => new Promise(r=>setTimeout(r,ms))
 const localDate = () => new Intl.DateTimeFormat('en-CA',{timeZone:process.env.APP_TIMEZONE||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
@@ -71,19 +71,13 @@ export async function enrichDate(requestedDate){
       const hm={...deriveRecentStats(hr,f.teams.home.id),...standingMetrics(st,f.teams.home.id)}
       const am={...deriveRecentStats(ar,f.teams.away.id),...standingMetrics(st,f.teams.away.id)}
 
-      const apiMarkets=parseApiFootballMarkets(apiOddsRaw)
-      const statsMarkets=parseStatsApiMarkets(statsOdds?.payload)
-      const recoveredApi=recoverApiFootballMarkets(apiOddsRaw,f)
-      const recoveredStats=recoverGenericMarkets(statsOdds?.payload,f)
-      const marketOdds=mergeRecoveredMarkets(
-        mergeMarkets(apiMarkets,statsMarkets),
-        recoveredApi,
-        recoveredStats
-      )
-
-      const mergedCanonical=canonicalOddsFromMarkets(marketOdds)
+      // v1.6.1: one deterministic odds path. It keeps each market tied to a real
+      // bookmaker instead of mixing the highest home/draw/away prices from
+      // different books, and it understands nested TheStatsAPI goal lines.
+      const verified=buildVerifiedOdds({apiPayload:apiOddsRaw,statsPayload:statsOdds?.payload,fixture:f})
       const api1x2=parse1x2Odds(apiOddsRaw) || {}
-      const odds=withFallback(mergedCanonical,api1x2)
+      const odds=withFallback(verified.canonical,api1x2)
+      const marketOdds=verified.marketOdds
 
       enriched.push({
         fixtureId:f.fixture.id,
