@@ -12,7 +12,7 @@ import { applyWinSafety, WIN_SAFETY_POLICY } from './winSafety.js'
 import { buildLifecycleMap, mergeLifecycleBoard } from './lifecycle.js'
 import { createRefreshJobs } from './refreshJobs.js'
 
-const VERSION='1.9.1'
+const VERSION='1.9.2'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -35,9 +35,13 @@ const normalizeDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))?String(
 async function runRefresh(requestedDate,progress=()=>{}){
   progress({phase:'start',message:'Starting real-data refresh.',current:0,total:null})
   const enriched=await enrichDate(requestedDate,{onProgress:progress})
-  const {date,fixtures,rawFixtures,rawCount,upcomingCount,maturityCandidates,earlySeasonSkipped,standingsUnavailable,statsOddsFallbacks}=enriched
+  const {
+    date,fixtures,rawFixtures,rawCount,upcomingCount,preflightLimit,maturityCandidates,candidatesAttempted,
+    earlySeasonSkipped,standingsUnavailable,statsOddsFallbacks,statsFallbackCapSkipped,unpricedSkipped,
+    shortSplitHistory,enrichmentErrors
+  }=enriched
   const matureFixtures=filterMatureFixtures(fixtures)
-  progress({phase:'engine',message:`Running prediction engine on ${matureFixtures.length} mature fixtures.`,current:matureFixtures.length,total:matureFixtures.length})
+  progress({phase:'engine',message:`Running prediction engine on ${matureFixtures.length} priced mature fixtures.`,current:matureFixtures.length,total:matureFixtures.length})
 
   const baseBoard=buildBoard(matureFixtures,{
     date,
@@ -54,9 +58,6 @@ async function runRefresh(requestedDate,progress=()=>{}){
   })
   const safeBoard=applyWinSafety(baseBoard,matureFixtures)
 
-  // A second fresh fixture-status call must never discard a completed prediction
-  // refresh. If the provider is temporarily rate-limited, use the fixture status
-  // already loaded at the start of the refresh and save the new board anyway.
   let statusFixtures=Array.isArray(rawFixtures)?rawFixtures:[]
   let lifecycleSource='loaded-fixtures'
   try{
@@ -81,19 +82,30 @@ async function runRefresh(requestedDate,progress=()=>{}){
       refreshDiagnostics:{
         sourceFixtures:rawCount,
         upcomingFixtures:upcomingCount,
+        preflightLimit,
         maturityCandidates,
-        enrichedFixtures:matureFixtures.length,
+        candidatesAttempted,
+        pricedEnrichedFixtures:matureFixtures.length,
         earlySeasonSkipped,
         standingsUnavailable,
+        unpricedSkipped,
         statsOddsFallbacks,
+        statsFallbackCapSkipped,
+        shortSplitHistory,
+        enrichmentErrors,
+        engineCandidates:baseBoard?.meta?.qualified??0,
+        finalQualified:merged?.meta?.qualified??0,
+        straightWinsBlocked:safeBoard?.meta?.straightWinsBlocked??0,
+        bottom3TeamResultBlocked:safeBoard?.meta?.bottom3TeamResultBlocked??0,
+        seasonSplitWinFallbacks:safeBoard?.meta?.seasonSplitWinFallbacks??0,
         lifecycleSource
       }
     }
   }
 
-  progress({phase:'save',message:'Saving the fresh prediction board.',current:0,total:1})
+  progress({phase:'save',message:`Saving fresh board with ${board.meta?.qualified||0} qualified picks.`,current:0,total:1})
   await saveSnapshot(board,date)
-  progress({phase:'save',message:'Fresh prediction board saved.',current:1,total:1})
+  progress({phase:'save',message:`Fresh board saved with ${board.meta?.qualified||0} qualified picks.`,current:1,total:1})
   return board
 }
 
@@ -101,7 +113,7 @@ const refreshJobs=createRefreshJobs(runRefresh,{ttlMs:Number(process.env.REFRESH
 
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,refreshMode:'background-job',time:new Date().toISOString()})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,refreshMode:'background-job',candidatePolicy:'priced-after-maturity',time:new Date().toISOString()})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false})
@@ -117,20 +129,8 @@ const server=http.createServer(async(req,res)=>{try{
  if(u.pathname==='/api/board'){
   if(!await authed(req,res))return
   const board=await loadLatestSnapshot()
-  if(board&&!snapshotHasStrictMaturityPolicy(board))return json(res,200,emptyMatureBoard({
-    date:board?.meta?.date||null,
-    generatedAt:board?.meta?.generatedAt||null,
-    sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,
-    stale:true,
-    maturityReason:`Saved board was built before the ${MIN_LEAGUE_GAMES}-game league maturity rule. Refresh real data.`
-  }))
-  if(board&&!snapshotHasStrictSplitPolicy(board))return json(res,200,emptyMatureBoard({
-    date:board?.meta?.date||null,
-    generatedAt:board?.meta?.generatedAt||null,
-    sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,
-    stale:true,
-    splitReason:'Saved board used overall/legacy football metrics. Refresh real data to build strict home-vs-away split predictions.'
-  }))
+  if(board&&!snapshotHasStrictMaturityPolicy(board))return json(res,200,emptyMatureBoard({date:board?.meta?.date||null,generatedAt:board?.meta?.generatedAt||null,sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,stale:true,maturityReason:`Saved board was built before the ${MIN_LEAGUE_GAMES}-game league maturity rule. Refresh real data.`}))
+  if(board&&!snapshotHasStrictSplitPolicy(board))return json(res,200,emptyMatureBoard({date:board?.meta?.date||null,generatedAt:board?.meta?.generatedAt||null,sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,stale:true,splitReason:'Saved board used overall/legacy football metrics. Refresh real data to build strict home-vs-away split predictions.'}))
   return json(res,200,board||emptyMatureBoard())
  }
  if(u.pathname==='/api/refresh-status'&&req.method==='GET'){
