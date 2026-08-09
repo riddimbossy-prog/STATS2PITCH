@@ -1,48 +1,72 @@
-# Modular Football Agent
+# Stats2Pitch.com
 
-A private, login-gated football prediction website using:
+**From stats to the pitch.**
 
-- **GitHub** — source control
-- **Render** — Node web service (zero runtime packages)
-- **Supabase** — authentication + persistent prediction snapshots
-- **API-Football / API-Sports v3** — real fixtures, standings, recent results and odds
+Stats2Pitch.com is a login-gated football intelligence website built for GitHub, Render and Supabase, with live enrichment from API-Football / API-Sports v3.
 
-## What is already built
+## Brand
 
-- Login-only Supabase email/password access via Auth REST (no public signup form)
-- Supabase GitHub OAuth login
-- Entire dashboard protected by Supabase JWT verification on the Render server
+The production UI is fully rebranded around the supplied Stats2Pitch logo:
+
+- Stats2Pitch wordmark on the login screen and dashboard
+- Stats2Pitch favicon and install icons derived from the supplied emblem
+- Deep navy / black interface with Stats2Pitch green accents
+- `stats2pitch` package and Render service naming
+- Stats2Pitch metadata and web-app manifest
+
+## Authentication
+
+The entire prediction board remains protected behind Supabase authentication.
+
+Supported access:
+
+- Email + password sign in
+- Email + password account creation (controlled by `ALLOW_PUBLIC_SIGNUP`)
+- GitHub OAuth (controlled by `ENABLE_GITHUB_LOGIN`)
+- JWT verification on every protected Render API request
+- Refresh-token session renewal
+- Server-side sign-out + local token cleanup
+
+### IMPORTANT — no email verification
+
+To allow a new email/password account to enter Stats2Pitch immediately without clicking a verification email:
+
+1. Open your Supabase project.
+2. Go to **Authentication → Providers → Email**.
+3. Keep Email/Password enabled.
+4. Turn **Confirm email** / **Email confirmations** **OFF**.
+5. Keep new-user signup enabled if `ALLOW_PUBLIC_SIGNUP=true`.
+
+Stats2Pitch detects the common misconfiguration: if a signup succeeds but Supabase still refuses login because confirmation is required, the login screen tells you exactly which setting to change.
+
+If you want the site to be invite/admin-created users only, set `ALLOW_PUBLIC_SIGNUP=false` on Render. Existing confirmed users can still sign in.
+
+## Football data already built
+
 - Real fixtures for the selected date from API-Football
-- League positions and PPG from standings
+- League position and PPG
+- Season goals scored/conceded per match
 - Last-5 win/loss rates
-- Season goals scored/conceded per-game averages from standings
-- O/U 1.5, 2.5 and 3.5 hit rates derived from each team’s last 10 completed matches
-- Real 1X2 and draw odds where API-Football returns them
-- Modular Single / 2 / 3+ classification
+- Last-10 O/U 1.5, 2.5 and 3.5 hit rates
+- Real 1X2 + draw odds where API-Football supplies them
+- Single / 2 / 3+ modular classification
 - Opponent-weakness logic
 - Contradiction grading
 - Priority prediction list
-- Responsive desktop/tablet/mobile UI
-- Supabase snapshot persistence and last-known-good fallback
+- Team crests and country/league imagery when supplied by the API
+- Responsive desktop, tablet and mobile dashboard
+- Supabase prediction snapshot persistence
+- Last-known-good fallback so a failed API refresh does not blank the board
 
-## 1. Supabase
+## Supabase database
 
-1. Create a Supabase project.
-2. Open **SQL Editor** and run `supabase/schema.sql`.
-3. In **Authentication > Providers**, enable Email. Enable GitHub if you want the GitHub login button to work.
-4. For a private site, disable public new-user signup after creating your authorized accounts.
-5. Copy:
-   - Project URL
-   - anon public key
-   - service role key
+Run `supabase/schema.sql` once in the Supabase SQL Editor.
 
-### Optional GitHub OAuth
+The browser never receives the Supabase service-role key. Prediction snapshots are read/written only by the Render server after the user's JWT is verified.
 
-In Supabase Authentication > Providers > GitHub, configure your GitHub OAuth App. Add your final Render domain to Supabase Auth URL configuration / redirect URLs.
+## Local test
 
-## 2. Local test
-
-Set the environment variables, then run:
+Copy `.env.example` to `.env`, add your private values to your shell or environment, then run:
 
 ```bash
 npm install
@@ -50,65 +74,39 @@ npm run check
 npm start
 ```
 
-App: http://localhost:3000
+Open: `http://localhost:3000`
 
-## 3. GitHub
+Health check: `http://localhost:3000/api/health`
 
-Create a new empty GitHub repository and push this whole folder.
+## GitHub
 
-Using GitHub Desktop:
+Create a repository named something like `stats2pitch`, commit this whole folder and publish it with GitHub Desktop.
 
-1. File > Add local repository
-2. Select this folder
-3. Publish repository
+Do not commit `.env`.
 
-Do **not** commit `.env`.
+## Render
 
-## 4. Render
+The repository includes `render.yaml` with the service name `stats2pitch`.
 
-The repo includes `render.yaml`.
-
-1. Render > New > Blueprint
-2. Select the GitHub repository
-3. Add the secret environment values requested by the Blueprint
-4. Deploy
-
-Required values:
+Required secrets:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `API_FOOTBALL_KEY`
 
-## 5. API-Football usage
+Useful switches:
 
-The server calls API-Sports v3 endpoints for:
+- `ALLOW_PUBLIC_SIGNUP=true`
+- `ENABLE_GITHUB_LOGIN=true`
+- `ALLOW_MANUAL_REFRESH=true`
+- `MAX_FIXTURES_PER_REFRESH=60`
+- `CACHE_TTL_SECONDS=900`
 
-- `/fixtures`
-- `/standings`
-- `/fixtures?team=...&last=10`
-- `/odds?fixture=...`
+## API-Football usage
 
-The server caches responses in memory to reduce calls. `MAX_FIXTURES_PER_REFRESH` defaults to 60 to avoid uncontrolled API consumption.
+The server calls API-Sports v3 endpoints for fixtures, standings, recent team fixtures and odds. Identical calls are cached in memory to reduce API consumption. Missing odds/stats are never invented.
 
-If your API plan does not provide odds for a competition, the fixture can still be analyzed statistically, but the UI displays a dash for missing odds. No odds are invented.
+## Board stability
 
-## Persistence / board stability
-
-Every successful refresh is written to `prediction_snapshots` in Supabase. If API-Football temporarily fails, `/api/refresh` returns the last known good snapshot rather than an empty board. This protects predictions from appearing briefly and then disappearing on reload.
-
-## Important production hardening
-
-- Disable public signups in Supabase if this site is for invited users only.
-- Or add an allowlist table / admin role before launch.
-- Keep `SUPABASE_SERVICE_ROLE_KEY` and `API_FOOTBALL_KEY` only on Render.
-
-## Next useful additions
-
-- Admin-only refresh permission
-- Scheduled Render Cron refresh
-- Settlement engine after FT
-- Accuracy history by filter combination, league and market
-- Team crests and country flags
-- Date selector and multi-day board
-- Confidence/market/league filters
+Every successful refresh is stored in `prediction_snapshots` in Supabase. If API-Football temporarily fails, `/api/refresh` returns the last known good snapshot instead of an empty board.

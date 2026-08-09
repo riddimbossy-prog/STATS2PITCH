@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: modular-football-agent
+    name: stats2pitch
     runtime: node
     plan: starter
     buildCommand: npm ci
@@ -19,6 +19,10 @@ services:
       - key: MAX_FIXTURES_PER_REFRESH
         value: 60
       - key: ALLOW_MANUAL_REFRESH
+        value: true
+      - key: ALLOW_PUBLIC_SIGNUP
+        value: true
+      - key: ENABLE_GITHUB_LOGIN
         value: true
       - key: SUPABASE_URL
         sync: false
