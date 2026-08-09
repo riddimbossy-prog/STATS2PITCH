@@ -8,7 +8,7 @@ import { buildBoard } from './engine.js'
 import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
 import { MIN_LEAGUE_GAMES } from './stats.js'
 
-const VERSION='1.7.4'
+const VERSION='1.7.5'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -27,8 +27,8 @@ async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk
 const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'');return raw&&!/^https?:\/\//i.test(raw)?`https://${raw}`:raw}
 
 // The normal board only exposes the odd attached to each chosen prediction.
-// It also refuses to expose snapshots created before the strict 10-games-per-team
-// league maturity policy, preventing old early-season picks from leaking back in.
+// It also refuses to expose snapshots created before the current strict
+// league-maturity policy, preventing outdated early-season picks from returning.
 function publicBoard(board){
  if(!board)return emptyMatureBoard({fixturesScanned:0,sourceFixtures:0,generatedAt:null})
  if(!snapshotHasStrictMaturityPolicy(board)){
@@ -60,7 +60,8 @@ const server=http.createServer(async(req,res)=>{try{
     const requested=u.searchParams.get('date')||''
     const {date,fixtures,rawCount,earlySeasonSkipped=0}=await enrichDate(requested)
     // Second independent fail-closed gate. Even if enrichment changes later, a
-    // fixture cannot reach buildBoard unless the league and both teams are 10+.
+    // fixture cannot reach buildBoard unless the league and both teams satisfy
+    // the current minimum-game threshold.
     const matureFixtures=filterMatureFixtures(fixtures,MIN_LEAGUE_GAMES)
     const secondGateSkipped=Math.max(0,fixtures.length-matureFixtures.length)
     const board=buildBoard(matureFixtures,{
