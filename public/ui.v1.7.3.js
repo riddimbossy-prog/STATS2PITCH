@@ -1,6 +1,7 @@
 (()=>{
   let activeTab=sessionStorage.getItem('s2p_board_tab')||'best'
   let scheduled=false
+  let lastTabsSignature=''
 
   const text=n=>String(n?.textContent||'').trim()
 
@@ -28,6 +29,36 @@
     }
   }
 
+  function applyTab(shell){
+    for(const el of shell.querySelectorAll('[data-s2p-tab-panel]')){
+      const visible=el.dataset.s2pTabPanel===activeTab
+      el.classList.toggle('s2p-tab-visible',visible)
+      el.setAttribute('aria-hidden',visible?'false':'true')
+    }
+    shell.dataset.s2pActiveTab=activeTab
+    document.documentElement.dataset.s2pActiveTab=activeTab
+    window.dispatchEvent(new CustomEvent('s2p:tabchange',{detail:{tab:activeTab}}))
+  }
+
+  function bindTabButtons(tabs,shell){
+    tabs.querySelectorAll('[data-s2p-tab]').forEach(btn=>{
+      btn.onclick=()=>{
+        const next=btn.dataset.s2pTab
+        if(!next||next===activeTab)return
+        activeTab=next
+        sessionStorage.setItem('s2p_board_tab',activeTab)
+        applyTab(shell)
+        tabs.querySelectorAll('[data-s2p-tab]').forEach(x=>{
+          const on=x.dataset.s2pTab===activeTab
+          x.classList.toggle('is-active',on)
+          x.setAttribute('aria-pressed',on?'true':'false')
+        })
+        // Do not call scrollIntoView here. The dashboard owns its own scroll
+        // surface from v1.7.8, and scrollIntoView can move the wrong ancestor.
+      }
+    })
+  }
+
   function installTabs(){
     const shell=document.querySelector('.app-shell')
     if(!shell)return
@@ -49,7 +80,22 @@
 
     const bestCount=priorityPanel.querySelectorAll('[data-priority-key]').length
     const defs=[['best','Best picks',bestCount],['three','3+ filters',panelCount(map.three)],['two','2 filters',panelCount(map.two)],['single','Single',panelCount(map.single)]]
-    tabs.innerHTML=defs.map(([key,label,count])=>`<button type="button" class="s2p-board-tab ${activeTab===key?'is-active':''}" data-s2p-tab="${key}" aria-pressed="${activeTab===key?'true':'false'}"><span>${label}</span><b>${count}</b></button>`).join('')
+    const signature=JSON.stringify(defs)
+
+    // Avoid rewriting the tabs on every MutationObserver callback. Replacing
+    // innerHTML here used to generate another mutation and could keep the Best
+    // picks area in a continuous render loop while the user tried to scroll.
+    if(signature!==lastTabsSignature||!tabs.querySelector('[data-s2p-tab]')){
+      tabs.innerHTML=defs.map(([key,label,count])=>`<button type="button" class="s2p-board-tab ${activeTab===key?'is-active':''}" data-s2p-tab="${key}" aria-pressed="${activeTab===key?'true':'false'}"><span>${label}</span><b>${count}</b></button>`).join('')
+      lastTabsSignature=signature
+      bindTabButtons(tabs,shell)
+    }else{
+      tabs.querySelectorAll('[data-s2p-tab]').forEach(x=>{
+        const on=x.dataset.s2pTab===activeTab
+        x.classList.toggle('is-active',on)
+        x.setAttribute('aria-pressed',on?'true':'false')
+      })
+    }
 
     priorityTitle.dataset.s2pTabPanel='best'
     priorityPanel.dataset.s2pTabPanel='best'
@@ -58,23 +104,6 @@
     if(map.single)map.single.dataset.s2pTabPanel='single'
 
     applyTab(shell)
-    tabs.querySelectorAll('[data-s2p-tab]').forEach(btn=>btn.onclick=()=>{
-      activeTab=btn.dataset.s2pTab
-      sessionStorage.setItem('s2p_board_tab',activeTab)
-      applyTab(shell)
-      tabs.querySelectorAll('[data-s2p-tab]').forEach(x=>{
-        const on=x.dataset.s2pTab===activeTab
-        x.classList.toggle('is-active',on)
-        x.setAttribute('aria-pressed',on?'true':'false')
-      })
-      tabs.scrollIntoView({block:'start',behavior:'smooth'})
-    })
-  }
-
-  function applyTab(shell){
-    for(const el of shell.querySelectorAll('[data-s2p-tab-panel]')){
-      el.classList.toggle('s2p-tab-visible',el.dataset.s2pTabPanel===activeTab)
-    }
   }
 
   function improveControls(){
@@ -91,7 +120,10 @@
     installTabs()
     improveControls()
   }
-  function queue(){
+  function queue(mutations=[]){
+    // Ignore mutations that are entirely inside the tab bar. Those are our own
+    // state updates and must not schedule another full board pass.
+    if(mutations.length&&mutations.every(m=>m.target?.closest?.('.s2p-board-tabs')))return
     if(scheduled)return
     scheduled=true
     requestAnimationFrame(run)
