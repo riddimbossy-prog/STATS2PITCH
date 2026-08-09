@@ -29,3 +29,18 @@ export async function createConfirmedUser(email,password){
  return body;
 }
 
+export async function accountExists(email){
+ need();
+ const target=String(email||'').trim().toLowerCase();
+ if(!target)return false;
+ const maxPages=Math.max(1,Number(process.env.SUPABASE_USER_LOOKUP_MAX_PAGES||5));
+ for(let page=1;page<=maxPages;page++){
+  const r=await fetch(`${url}/auth/v1/admin/users?page=${page}&per_page=200`,{headers:{apikey:service,Authorization:`Bearer ${service}`}});
+  if(!r.ok)throw new Error(`Account lookup failed (${r.status})`);
+  const body=await r.json().catch(()=>({}));
+  const users=Array.isArray(body?.users)?body.users:Array.isArray(body)?body:[];
+  if(users.some(u=>String(u?.email||'').trim().toLowerCase()===target))return true;
+  if(users.length<200)break;
+ }
+ return false;
+}
