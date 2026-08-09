@@ -6,12 +6,12 @@ import { verifyBearer, saveSnapshot, loadLatestSnapshot, loadSnapshotByDate, cre
 import { enrichDate } from './enrich.js'
 import { getFixturesByDateFresh } from './apiFootball.js'
 import { buildBoard } from './engine.js'
-import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
-import { MIN_LEAGUE_GAMES } from './stats.js'
+import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, snapshotHasStrictSplitPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
+import { MIN_LEAGUE_GAMES, SPLIT_ENGINE_POLICY } from './stats.js'
 import { applyWinSafety, WIN_SAFETY_POLICY } from './winSafety.js'
 import { buildLifecycleMap, mergeLifecycleBoard } from './lifecycle.js'
 
-const VERSION='1.8.0'
+const VERSION='1.9.0'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -31,7 +31,7 @@ const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').
 
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,time:new Date().toISOString()})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,time:new Date().toISOString()})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false})
@@ -54,6 +54,13 @@ const server=http.createServer(async(req,res)=>{try{
     stale:true,
     maturityReason:`Saved board was built before the ${MIN_LEAGUE_GAMES}-game league maturity rule. Refresh real data.`
   }))
+  if(board&&!snapshotHasStrictSplitPolicy(board))return json(res,200,emptyMatureBoard({
+    date:board?.meta?.date||null,
+    generatedAt:board?.meta?.generatedAt||null,
+    sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,
+    stale:true,
+    splitReason:'Saved board used overall/legacy football metrics. Refresh real data to build strict home-vs-away split predictions.'
+  }))
   return json(res,200,board||emptyMatureBoard())
  }
  if(u.pathname==='/api/refresh'&&req.method==='POST'){
@@ -71,16 +78,17 @@ const server=http.createServer(async(req,res)=>{try{
       earlySeasonPolicy:EARLY_SEASON_POLICY,
       minimumLeagueGames:MIN_LEAGUE_GAMES,
       maturityPolicy:EARLY_SEASON_POLICY,
-      minLeagueGames:MIN_LEAGUE_GAMES
+      minLeagueGames:MIN_LEAGUE_GAMES,
+      splitPolicy:SPLIT_ENGINE_POLICY,
+      splitPrimaryOnly:true,
+      splitDescription:'Home team uses home-only league stats/form; away team uses away-only league stats/form. Overall stats are context only.'
     })
     const safeBoard=applyWinSafety(baseBoard,matureFixtures)
 
-    // Status/score truth bypasses the long enrichment cache so Live and Settled
-    // reflect the latest API-Football state whenever the user refreshes.
     const statusFixtures=await getFixturesByDateFresh(date)
     const lifecycleMap=buildLifecycleMap(statusFixtures)
     const previous=await loadSnapshotByDate(date).catch(()=>null)
-    const compatiblePrevious=previous?.meta?.winSafetyPolicy===WIN_SAFETY_POLICY?previous:null
+    const compatiblePrevious=previous?.meta?.winSafetyPolicy===WIN_SAFETY_POLICY&&snapshotHasStrictSplitPolicy(previous)?previous:null
     const board=mergeLifecycleBoard(safeBoard,compatiblePrevious,lifecycleMap)
 
     await saveSnapshot(board,date)
@@ -89,7 +97,7 @@ const server=http.createServer(async(req,res)=>{try{
     console.error(e)
     try{
       const previous=await loadLatestSnapshot()
-      if(previous&&snapshotHasStrictMaturityPolicy(previous))return json(res,200,{...previous,meta:{...previous.meta,stale:true,refreshError:e.message}})
+      if(previous&&snapshotHasStrictMaturityPolicy(previous)&&snapshotHasStrictSplitPolicy(previous))return json(res,200,{...previous,meta:{...previous.meta,stale:true,refreshError:e.message}})
     }catch{}
     return json(res,500,{error:'Matches could not be updated right now. Please try again.'})
   }
