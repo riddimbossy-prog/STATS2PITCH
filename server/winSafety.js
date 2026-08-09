@@ -1,4 +1,5 @@
 const odd=v=>{const n=Number(v);return Number.isFinite(n)&&n>1.001&&n<1000?n:null}
+const metric=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))?Number(v):null
 const norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()
 
 function allRows(board){return[...(board?.groups?.threePlus||[]),...(board?.groups?.two||[]),...(board?.groups?.single||[])]}
@@ -38,12 +39,12 @@ function fallbackMarket(fixture,isHome,teamName){
   return null
 }
 
-export const WIN_SAFETY_POLICY='strict-split-bottom3-veto-under60-v3'
+export const WIN_SAFETY_POLICY='strict-split-bottom3-veto-under60-v4'
 
 export function applyWinSafety(board,fixtures){
   const byId=new Map((fixtures||[]).map(f=>[String(f.fixtureId),f]))
   const kept=[]
-  let straightWinsBlocked=0,downgraded=0,exceptionWins=0,bottom3TeamResultBlocked=0,missingSplitBlocked=0
+  let straightWinsBlocked=0,downgraded=0,exceptionWins=0,bottom3TeamResultBlocked=0,missingSplitBlocked=0,seasonSplitFallbacks=0
 
   for(const row of allRows(board)){
     if(row?.market!=='1X2'){kept.push(row);continue}
@@ -52,8 +53,6 @@ export function applyWinSafety(board,fixtures){
     if(!fixture||!sides){straightWinsBlocked++;continue}
     const {selected,opponent,isHome}=sides
 
-    // Never fall back to overall metrics. A team-result route requires explicit
-    // home/away split identity from v1.9.0 enrichment.
     if(!['home','away'].includes(selected?.venue)||!['home','away'].includes(opponent?.venue)){
       missingSplitBlocked++
       straightWinsBlocked++
@@ -69,16 +68,33 @@ export function applyWinSafety(board,fixtures){
     }
 
     const venue=selected.venue
-    const winRate=Number(selected?.winRate)
-    if(Number.isFinite(winRate)&&winRate>=60){kept.push({...row,winSafety:'split-win-rate-60-plus'});continue}
+    const recentWinRate=metric(selected?.winRate)
+    const seasonWinRate=metric(selected?.seasonWinRate)
+    const seasonSplitPlayed=metric(selected?.played)
+    let winRate=recentWinRate
+    let winRateSource='last-5'
 
-    // These exceptions are also venue-split: opponent's split-table position and
-    // goals conceded per relevant home/away league match.
+    // If the provider cannot return the chronological venue history but the
+    // standings themselves contain a mature 5+ HOME/AWAY sample, use that exact
+    // split season record. This remains strict venue data; overall form is never
+    // substituted. It prevents a transient history endpoint failure from
+    // deleting every team-result prediction on the board.
+    if(winRate===null&&seasonSplitPlayed!==null&&seasonSplitPlayed>=5&&seasonWinRate!==null){
+      winRate=seasonWinRate
+      winRateSource='season-split'
+      seasonSplitFallbacks++
+    }
+
+    if(winRate!==null&&winRate>=60){
+      kept.push({...row,winSafety:winRateSource==='last-5'?'split-win-rate-60-plus':'split-season-win-rate-60-plus',winRateSource})
+      continue
+    }
+
     const opponentIsLast=Number.isFinite(Number(opponent?.position))&&Number.isFinite(Number(opponent?.leagueSize))&&Number(opponent.position)===Number(opponent.leagueSize)
-    const opponentConcedesHeavy=Number.isFinite(Number(opponent?.goalsConceded))&&Number(opponent.goalsConceded)>2.3
+    const opponentConcedesHeavy=metric(opponent?.goalsConceded)!==null&&Number(opponent.goalsConceded)>2.3
     if(opponentIsLast||opponentConcedesHeavy){
       exceptionWins++
-      kept.push({...row,winSafety:opponentIsLast?'split-opponent-last-place-exception':'split-opponent-concedes-2.30-plus-exception'})
+      kept.push({...row,winSafety:opponentIsLast?'split-opponent-last-place-exception':'split-opponent-concedes-2.30-plus-exception',winRateSource:winRateSource||null})
       continue
     }
 
@@ -86,7 +102,7 @@ export function applyWinSafety(board,fixtures){
       const fallback=fallbackMarket(fixture,isHome,selected.name)
       if(fallback){
         downgraded++
-        kept.push({...row,...fallback,winSafety:'downgraded-under60-split',originalMarket:'1X2',originalOdds:row.odds,shortReason:`Safer market used because ${selected.name} have won fewer than 60% of their last 5 ${venue} league matches.`})
+        kept.push({...row,...fallback,winSafety:'downgraded-under60-split',originalMarket:'1X2',originalOdds:row.odds,shortReason:`Safer market used because ${selected.name} do not have a verified 60%+ ${venue} win rate.`,winRateSource:winRateSource||null})
         continue
       }
     }
@@ -100,7 +116,7 @@ export function applyWinSafety(board,fixtures){
   }
   return{
     ...board,
-    meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins,bottom3TeamResultBlocked,missingSplitBlocked},
+    meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins,bottom3TeamResultBlocked,missingSplitBlocked,seasonSplitWinFallbacks:seasonSplitFallbacks},
     groups,
     priority:[...kept].sort(sortPicks)
   }
