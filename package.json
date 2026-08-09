@@ -1,11 +1,11 @@
 {
   "name": "stats2pitch",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "check": "node --check public/ui.v1.7.0.js && node --check public/odds-ui.v1.7.2.js && node --check public/ui.v1.7.3.js && node server/selftest.js"
+    "check": "node --check server/maturity.js && node --check server/enrich.js && node --check server/index.js && node --check public/ui.v1.7.0.js && node --check public/odds-ui.v1.7.2.js && node --check public/ui.v1.7.3.js && node server/selftest.js"
   },
   "engines": {
     "node": ">=20.19.0 <23"

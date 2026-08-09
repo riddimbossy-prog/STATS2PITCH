@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url'
 import { verifyBearer, saveSnapshot, loadLatestSnapshot, createConfirmedUser, accountExists } from './supabaseAdmin.js'
 import { enrichDate } from './enrich.js'
 import { buildBoard } from './engine.js'
+import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
+import { MIN_LEAGUE_GAMES } from './stats.js'
 
-const VERSION='1.7.3'
+const VERSION='1.7.4'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -24,16 +26,20 @@ function allowLookupAttempt(ip){return allowBucket(lookupBuckets,ip,20)}
 async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>20_000)throw new Error('Request too large.')}try{return JSON.parse(raw||'{}')}catch{throw new Error('Invalid JSON.')}}
 const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'');return raw&&!/^https?:\/\//i.test(raw)?`https://${raw}`:raw}
 
-// The browser only needs the odd attached to each chosen prediction. Full
-// bookmaker market grids stay server-side and are not sent to the normal board.
+// The normal board only exposes the odd attached to each chosen prediction.
+// It also refuses to expose snapshots created before the strict 10-games-per-team
+// league maturity policy, preventing old early-season picks from leaking back in.
 function publicBoard(board){
- if(!board)return{meta:{fixturesScanned:0,qualified:0,generatedAt:null},groups:{single:[],two:[],threePlus:[]},priority:[],oddsByFixture:{},availableMarkets:[]}
+ if(!board)return emptyMatureBoard({fixturesScanned:0,sourceFixtures:0,generatedAt:null})
+ if(!snapshotHasStrictMaturityPolicy(board)){
+  return emptyMatureBoard({...board.meta,blockedLegacySnapshot:true})
+ }
  return{...board,oddsByFixture:{},availableMarkets:[]}
 }
 
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,time:new Date().toISOString()})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,time:new Date().toISOString(),earlySeasonPolicy:EARLY_SEASON_POLICY,minimumLeagueGames:MIN_LEAGUE_GAMES})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false})
@@ -50,7 +56,29 @@ const server=http.createServer(async(req,res)=>{try{
  if(u.pathname==='/api/refresh'&&req.method==='POST'){
   if(!await authed(req,res))return
   if(String(process.env.ALLOW_MANUAL_REFRESH||'true')!=='true')return json(res,403,{error:'Manual refresh is disabled.'})
-  try{const requested=u.searchParams.get('date')||'';const {date,fixtures,rawCount}=await enrichDate(requested);const board=buildBoard(fixtures,{date,fixturesScanned:fixtures.length,sourceFixtures:rawCount,generatedAt:new Date().toISOString()});await saveSnapshot(board,date);return json(res,200,publicBoard(board))}catch(e){console.error(e);try{const previous=await loadLatestSnapshot();if(previous)return json(res,200,publicBoard({...previous,meta:{...previous.meta,stale:true,refreshError:e.message}}))}catch{}return json(res,500,{error:'Matches could not be updated right now. Please try again.'})}
+  try{
+    const requested=u.searchParams.get('date')||''
+    const {date,fixtures,rawCount,earlySeasonSkipped=0}=await enrichDate(requested)
+    // Second independent fail-closed gate. Even if enrichment changes later, a
+    // fixture cannot reach buildBoard unless the league and both teams are 10+.
+    const matureFixtures=filterMatureFixtures(fixtures,MIN_LEAGUE_GAMES)
+    const secondGateSkipped=Math.max(0,fixtures.length-matureFixtures.length)
+    const board=buildBoard(matureFixtures,{
+      date,
+      fixturesScanned:matureFixtures.length,
+      sourceFixtures:rawCount,
+      generatedAt:new Date().toISOString(),
+      earlySeasonPolicy:EARLY_SEASON_POLICY,
+      minimumLeagueGames:MIN_LEAGUE_GAMES,
+      earlySeasonSkipped:earlySeasonSkipped+secondGateSkipped
+    })
+    await saveSnapshot(board,date)
+    return json(res,200,publicBoard(board))
+  }catch(e){
+    console.error(e)
+    try{const previous=await loadLatestSnapshot();if(previous)return json(res,200,publicBoard({...previous,meta:{...previous.meta,stale:true,refreshError:e.message}}))}catch{}
+    return json(res,500,{error:'Matches could not be updated right now. Please try again.'})
+  }
  }
  return serve(req,res)
 }catch(e){console.error(e);json(res,500,{error:e.message})}})

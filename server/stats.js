@@ -2,22 +2,47 @@ function pct(n,d){ return d ? Math.round((n/d)*100) : null }
 
 export const MIN_LEAGUE_GAMES = 10
 
+function playedValues(standings) {
+  if (!Array.isArray(standings) || !standings.length) return []
+  return standings.map(row => {
+    const played = Number(row?.all?.played)
+    return Number.isFinite(played) && played >= 0 ? played : 0
+  })
+}
+
 /**
- * Count completed league matches from the standings table.
- * Every completed match appears once in each team's `all.played`, so the
- * league-wide total is the sum of those values divided by two.
+ * Strict early-season maturity value.
+ *
+ * This is intentionally NOT the number of fixtures completed by the whole
+ * competition. In an 18-team league, 10 total competition fixtures can be
+ * reached after barely one round and is still far too early.
+ *
+ * Instead, Stats2Pitch uses the least-played team in the current standings.
+ * A league therefore reaches "10 games" only when EVERY team represented in
+ * that standings table has played at least 10 overall league matches.
  */
 export function leagueGamesPlayed(standings) {
-  if (!Array.isArray(standings) || !standings.length) return 0
-  const teamAppearances = standings.reduce((sum,row) => {
-    const played = Number(row?.all?.played || 0)
-    return sum + (Number.isFinite(played) && played > 0 ? played : 0)
-  }, 0)
-  return Math.floor(teamAppearances / 2)
+  const values = playedValues(standings)
+  return values.length ? Math.min(...values) : 0
+}
+
+export function leagueMinimumTeamPlayed(standings) {
+  return leagueGamesPlayed(standings)
+}
+
+export function leagueTotalCompletedGames(standings) {
+  const values = playedValues(standings)
+  return values.length ? Math.floor(values.reduce((a,b)=>a+b,0) / 2) : 0
+}
+
+export function leagueAverageTeamPlayed(standings) {
+  const values = playedValues(standings)
+  return values.length ? +(values.reduce((a,b)=>a+b,0) / values.length).toFixed(2) : 0
 }
 
 export function hasMinimumLeagueGames(standings, minimum=MIN_LEAGUE_GAMES) {
-  return leagueGamesPlayed(standings) >= Number(minimum || MIN_LEAGUE_GAMES)
+  const required = Number(minimum || MIN_LEAGUE_GAMES)
+  return playedValues(standings).length > 0 && leagueMinimumTeamPlayed(standings) >= required
 }
 
 export function deriveRecentStats(fixtures, teamId) {
