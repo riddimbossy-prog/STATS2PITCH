@@ -44,17 +44,17 @@
   function applyUi(){
     const btn=document.getElementById('refresh')
     if(btn){
-      btn.disabled=running
-      btn.innerHTML=running?'↻ <span>Refreshing in background…</span>':'↻ <span>Refresh real data</span>'
+      const desired=running?'↻ <span>Refreshing in background…</span>':'↻ <span>Refresh real data</span>'
+      if(btn.disabled!==running)btn.disabled=running
+      if(btn.innerHTML!==desired)btn.innerHTML=desired
     }
     const el=notice()
     if(el){
-      if(running||lastJob?.status==='failed'||lastJob?.status==='complete'){
-        el.textContent=describe(lastJob)||'Refreshing real data…'
-        el.hidden=false
-      }else if(/most recent saved board is being shown while today/i.test(el.textContent||'')){
-        el.textContent='The last refresh failed or was interrupted. The previous saved board is still shown. Press Refresh real data to retry.'
-      }
+      let desired=null
+      if(running||lastJob?.status==='failed'||lastJob?.status==='complete')desired=describe(lastJob)||'Refreshing real data…'
+      else if(/most recent saved board is being shown while today/i.test(el.textContent||''))desired='The last refresh failed or was interrupted. The previous saved board is still shown. Press Refresh real data to retry.'
+      if(desired!==null&&el.textContent!==desired)el.textContent=desired
+      if(desired!==null&&el.hidden)el.hidden=false
     }
   }
 
