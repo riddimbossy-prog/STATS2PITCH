@@ -30,7 +30,7 @@
         <div class="s2p-loader-scene" aria-hidden="true">
           <div class="s2p-loader-trail"></div>
           <div class="s2p-loader-ball-track">
-            <div class="s2p-loader-ball"></div>
+            <img class="s2p-loader-ball-real" src="/assets/football-real.svg" alt="">
             <div class="s2p-loader-shadow"></div>
           </div>
           <div class="s2p-loader-pitch">
