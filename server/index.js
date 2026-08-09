@@ -8,7 +8,7 @@ import { buildBoard } from './engine.js'
 import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
 import { MIN_LEAGUE_GAMES } from './stats.js'
 
-const VERSION='1.7.8'
+const VERSION='1.7.9'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -26,15 +26,9 @@ function allowLookupAttempt(ip){return allowBucket(lookupBuckets,ip,20)}
 async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>20_000)throw new Error('Request too large.')}try{return JSON.parse(raw||'{}')}catch{throw new Error('Invalid JSON.')}}
 const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'');return raw&&!/^https?:\/\//i.test(raw)?`https://${raw}`:raw}
 
-function publicBoard(board){
- if(!board)return emptyMatureBoard({fixturesScanned:0,sourceFixtures:0,generatedAt:null})
- if(!snapshotHasStrictMaturityPolicy(board))return emptyMatureBoard({...board.meta,blockedLegacySnapshot:true})
- return{...board,oddsByFixture:{},availableMarkets:[]}
-}
-
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,time:new Date().toISOString(),earlySeasonPolicy:EARLY_SEASON_POLICY,minimumLeagueGames:MIN_LEAGUE_GAMES})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,time:new Date().toISOString()})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false})
@@ -47,21 +41,34 @@ const server=http.createServer(async(req,res)=>{try{
   try{const body=await readJson(req);const email=String(body.email||'').trim().toLowerCase();const password=String(body.password||'');if(!/^\S+@\S+\.\S+$/.test(email))return json(res,400,{error:'Enter a valid email address.'});if(password.length<6)return json(res,400,{error:'Password must be at least 6 characters.'});const user=await createConfirmedUser(email,password);return json(res,201,{ok:true,userId:user.id,email:user.email,confirmed:true})}catch(e){const msg=String(e.message||'Signup failed.');const duplicate=/already|registered|exists/i.test(msg);return json(res,duplicate?409:400,{error:duplicate?'An account with this email already exists.':'Account could not be created right now. Please try again.'})}
  }
  if(u.pathname==='/api/me'){const user=await authed(req,res);if(user)return json(res,200,{id:user.id,email:user.email});return}
- if(u.pathname==='/api/board'){if(!await authed(req,res))return;const board=await loadLatestSnapshot();return json(res,200,publicBoard(board))}
+ if(u.pathname==='/api/board'){
+  if(!await authed(req,res))return
+  const board=await loadLatestSnapshot()
+  if(board&&!snapshotHasStrictMaturityPolicy(board))return json(res,200,emptyMatureBoard({
+    date:board?.meta?.date||null,
+    generatedAt:board?.meta?.generatedAt||null,
+    sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,
+    stale:true,
+    maturityReason:`Saved board was built before the ${MIN_LEAGUE_GAMES}-game league maturity rule. Refresh real data.`
+  }))
+  return json(res,200,board||emptyMatureBoard())
+ }
  if(u.pathname==='/api/refresh'&&req.method==='POST'){
   if(!await authed(req,res))return
   if(String(process.env.ALLOW_MANUAL_REFRESH||'true')!=='true')return json(res,403,{error:'Manual refresh is disabled.'})
   try{
     const requested=u.searchParams.get('date')||''
-    const {date,fixtures,rawCount,earlySeasonSkipped=0}=await enrichDate(requested)
-    const matureFixtures=filterMatureFixtures(fixtures,MIN_LEAGUE_GAMES)
-    const secondGateSkipped=Math.max(0,fixtures.length-matureFixtures.length)
-    const board=buildBoard(matureFixtures,{date,fixturesScanned:matureFixtures.length,sourceFixtures:rawCount,generatedAt:new Date().toISOString(),earlySeasonPolicy:EARLY_SEASON_POLICY,minimumLeagueGames:MIN_LEAGUE_GAMES,earlySeasonSkipped:earlySeasonSkipped+secondGateSkipped})
+    const {date,fixtures,rawCount,maturity={}}=await enrichDate(requested)
+    const matureFixtures=filterMatureFixtures(fixtures)
+    const board=buildBoard(matureFixtures,{date,fixturesScanned:matureFixtures.length,sourceFixtures:rawCount,generatedAt:new Date().toISOString(),...maturity,maturityPolicy:EARLY_SEASON_POLICY,minLeagueGames:MIN_LEAGUE_GAMES})
     await saveSnapshot(board,date)
-    return json(res,200,publicBoard(board))
+    return json(res,200,board)
   }catch(e){
     console.error(e)
-    try{const previous=await loadLatestSnapshot();if(previous)return json(res,200,publicBoard({...previous,meta:{...previous.meta,stale:true,refreshError:e.message}}))}catch{}
+    try{
+      const previous=await loadLatestSnapshot()
+      if(previous&&snapshotHasStrictMaturityPolicy(previous))return json(res,200,{...previous,meta:{...previous.meta,stale:true,refreshError:e.message}})
+    }catch{}
     return json(res,500,{error:'Matches could not be updated right now. Please try again.'})
   }
  }

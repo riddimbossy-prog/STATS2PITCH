@@ -19,7 +19,6 @@
     const shell=document.querySelector('.app-shell')
     const auth=document.querySelector('.auth-page')
 
-    // The dashboard owns scroll. This bypasses any stale body/html scroll lock.
     if(shell){
       shell.style.setProperty('height',`${h}px`,'important')
       shell.style.setProperty('max-height',`${h}px`,'important')
@@ -40,7 +39,6 @@
       auth.style.setProperty('-webkit-overflow-scrolling','touch','important')
     }
 
-    // Keep root/body intentionally non-scrolling; the inner shell is deterministic.
     document.body.style.setProperty('overflow','hidden','important')
     document.documentElement.style.setProperty('overflow','hidden','important')
   }
@@ -48,7 +46,6 @@
   function verifyScrollable(){
     const shell=document.querySelector('.app-shell')
     if(!shell)return
-    // If content grows, the board must have a real scroll range.
     const hasOverflow=shell.scrollHeight>shell.clientHeight+2
     shell.dataset.s2pHasOverflow=hasOverflow?'true':'false'
   }
@@ -67,13 +64,18 @@
     raf=requestAnimationFrame(refresh)
   }
 
-  new MutationObserver(queue).observe(document.documentElement,{childList:true,subtree:true})
+  new MutationObserver(mutations=>{
+    // Best-picks rows and tab buttons are managed by their own stable layer.
+    // Do not repeatedly re-run viewport work for mutations entirely inside them.
+    if(mutations.length&&mutations.every(m=>m.target?.closest?.('.priority-compact,.s2p-board-tabs')))return
+    queue()
+  }).observe(document.documentElement,{childList:true,subtree:true})
+
   window.addEventListener('resize',queue,{passive:true})
   window.addEventListener('orientationchange',queue,{passive:true})
   window.visualViewport?.addEventListener('resize',queue,{passive:true})
-
-  // Re-assert after pageshow because mobile browsers can restore stale scroll-lock styles.
   window.addEventListener('pageshow',queue,{passive:true})
+  window.addEventListener('s2p:tabchange',queue,{passive:true})
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true})
   else refresh()

@@ -5,8 +5,8 @@
   let fetchPromise=null
   let lastFetch=0
 
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
-  const fmt=n=>Number.isFinite(Number(n))?Number(n).toFixed(2):'—'
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]))
+  const fmt=n=>{const v=Number(n);return Number.isFinite(v)&&v>1.001?v.toFixed(2):'—'}
   const token=()=>localStorage.getItem(ACCESS_KEY)||''
   const allRows=b=>[...(b?.groups?.threePlus||[]),...(b?.groups?.two||[]),...(b?.groups?.single||[])]
   const keyFor=r=>`${r.fixtureId}|${r.market}|${r.selectedTeamId||r.selectedTeam}`
@@ -59,7 +59,7 @@
       [/selected team won fewer than 2 of its last 5/i,`${selectedName} have won fewer than 2 of their last 5.`],
       [/selected team won fewer than 3 of its last 5/i,`${selectedName} have won fewer than 3 of their last 5.`],
       [/selected team lost at least 4 of its last 5/i,`${selectedName} have lost 4 of their last 5.`],
-      [/selected team lost at least 3 of its last 5/i,`${selectedName} have lost at least 3 of their last 5.`],
+      [/selected team lost at least 3 of its last 5/i,`${selectedName} have lost 3 of their last 5.`],
       [/opponent is in the league top 3/i,`${opponentName} are also in the top 3.`],
       [/opponent is in the bottom 3/i,`${opponentName} are in the bottom 3.`],
       [/opponent averages under 1 point per game/i,`${opponentName} have been struggling for points.`],
@@ -122,7 +122,8 @@
           const time=tr.querySelector('[data-label="Time"]')
           time?.insertAdjacentElement('afterend',league)
         }
-        league.innerHTML=competitionHtml(row)
+        const competition=competitionHtml(row)
+        if(league.innerHTML!==competition)league.innerHTML=competition
         const reason=tr.querySelector('[data-label="Key reasons"]')
         if(reason)reason.remove()
         const details=btn.closest('td')
@@ -135,11 +136,18 @@
     const old=document.querySelector('.priority-compact')
     const title=[...document.querySelectorAll('.section-title')].find(x=>/priority prediction list/i.test(x.textContent||''))
     if(!title)return
-    const rows=[...document.querySelectorAll('.prediction-panel tbody tr')].slice(0,12)
-    if(!rows.length)return
+
+    // Best picks should be a complete, stable list. The old `.slice(0,12)` hid
+    // later qualified matches and the panel was rewritten on every mutation.
+    const rows=[...document.querySelectorAll('.prediction-panel tbody tr')]
+    if(!rows.length){
+      if(old&&old.innerHTML)old.innerHTML=''
+      return
+    }
+
     const panel=old||document.createElement('section')
     panel.className='priority-compact priority-compact-v17'
-    panel.innerHTML=rows.map(tr=>{
+    const html=rows.map(tr=>{
       const btn=tr.querySelector('[data-row-key]'),row=btn?rowMap.get(btn.dataset.rowKey):null
       if(!row)return''
       const match=tr.querySelector('[data-label="Match"]')?.innerText?.replace(/\n+/g,' vs ')||row.match||''
@@ -152,8 +160,13 @@
         <div class="priority-compact-star">★</div>
       </button>`
     }).join('')
+
     if(!old)title.insertAdjacentElement('afterend',panel)
-    panel.querySelectorAll('[data-priority-key]').forEach(b=>b.onclick=()=>openDetails(rowMap.get(b.dataset.priorityKey)))
+    if(panel.dataset.s2pPriorityHtml!==html){
+      panel.innerHTML=html
+      panel.dataset.s2pPriorityHtml=html
+      panel.querySelectorAll('[data-priority-key]').forEach(b=>b.onclick=()=>openDetails(rowMap.get(b.dataset.priorityKey)))
+    }
   }
 
   function confidence(row){
@@ -227,6 +240,11 @@
   interceptDetails()
   let queued=false
   const queue=()=>{if(queued)return;queued=true;requestAnimationFrame(async()=>{queued=false;await enhance(false)})}
-  new MutationObserver(queue).observe(document.documentElement,{childList:true,subtree:true})
+  new MutationObserver(mutations=>{
+    // Ignore our own Best-picks rewrites; otherwise the observer schedules
+    // another rebuild immediately and can fight scrolling on that tab.
+    if(mutations.length&&mutations.every(m=>m.target?.closest?.('.priority-compact,.s2p-board-tabs')))return
+    queue()
+  }).observe(document.documentElement,{childList:true,subtree:true})
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>enhance(true));else enhance(true)
 })()
