@@ -1,6 +1,7 @@
 import { getFixturesByDate, getStandings, getRecent, getFixtureOdds } from './apiFootball.js'
 import { deriveRecentStats, standingMetrics, parse1x2Odds } from './stats.js'
 import { getStatsOddsForFixture, parseStatsApiMarkets, parseApiFootballMarkets, mergeMarkets, canonicalOddsFromMarkets, statsApiConfigured } from './statsApi.js'
+import { getStatsOddsFallback } from './statsFallback.js'
 import { recoverApiFootballMarkets, recoverGenericMarkets, mergeRecoveredMarkets } from './oddsEnhancer.js'
 
 const sleep = ms => new Promise(r=>setTimeout(r,ms))
@@ -20,6 +21,19 @@ function withFallback(primary, fallback) {
     bttsYes: primary?.bttsYes ?? fallback?.bttsYes ?? null,
     bttsNo: primary?.bttsNo ?? fallback?.bttsNo ?? null
   }
+}
+
+async function statsOddsFor(fixture){
+  if(!statsApiConfigured())return null
+  try{
+    const primary=await getStatsOddsForFixture(fixture)
+    if(primary?.payload)return primary
+  }catch(e){console.warn('Primary additional odds match failed',fixture?.fixture?.id,e.message)}
+  try{
+    const fallback=await getStatsOddsFallback(fixture)
+    if(fallback?.payload)return fallback
+  }catch(e){console.warn('Fallback additional odds match failed',fixture?.fixture?.id,e.message)}
+  return null
 }
 
 export async function enrichDate(requestedDate){
@@ -51,12 +65,7 @@ export async function enrichDate(requestedDate){
           console.warn('Primary odds unavailable for fixture',f.fixture?.id,e.message)
           return []
         }),
-        statsApiConfigured()
-          ? getStatsOddsForFixture(f).catch(e => {
-              console.warn('Additional odds enrichment skipped for fixture',f.fixture?.id,e.message)
-              return null
-            })
-          : Promise.resolve(null)
+        statsOddsFor(f)
       ])
 
       const hm={...deriveRecentStats(hr,f.teams.home.id),...standingMetrics(st,f.teams.home.id)}
