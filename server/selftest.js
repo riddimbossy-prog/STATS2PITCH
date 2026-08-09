@@ -2,11 +2,8 @@ import { buildBoard } from './engine.js'
 import { buildVerifiedOdds } from './oddsV2.js'
 import { leagueGamesPlayed, hasMinimumLeagueGames, MIN_LEAGUE_GAMES } from './stats.js'
 
-const fixtureShape={
-  teams:{home:{name:'Alpha'},away:{name:'Beta'}}
-}
+const fixtureShape={teams:{home:{name:'Alpha'},away:{name:'Beta'}}}
 
-// Early-season gate: 9 league games must be rejected; 10 must be accepted.
 const nineGameStandings=[
   {team:{id:1},all:{played:5}},
   {team:{id:2},all:{played:5}},
@@ -25,8 +22,6 @@ if(leagueGamesPlayed(tenGameStandings)!==10) throw new Error('League game count 
 if(!hasMinimumLeagueGames(tenGameStandings,MIN_LEAGUE_GAMES)) throw new Error('League with 10 games should be allowed')
 if(hasMinimumLeagueGames([],MIN_LEAGUE_GAMES)) throw new Error('Missing standings must not bypass early-season gate')
 
-// Match the real TheStatsAPI layout used elsewhere in this project:
-// bookmakers[].markets.match_odds / total_goals with last_seen/opening values.
 const statsPayload={data:{bookmakers:[
   {
     bookmaker:'Pinnacle',
@@ -72,15 +67,27 @@ if(parsed.bttsYes!==1.85||parsed.bttsNo!==1.95) throw new Error('BTTS mapping fa
 if(!marketOdds.some(m=>m.marketKey==='double-chance')) throw new Error('Expected double-chance coverage')
 if(parsed.home===1.69||parsed.over25===1.99) throw new Error('Odds were incorrectly maxed across bookmakers')
 
-const fixture={fixtureId:1,match:'Alpha vs Beta',league:'Test',country:'Test',kickoff:new Date().toISOString(),kickoffLocal:'Today',marketOdds,odds:{...parsed},home:{id:1,name:'Alpha',position:1,leagueSize:12,ppg:2.3,goalsScored:2.4,goalsConceded:.7,winRate:80,lossRate:0,over15:80,under15:20,over25:60,under25:40,over35:20,under35:80},away:{id:2,name:'Beta',position:12,leagueSize:12,ppg:.7,goalsScored:.8,goalsConceded:2.5,winRate:20,lossRate:80,over15:80,under15:20,over25:60,under25:40,over35:20,under35:80}}
+const strongHome={id:1,name:'Alpha',position:1,leagueSize:12,ppg:2.3,goalsScored:2.4,goalsConceded:.7,winRate:80,lossRate:0,over15:80,under15:20,over25:60,under25:40,over35:20,under35:80}
+const weakAway={id:2,name:'Beta',position:12,leagueSize:12,ppg:.7,goalsScored:.8,goalsConceded:2.5,winRate:20,lossRate:80,over15:80,under15:20,over25:60,under25:40,over35:20,under35:80}
+const fixture={fixtureId:1,match:'Alpha vs Beta',league:'Test',country:'Test',kickoff:new Date().toISOString(),kickoffLocal:'Today',marketOdds,odds:{...parsed},home:strongHome,away:weakAway}
 const board=buildBoard([fixture],{fixturesScanned:1,generatedAt:new Date().toISOString()})
 if(!board.groups.threePlus.length) throw new Error('Expected 3+ filter pick')
 if(!board.oddsByFixture['1']?.length) throw new Error('Expected market prices on board')
 if(!board.priority.some(p=>p.market==='O2.5'&&p.odds===1.72)) throw new Error('Expected verified Over 2.5 price on pick')
+if(board.priority.some(p=>!(Number.isFinite(p.odds)&&p.odds>1.001))) throw new Error('Published board contains an invalid price')
+
+// Regression for the screenshot bug: a very strong statistical profile with no
+// bookmaker price must NOT appear as a 0.00 prediction.
+const unpricedFixture={...fixture,fixtureId:2,match:'Gamma vs Delta',marketOdds:[],odds:{home:null,draw:null,away:null,over15:null,under15:null,over25:null,under25:null,over35:null,under35:null},home:{...strongHome,id:3,name:'Gamma'},away:{...weakAway,id:4,name:'Delta'}}
+const unpricedBoard=buildBoard([unpricedFixture],{fixturesScanned:1,generatedAt:new Date().toISOString()})
+if(unpricedBoard.priority.length!==0) throw new Error('Unpriced fixture was incorrectly published')
+if(unpricedBoard.groups.single.length||unpricedBoard.groups.two.length||unpricedBoard.groups.threePlus.length) throw new Error('Unpriced fixture reached a filter group')
 
 console.log(JSON.stringify({
   ok:true,
   earlySeasonGate:{minimum:MIN_LEAGUE_GAMES,rejects:9,allows:10},
+  pricingPolicy:board.meta.pricingPolicy,
+  unpricedFixturePublished:unpricedBoard.priority.length,
   filters:board.groups.threePlus[0].filterCount,
   markets:board.oddsByFixture['1'].length,
   home:parsed.home,

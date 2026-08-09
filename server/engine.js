@@ -1,4 +1,5 @@
 const isNum = v => typeof v === 'number' && Number.isFinite(v)
+const isOdd = v => isNum(v) && v > 1.001 && v < 1000
 const add = (arr, code, label, direction='positive', group='general', weight=1) => arr.push({code,label,direction,group,weight})
 
 function teamSignals(team, opponent, odds, drawOdds) {
@@ -27,19 +28,18 @@ function teamSignals(team, opponent, odds, drawOdds) {
     if (team.lossRate >= 80) add(s,'LOSS80','Selected team lost at least 4 of its last 5','negative','loss',1.4)
     else if (team.lossRate >= 60) add(s,'LOSS60','Selected team lost at least 3 of its last 5','negative','loss',1.1)
   }
-  if (isNum(odds)) {
+  if (isOdd(odds)) {
     if (odds < 1.20) add(s,'ODDS_120','Win price is below 1.20','positive','odds',1.5)
     else if (odds <= 1.55) add(s,'ODDS_155','Win price is 1.55 or lower','positive','odds',1.25)
     else if (odds <= 2.0) add(s,'ODDS_200','Win price is 2.00 or lower','positive','odds',.8)
     else if (odds > 5) add(s,'ODDS_500','Win price is above 5.00','negative','odds',1.4)
   }
-  if (isNum(drawOdds)) {
+  if (isOdd(drawOdds)) {
     if (drawOdds < 3) add(s,'DRAW_LT3','Draw price is below 3.00','negative','drawOdds',.8)
     else if (drawOdds > 5) add(s,'DRAW_GT5','Draw price is above 5.00','positive','drawOdds',1.1)
     else if (drawOdds > 4) add(s,'DRAW_GT4','Draw price is above 4.00','positive','drawOdds',.8)
   }
 
-  // Opponent weaknesses become supporting matchup evidence.
   if (isNum(opponent.position) && opponent.position <= 3) add(s,'OPP_TOP3','Opponent is in the league top 3','negative','oppPosition',1.2)
   if (isNum(opponent.position) && isNum(opponent.leagueSize) && opponent.position > opponent.leagueSize - 3) add(s,'OPP_BOTTOM3','Opponent is in the bottom 3','positive','oppPosition',1.2)
   if (isNum(opponent.ppg) && opponent.ppg < 1) add(s,'OPP_PPG_LOW','Opponent averages under 1 point per game','positive','oppPpg',1.2)
@@ -65,8 +65,8 @@ const goalCode = market => market.replace('.','').replace(/^O/,'O').replace(/^U/
 
 function goalPrice(odds, market) {
   const key={ 'O1.5':'over15','U1.5':'under15','O2.5':'over25','U2.5':'under25','O3.5':'over35','U3.5':'under35' }[market]
-  const v=key ? Number(odds?.[key]) : NaN
-  return Number.isFinite(v) && v > 1 ? v : null
+  const v=key ? odds?.[key] : null
+  return isOdd(v) ? v : null
 }
 
 function goalSignals(home, away) {
@@ -111,18 +111,21 @@ function priorityLabel(count, contradiction){
 }
 
 function makeTeamPick(fixture, selected, opponent, odds, drawOdds) {
+  // A published prediction must have a real decimal price. Form/position data may
+  // still be enriched for the fixture, but an unpriced pick never reaches the board.
+  if (!isOdd(odds)) return null
   const signals = teamSignals(selected, opponent, odds, drawOdds)
   const positives = signals.filter(x=>x.direction==='positive')
   if (!positives.length) return null
   const negatives = signals.filter(x=>x.direction==='negative')
   const contradiction = contradictionLevel(signals)
   const filterCount = positives.length
-  const score = positives.reduce((a,x)=>a+x.weight,0) - negatives.reduce((a,x)=>a+x.weight,0) + (odds ? Math.max(0,2.5-odds)*.35 : 0)
+  const score = positives.reduce((a,x)=>a+x.weight,0) - negatives.reduce((a,x)=>a+x.weight,0) + Math.max(0,2.5-odds)*.35
   return {
     fixtureId: fixture.fixtureId, match: fixture.match, league: fixture.league, country: fixture.country, leagueLogo:fixture.leagueLogo||null, countryFlag:fixture.countryFlag||null, kickoff: fixture.kickoff, kickoffLocal: fixture.kickoffLocal,
     selectedTeamId:selected.id, selectedTeamLogo:selected.logo||null, selectedTeam:selected.name, selectedPosition:selected.position,
     opponentTeamId:opponent.id, opponentTeam:opponent.name, opponentTeamLogo:opponent.logo||null, opponentPosition:opponent.position,
-    odds, drawOdds, market:'1X2', filterCount, contradiction, score:+score.toFixed(3), priorityLabel:priorityLabel(filterCount, contradiction),
+    odds, drawOdds:isOdd(drawOdds)?drawOdds:null, market:'1X2', filterCount, contradiction, score:+score.toFixed(3), priorityLabel:priorityLabel(filterCount, contradiction),
     filters:positives.map(x=>x.label), filterCodes:positives.map(x=>x.code),
     negativeSignals:negatives.map(x=>x.label), negativeSignalCodes:negatives.map(x=>x.code),
     shortReason: positives.slice(0,4).map(x=>x.label).join(' • ') + (positives.length>4 ? ` • +${positives.length-4} more` : '')
@@ -135,7 +138,6 @@ export function analyzeFixture(fixture){
   const ap=makeTeamPick(fixture, fixture.away, fixture.home, fixture.odds?.away, fixture.odds?.draw)
   if (hp) picks.push(hp); if (ap) picks.push(ap)
 
-  // Avoid selecting both sides as primary 1X2 unless one clearly outranks the other.
   const oneXtwo = picks.filter(p=>p.market==='1X2').sort((a,b)=>b.score-a.score)
   const resolved=[]
   if (oneXtwo[0]) resolved.push(oneXtwo[0])
@@ -143,18 +145,22 @@ export function analyzeFixture(fixture){
     oneXtwo[0].contradiction='HIGH'; oneXtwo[0].priorityLabel='WATCHLIST'
   }
 
-  for (const g of goalSignals(fixture.home, fixture.away)) resolved.push({
-    fixtureId:fixture.fixtureId, match:fixture.match, league:fixture.league, country:fixture.country, leagueLogo:fixture.leagueLogo||null, countryFlag:fixture.countryFlag||null, kickoff:fixture.kickoff, kickoffLocal:fixture.kickoffLocal,
-    selectedTeamId:0, selectedTeam:goalNames[g.market], selectedPosition:null, opponentTeam:'Whole match', opponentPosition:null,
-    odds:goalPrice(fixture.odds,g.market), drawOdds:fixture.odds?.draw ?? null, market:g.market, filterCount:g.filterCount, contradiction:'LOW', score:g.score/100,
-    priorityLabel:priorityLabel(g.filterCount,'LOW'), filters:g.reasons.map(x=>x.label), filterCodes:g.reasons.map(x=>x.code), negativeSignals:[], negativeSignalCodes:[], shortReason:g.reason
-  })
+  for (const g of goalSignals(fixture.home, fixture.away)) {
+    const price=goalPrice(fixture.odds,g.market)
+    if (!isOdd(price)) continue
+    resolved.push({
+      fixtureId:fixture.fixtureId, match:fixture.match, league:fixture.league, country:fixture.country, leagueLogo:fixture.leagueLogo||null, countryFlag:fixture.countryFlag||null, kickoff:fixture.kickoff, kickoffLocal:fixture.kickoffLocal,
+      selectedTeamId:0, selectedTeam:goalNames[g.market], selectedPosition:null, opponentTeam:'Whole match', opponentPosition:null,
+      odds:price, drawOdds:isOdd(fixture.odds?.draw)?fixture.odds.draw:null, market:g.market, filterCount:g.filterCount, contradiction:'LOW', score:g.score/100,
+      priorityLabel:priorityLabel(g.filterCount,'LOW'), filters:g.reasons.map(x=>x.label), filterCodes:g.reasons.map(x=>x.code), negativeSignals:[], negativeSignalCodes:[], shortReason:g.reason
+    })
+  }
   return resolved
 }
 
 export function buildBoard(fixtures, meta={}){
   const all = fixtures.flatMap(analyzeFixture)
-  const qualified = all.filter(x=>x.filterCount>=1)
+  const qualified = all.filter(x=>x.filterCount>=1 && isOdd(x.odds))
   const groups = {
     single: qualified.filter(x=>x.filterCount===1).sort(sortPicks),
     two: qualified.filter(x=>x.filterCount===2).sort(sortPicks),
@@ -162,7 +168,7 @@ export function buildBoard(fixtures, meta={}){
   }
   const oddsByFixture=Object.fromEntries(fixtures.map(f=>[String(f.fixtureId), Array.isArray(f.marketOdds)?f.marketOdds:[]]))
   const availableMarkets=[...new Set(fixtures.flatMap(f=>(f.marketOdds||[]).map(m=>m.market)).filter(Boolean))].sort((a,b)=>a.localeCompare(b))
-  return { meta:{...meta, qualified:qualified.length}, groups, priority:[...qualified].sort(sortPicks), oddsByFixture, availableMarkets }
+  return { meta:{...meta, qualified:qualified.length, pricingPolicy:'verified-odds-only'}, groups, priority:[...qualified].sort(sortPicks), oddsByFixture, availableMarkets }
 }
 function sortPicks(a,b){ return b.filterCount-a.filterCount || rankContradiction(a.contradiction)-rankContradiction(b.contradiction) || b.score-a.score || (a.odds??99)-(b.odds??99) }
 function rankContradiction(x){ return x==='LOW'?0:x==='MODERATE'?1:2 }
