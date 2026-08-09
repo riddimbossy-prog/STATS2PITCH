@@ -40,8 +40,30 @@ export async function getStandings(league, season) {
   return rows?.[0]?.league?.standings?.[0] || []
 }
 
+// Legacy overall form helper retained for compatibility only.
 export async function getRecent(team) {
   return football('/fixtures', { team, last: 10, status: 'FT', timezone: process.env.APP_TIMEZONE || 'UTC' })
+}
+
+/**
+ * Strict split-form source. We request a larger league/season-specific pool and
+ * then keep only the requested venue. This avoids cup/friendly contamination
+ * and guarantees that 'last 5 home' really means five home league matches.
+ */
+export async function getRecentLeagueVenue(team, league, season, venue, limit=10) {
+  if(!['home','away'].includes(venue))throw new Error('Venue must be home or away')
+  const rows=await football('/fixtures', {
+    team,
+    league,
+    season,
+    last: 30,
+    status: 'FT',
+    timezone: process.env.APP_TIMEZONE || 'UTC'
+  })
+  return rows
+    .filter(f=>venue==='home'?String(f?.teams?.home?.id)===String(team):String(f?.teams?.away?.id)===String(team))
+    .sort((a,b)=>new Date(b?.fixture?.date)-new Date(a?.fixture?.date))
+    .slice(0,Math.max(1,Number(limit||10)))
 }
 
 export async function getFixtureOdds(fixture) {

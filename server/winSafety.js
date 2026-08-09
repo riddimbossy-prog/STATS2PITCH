@@ -3,7 +3,7 @@ const norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()
 
 function allRows(board){return[...(board?.groups?.threePlus||[]),...(board?.groups?.two||[]),...(board?.groups?.single||[])]}
 function rank(x){return x==='LOW'?0:x==='MODERATE'?1:2}
-function sortPicks(a,b){return Number(b.filterCount||0)-Number(a.filterCount||0)||rank(a.contradiction)-rank(b.contradiction)||Number(b.score||0)-Number(a.score||0)||(Number(a.odds)||99)-(Number(b.odds)||99)}
+function sortPicks(a,b){return Number(b.filterCount||0)-Number(a.filterCount||0)||Number(b.familyCount||0)-Number(a.familyCount||0)||rank(a.contradiction)-rank(b.contradiction)||Number(b.score||0)-Number(a.score||0)||(Number(a.odds)||99)-(Number(b.odds)||99)}
 
 function fixtureSides(fixture,row){
   const selected=String(row?.selectedTeamId)===String(fixture?.home?.id)?fixture.home:String(row?.selectedTeamId)===String(fixture?.away?.id)?fixture.away:null
@@ -38,12 +38,12 @@ function fallbackMarket(fixture,isHome,teamName){
   return null
 }
 
-export const WIN_SAFETY_POLICY='bottom3-veto-under60-exception-or-downgrade-v2'
+export const WIN_SAFETY_POLICY='strict-split-bottom3-veto-under60-v3'
 
 export function applyWinSafety(board,fixtures){
   const byId=new Map((fixtures||[]).map(f=>[String(f.fixtureId),f]))
   const kept=[]
-  let straightWinsBlocked=0,downgraded=0,exceptionWins=0,bottom3TeamResultBlocked=0
+  let straightWinsBlocked=0,downgraded=0,exceptionWins=0,bottom3TeamResultBlocked=0,missingSplitBlocked=0
 
   for(const row of allRows(board)){
     if(row?.market!=='1X2'){kept.push(row);continue}
@@ -52,33 +52,41 @@ export function applyWinSafety(board,fixtures){
     if(!fixture||!sides){straightWinsBlocked++;continue}
     const {selected,opponent,isHome}=sides
 
-    // Absolute veto: a bottom-three team is never published in a team-result
-    // market. Odds, recent form, opponent weakness and all other exceptions are
-    // ignored. Do not downgrade the bottom-three team to DNB/1X/X2 either.
+    // Never fall back to overall metrics. A team-result route requires explicit
+    // home/away split identity from v1.9.0 enrichment.
+    if(!['home','away'].includes(selected?.venue)||!['home','away'].includes(opponent?.venue)){
+      missingSplitBlocked++
+      straightWinsBlocked++
+      continue
+    }
+
+    // Absolute split-table veto. No odds/form/weak-opponent exception and no
+    // DNB or double-chance downgrade is allowed for a bottom-three venue team.
     if(isBottomThree(selected)){
       bottom3TeamResultBlocked++
       straightWinsBlocked++
       continue
     }
 
+    const venue=selected.venue
     const winRate=Number(selected?.winRate)
-    if(Number.isFinite(winRate)&&winRate>=60){kept.push({...row,winSafety:'win-rate-60-plus'});continue}
+    if(Number.isFinite(winRate)&&winRate>=60){kept.push({...row,winSafety:'split-win-rate-60-plus'});continue}
 
+    // These exceptions are also venue-split: opponent's split-table position and
+    // goals conceded per relevant home/away league match.
     const opponentIsLast=Number.isFinite(Number(opponent?.position))&&Number.isFinite(Number(opponent?.leagueSize))&&Number(opponent.position)===Number(opponent.leagueSize)
     const opponentConcedesHeavy=Number.isFinite(Number(opponent?.goalsConceded))&&Number(opponent.goalsConceded)>2.3
     if(opponentIsLast||opponentConcedesHeavy){
       exceptionWins++
-      kept.push({...row,winSafety:opponentIsLast?'opponent-last-place-exception':'opponent-concedes-2.30-plus-exception'})
+      kept.push({...row,winSafety:opponentIsLast?'split-opponent-last-place-exception':'split-opponent-concedes-2.30-plus-exception'})
       continue
     }
 
-    // Under 60% with no exception can never remain a full-time win. Per the
-    // requested rule, only win prices above 2.00 are considered for downgrade.
     if(Number(row.odds)>2){
       const fallback=fallbackMarket(fixture,isHome,selected.name)
       if(fallback){
         downgraded++
-        kept.push({...row,...fallback,winSafety:'downgraded-under60',originalMarket:'1X2',originalOdds:row.odds,shortReason:`Safer market used because ${selected.name} have won fewer than 60% of their recent matches.`})
+        kept.push({...row,...fallback,winSafety:'downgraded-under60-split',originalMarket:'1X2',originalOdds:row.odds,shortReason:`Safer market used because ${selected.name} have won fewer than 60% of their last 5 ${venue} league matches.`})
         continue
       }
     }
@@ -92,7 +100,7 @@ export function applyWinSafety(board,fixtures){
   }
   return{
     ...board,
-    meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins,bottom3TeamResultBlocked},
+    meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins,bottom3TeamResultBlocked,missingSplitBlocked},
     groups,
     priority:[...kept].sort(sortPicks)
   }
