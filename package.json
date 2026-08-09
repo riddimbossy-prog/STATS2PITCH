@@ -1,11 +1,11 @@
 {
   "name": "stats2pitch",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "check": "node server/selftest.js"
+    "check": "node --check public/ui.v1.7.0.js && node server/selftest.js"
   },
   "engines": {
     "node": ">=20.19.0 <23"
