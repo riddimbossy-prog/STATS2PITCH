@@ -10,8 +10,9 @@ import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, snapshotHasStric
 import { MIN_LEAGUE_GAMES, SPLIT_ENGINE_POLICY } from './stats.js'
 import { applyWinSafety, WIN_SAFETY_POLICY } from './winSafety.js'
 import { buildLifecycleMap, mergeLifecycleBoard } from './lifecycle.js'
+import { createRefreshJobs } from './refreshJobs.js'
 
-const VERSION='1.9.0'
+const VERSION='1.9.1'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -28,10 +29,79 @@ function allowSignupAttempt(ip){return allowBucket(signupBuckets,ip,6)}
 function allowLookupAttempt(ip){return allowBucket(lookupBuckets,ip,20)}
 async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>20_000)throw new Error('Request too large.')}try{return JSON.parse(raw||'{}')}catch{throw new Error('Invalid JSON.')}}
 const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'');return raw&&!/^https?:\/\//i.test(raw)?`https://${raw}`:raw}
+const localDate=()=>new Intl.DateTimeFormat('en-CA',{timeZone:process.env.APP_TIMEZONE||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+const normalizeDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))?String(value):localDate()
+
+async function runRefresh(requestedDate,progress=()=>{}){
+  progress({phase:'start',message:'Starting real-data refresh.',current:0,total:null})
+  const enriched=await enrichDate(requestedDate,{onProgress:progress})
+  const {date,fixtures,rawFixtures,rawCount,upcomingCount,maturityCandidates,earlySeasonSkipped,standingsUnavailable,statsOddsFallbacks}=enriched
+  const matureFixtures=filterMatureFixtures(fixtures)
+  progress({phase:'engine',message:`Running prediction engine on ${matureFixtures.length} mature fixtures.`,current:matureFixtures.length,total:matureFixtures.length})
+
+  const baseBoard=buildBoard(matureFixtures,{
+    date,
+    fixturesScanned:matureFixtures.length,
+    sourceFixtures:rawCount,
+    generatedAt:new Date().toISOString(),
+    earlySeasonPolicy:EARLY_SEASON_POLICY,
+    minimumLeagueGames:MIN_LEAGUE_GAMES,
+    maturityPolicy:EARLY_SEASON_POLICY,
+    minLeagueGames:MIN_LEAGUE_GAMES,
+    splitPolicy:SPLIT_ENGINE_POLICY,
+    splitPrimaryOnly:true,
+    splitDescription:'Home team uses home-only league stats/form; away team uses away-only league stats/form. Overall stats are context only.'
+  })
+  const safeBoard=applyWinSafety(baseBoard,matureFixtures)
+
+  // A second fresh fixture-status call must never discard a completed prediction
+  // refresh. If the provider is temporarily rate-limited, use the fixture status
+  // already loaded at the start of the refresh and save the new board anyway.
+  let statusFixtures=Array.isArray(rawFixtures)?rawFixtures:[]
+  let lifecycleSource='loaded-fixtures'
+  try{
+    progress({phase:'lifecycle',message:'Updating live and settled match status.',current:0,total:1})
+    statusFixtures=await getFixturesByDateFresh(date)
+    lifecycleSource='fresh-status'
+  }catch(e){
+    console.warn('Fresh lifecycle status unavailable; using loaded fixture status:',e.message)
+    progress({phase:'lifecycle',message:'Fresh status check was unavailable; using the fixture status already loaded.',current:1,total:1})
+  }
+
+  const lifecycleMap=buildLifecycleMap(statusFixtures)
+  const previous=await loadSnapshotByDate(date).catch(()=>null)
+  const compatiblePrevious=previous?.meta?.winSafetyPolicy===WIN_SAFETY_POLICY&&snapshotHasStrictSplitPolicy(previous)?previous:null
+  const merged=mergeLifecycleBoard(safeBoard,compatiblePrevious,lifecycleMap)
+  const board={
+    ...merged,
+    meta:{
+      ...merged.meta,
+      stale:false,
+      refreshVersion:VERSION,
+      refreshDiagnostics:{
+        sourceFixtures:rawCount,
+        upcomingFixtures:upcomingCount,
+        maturityCandidates,
+        enrichedFixtures:matureFixtures.length,
+        earlySeasonSkipped,
+        standingsUnavailable,
+        statsOddsFallbacks,
+        lifecycleSource
+      }
+    }
+  }
+
+  progress({phase:'save',message:'Saving the fresh prediction board.',current:0,total:1})
+  await saveSnapshot(board,date)
+  progress({phase:'save',message:'Fresh prediction board saved.',current:1,total:1})
+  return board
+}
+
+const refreshJobs=createRefreshJobs(runRefresh,{ttlMs:Number(process.env.REFRESH_JOB_TTL_MS||30*60*1000)})
 
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,time:new Date().toISOString()})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,refreshMode:'background-job',time:new Date().toISOString()})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false})
@@ -63,44 +133,18 @@ const server=http.createServer(async(req,res)=>{try{
   }))
   return json(res,200,board||emptyMatureBoard())
  }
+ if(u.pathname==='/api/refresh-status'&&req.method==='GET'){
+  if(!await authed(req,res))return
+  const date=normalizeDate(u.searchParams.get('date')||'')
+  const job=refreshJobs.get(date)
+  return json(res,200,job||{date,status:'idle',progress:null,error:null,board:null})
+ }
  if(u.pathname==='/api/refresh'&&req.method==='POST'){
   if(!await authed(req,res))return
   if(String(process.env.ALLOW_MANUAL_REFRESH||'true')!=='true')return json(res,403,{error:'Manual refresh is disabled.'})
-  try{
-    const requested=u.searchParams.get('date')||''
-    const {date,fixtures,rawCount}=await enrichDate(requested)
-    const matureFixtures=filterMatureFixtures(fixtures)
-    const baseBoard=buildBoard(matureFixtures,{
-      date,
-      fixturesScanned:matureFixtures.length,
-      sourceFixtures:rawCount,
-      generatedAt:new Date().toISOString(),
-      earlySeasonPolicy:EARLY_SEASON_POLICY,
-      minimumLeagueGames:MIN_LEAGUE_GAMES,
-      maturityPolicy:EARLY_SEASON_POLICY,
-      minLeagueGames:MIN_LEAGUE_GAMES,
-      splitPolicy:SPLIT_ENGINE_POLICY,
-      splitPrimaryOnly:true,
-      splitDescription:'Home team uses home-only league stats/form; away team uses away-only league stats/form. Overall stats are context only.'
-    })
-    const safeBoard=applyWinSafety(baseBoard,matureFixtures)
-
-    const statusFixtures=await getFixturesByDateFresh(date)
-    const lifecycleMap=buildLifecycleMap(statusFixtures)
-    const previous=await loadSnapshotByDate(date).catch(()=>null)
-    const compatiblePrevious=previous?.meta?.winSafetyPolicy===WIN_SAFETY_POLICY&&snapshotHasStrictSplitPolicy(previous)?previous:null
-    const board=mergeLifecycleBoard(safeBoard,compatiblePrevious,lifecycleMap)
-
-    await saveSnapshot(board,date)
-    return json(res,200,board)
-  }catch(e){
-    console.error(e)
-    try{
-      const previous=await loadLatestSnapshot()
-      if(previous&&snapshotHasStrictMaturityPolicy(previous)&&snapshotHasStrictSplitPolicy(previous))return json(res,200,{...previous,meta:{...previous.meta,stale:true,refreshError:e.message}})
-    }catch{}
-    return json(res,500,{error:'Matches could not be updated right now. Please try again.'})
-  }
+  const date=normalizeDate(u.searchParams.get('date')||'')
+  const job=refreshJobs.start(date)
+  return json(res,202,job)
  }
  return serve(req,res)
 }catch(e){console.error(e);json(res,500,{error:e.message})}})
