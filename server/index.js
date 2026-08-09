@@ -8,7 +8,7 @@ import { buildBoard } from './engine.js'
 import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
 import { MIN_LEAGUE_GAMES } from './stats.js'
 
-const VERSION='1.7.6'
+const VERSION='1.7.7'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
