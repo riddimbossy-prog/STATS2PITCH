@@ -6,6 +6,8 @@ import { buildVerifiedOdds } from './oddsV2.js'
 
 const sleep = ms => new Promise(r=>setTimeout(r,ms))
 const localDate = () => new Intl.DateTimeFormat('en-CA',{timeZone:process.env.APP_TIMEZONE||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+const validOdd=v=>Number.isFinite(Number(v))&&Number(v)>1.001
+const emit=(cb,data)=>{try{if(typeof cb==='function')cb(data)}catch{}}
 
 function withFallback(primary, fallback) {
   return {
@@ -23,6 +25,14 @@ function withFallback(primary, fallback) {
   }
 }
 
+function apiHasPublishableCoverage(verified){
+  const c=verified?.canonical||{}
+  const complete1x2=['home','draw','away'].every(k=>validOdd(c[k]))
+  const completeGoalLine=[['over15','under15'],['over25','under25'],['over35','under35']].some(([a,b])=>validOdd(c[a])&&validOdd(c[b]))
+  const completeBtts=validOdd(c.bttsYes)&&validOdd(c.bttsNo)
+  return complete1x2||completeGoalLine||completeBtts
+}
+
 async function statsOddsFor(fixture){
   if(!statsApiConfigured())return null
   try{
@@ -36,13 +46,15 @@ async function statsOddsFor(fixture){
   return null
 }
 
-export async function selectMatureCandidates(upcoming, standingsFor, max=60) {
+export async function selectMatureCandidates(upcoming, standingsFor, max=60, onProgress=null) {
   const selected=[]
   let earlySeasonSkipped=0
   let standingsUnavailable=0
+  const pool=Array.isArray(upcoming)?upcoming:[]
 
-  for (const f of Array.isArray(upcoming)?upcoming:[]) {
+  for (let i=0;i<pool.length;i++) {
     if (selected.length >= max) break
+    const f=pool[i]
     try {
       const st=await standingsFor(f.league.id,f.league.season)
       const leagueMinimumPlayed=leagueGamesPlayed(st)
@@ -52,24 +64,29 @@ export async function selectMatureCandidates(upcoming, standingsFor, max=60) {
       if (!hasMinimumLeagueGames(st, MIN_LEAGUE_GAMES)) {
         earlySeasonSkipped++
         console.log(`Skipping early-season fixture ${f.fixture?.id}: ${f.league?.name||'league'} least-played team has ${leagueMinimumPlayed}/${MIN_LEAGUE_GAMES} overall matches.`)
-        continue
+      } else {
+        selected.push({f,st,leagueMinimumPlayed,leagueAveragePlayed,leagueTotalGames})
       }
-
-      selected.push({f,st,leagueMinimumPlayed,leagueAveragePlayed,leagueTotalGames})
     } catch (e) {
       standingsUnavailable++
       console.warn('Standings unavailable while pre-screening fixture',f.fixture?.id,e.message)
+    }
+    if(i===0||(i+1)%10===0||selected.length===max||i===pool.length-1){
+      emit(onProgress,{phase:'maturity',message:`Checking league maturity: ${i+1}/${pool.length} fixtures`,current:i+1,total:pool.length,selected:selected.length})
     }
   }
   return {selected,earlySeasonSkipped,standingsUnavailable}
 }
 
-export async function enrichDate(requestedDate){
+export async function enrichDate(requestedDate,options={}){
+  const onProgress=options?.onProgress
   const date=/^\d{4}-\d{2}-\d{2}$/.test(requestedDate||'')?requestedDate:localDate()
+  emit(onProgress,{phase:'fixtures',message:`Loading fixtures for ${date}…`,current:0,total:null})
   const raw=await getFixturesByDate(date)
   const max=Math.max(1,Number(process.env.MAX_FIXTURES_PER_REFRESH||60))
   const upcoming=raw.filter(f=>f.fixture?.status?.short==='NS' || f.fixture?.status?.short==='TBD')
   const standingCache=new Map(), recentCache=new Map()
+  emit(onProgress,{phase:'fixtures',message:`Loaded ${raw.length} fixtures; ${upcoming.length} are pre-kickoff.`,current:raw.length,total:raw.length})
 
   async function standings(league,season){
     const k=`${league}:${season}`
@@ -82,22 +99,24 @@ export async function enrichDate(requestedDate){
     return recentCache.get(k)
   }
 
-  const preflight=await selectMatureCandidates(upcoming,standings,max)
+  const preflight=await selectMatureCandidates(upcoming,standings,max,onProgress)
   const enriched=[]
   let teamGateSkipped=0
+  let statsOddsFallbacks=0
 
-  for (const candidate of preflight.selected) {
+  for (let i=0;i<preflight.selected.length;i++) {
+    const candidate=preflight.selected[i]
     const {f,st,leagueMinimumPlayed,leagueAveragePlayed,leagueTotalGames}=candidate
+    emit(onProgress,{phase:'enrich',message:`Enriching mature fixtures: ${i+1}/${preflight.selected.length}`,current:i+1,total:preflight.selected.length,selected:enriched.length})
     try {
       const leagueSize=st.length || null
-      const [homeVenueRows,awayVenueRows,apiOddsRaw,statsOdds] = await Promise.all([
+      const [homeVenueRows,awayVenueRows,apiOddsRaw] = await Promise.all([
         recentSplit(f.teams.home.id,f.league.id,f.league.season,'home'),
         recentSplit(f.teams.away.id,f.league.id,f.league.season,'away'),
         getFixtureOdds(f.fixture.id).catch(e => {
           console.warn('Primary odds unavailable for fixture',f.fixture?.id,e.message)
           return []
-        }),
-        statsOddsFor(f)
+        })
       ])
 
       const homeOverall=overallStandingMetrics(st,f.teams.home.id)
@@ -113,16 +132,23 @@ export async function enrichDate(requestedDate){
         overall:awayOverall
       }
 
-      // Four-game maturity remains an OVERALL league-sample rule. It must not
-      // accidentally become a four-home / four-away requirement after the split
-      // engine change.
       if (Number(hm.overallPlayed||0) < MIN_LEAGUE_GAMES || Number(am.overallPlayed||0) < MIN_LEAGUE_GAMES) {
         teamGateSkipped++
         console.log(`Skipping fixture ${f.fixture?.id}: overall games are ${hm.overallPlayed||0}/${am.overallPlayed||0}; both need ${MIN_LEAGUE_GAMES}+.`)
         continue
       }
 
-      const verified=buildVerifiedOdds({apiPayload:apiOddsRaw,statsPayload:statsOdds?.payload,fixture:f})
+      // API-Football is the fast primary odds source. TheStatsAPI is now a true
+      // fallback only when the primary feed has no complete publishable market.
+      // This avoids the 40-requests/minute secondary-feed queue making an
+      // interactive refresh take many minutes on a 60-fixture board.
+      const apiVerified=buildVerifiedOdds({apiPayload:apiOddsRaw,statsPayload:null,fixture:f})
+      let statsOdds=null
+      if(!apiHasPublishableCoverage(apiVerified)){
+        statsOddsFallbacks++
+        statsOdds=await statsOddsFor(f)
+      }
+      const verified=statsOdds?.payload?buildVerifiedOdds({apiPayload:apiOddsRaw,statsPayload:statsOdds.payload,fixture:f}):apiVerified
       const api1x2=parse1x2Odds(apiOddsRaw) || {}
       const odds=withFallback(verified.canonical,api1x2)
 
@@ -152,14 +178,17 @@ export async function enrichDate(requestedDate){
     }
   }
 
+  emit(onProgress,{phase:'enrich',message:`Enrichment finished: ${enriched.length} mature fixtures ready.`,current:preflight.selected.length,total:preflight.selected.length,selected:enriched.length})
   return {
     date,
     fixtures:enriched,
+    rawFixtures:raw,
     rawCount:raw.length,
     upcomingCount:upcoming.length,
     maturityCandidates:preflight.selected.length,
     earlySeasonSkipped:preflight.earlySeasonSkipped+teamGateSkipped,
     standingsUnavailable:preflight.standingsUnavailable,
+    statsOddsFallbacks,
     splitPolicy:SPLIT_ENGINE_POLICY
   }
 }
