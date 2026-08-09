@@ -1,9 +1,29 @@
 import { buildBoard } from './engine.js'
 import { buildVerifiedOdds } from './oddsV2.js'
+import { leagueGamesPlayed, hasMinimumLeagueGames, MIN_LEAGUE_GAMES } from './stats.js'
 
 const fixtureShape={
   teams:{home:{name:'Alpha'},away:{name:'Beta'}}
 }
+
+// Early-season gate: 9 league games must be rejected; 10 must be accepted.
+const nineGameStandings=[
+  {team:{id:1},all:{played:5}},
+  {team:{id:2},all:{played:5}},
+  {team:{id:3},all:{played:4}},
+  {team:{id:4},all:{played:4}}
+]
+const tenGameStandings=[
+  {team:{id:1},all:{played:5}},
+  {team:{id:2},all:{played:5}},
+  {team:{id:3},all:{played:5}},
+  {team:{id:4},all:{played:5}}
+]
+if(leagueGamesPlayed(nineGameStandings)!==9) throw new Error('League game count failed for 9 games')
+if(hasMinimumLeagueGames(nineGameStandings,MIN_LEAGUE_GAMES)) throw new Error('Early-season league with 9 games was not blocked')
+if(leagueGamesPlayed(tenGameStandings)!==10) throw new Error('League game count failed for 10 games')
+if(!hasMinimumLeagueGames(tenGameStandings,MIN_LEAGUE_GAMES)) throw new Error('League with 10 games should be allowed')
+if(hasMinimumLeagueGames([],MIN_LEAGUE_GAMES)) throw new Error('Missing standings must not bypass early-season gate')
 
 // Match the real TheStatsAPI layout used elsewhere in this project:
 // bookmakers[].markets.match_odds / total_goals with last_seen/opening values.
@@ -60,6 +80,7 @@ if(!board.priority.some(p=>p.market==='O2.5'&&p.odds===1.72)) throw new Error('E
 
 console.log(JSON.stringify({
   ok:true,
+  earlySeasonGate:{minimum:MIN_LEAGUE_GAMES,rejects:9,allows:10},
   filters:board.groups.threePlus[0].filterCount,
   markets:board.oddsByFixture['1'].length,
   home:parsed.home,
