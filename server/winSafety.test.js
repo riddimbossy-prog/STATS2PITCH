@@ -12,13 +12,26 @@ out=applyWinSafety(board(row({odds:1.85})),[fixture()])
 if(out.priority.length!==0)throw new Error('Under-60 full-time win at 2.00 or below must be blocked without an exception')
 
 out=applyWinSafety(board(row()),[fixture({away:{id:2,name:'Beta',winRate:20,position:10,leagueSize:10,goalsConceded:1.2}})])
-if(out.priority[0]?.market!=='1X2')throw new Error('Last-place opponent must allow the straight-win exception')
+if(out.priority[0]?.market!=='1X2')throw new Error('Last-place opponent must allow the straight-win exception for a non-bottom-three selection')
 
 out=applyWinSafety(board(row()),[fixture({away:{id:2,name:'Beta',winRate:20,position:6,leagueSize:10,goalsConceded:2.31}})])
-if(out.priority[0]?.market!=='1X2')throw new Error('Opponent conceding above 2.30 must allow the straight-win exception')
+if(out.priority[0]?.market!=='1X2')throw new Error('Opponent conceding above 2.30 must allow the straight-win exception for a non-bottom-three selection')
 
 out=applyWinSafety(board(row()),[fixture({home:{id:1,name:'Alpha',winRate:60,position:4,leagueSize:10,goalsConceded:1}})])
-if(out.priority[0]?.market!=='1X2')throw new Error('60% win rate must allow a straight win')
+if(out.priority[0]?.market!=='1X2')throw new Error('60% win rate must allow a straight win for a non-bottom-three selection')
+
+// Absolute bottom-three veto: even excellent form, favourable odds, a last-place
+// opponent and available DNB/DC prices may not publish a team-result selection.
+out=applyWinSafety(board(row({odds:1.45})),[fixture({home:{id:1,name:'Alpha',winRate:100,position:8,leagueSize:10,goalsConceded:.5},away:{id:2,name:'Beta',winRate:0,position:10,leagueSize:10,goalsConceded:3.4}})])
+if(out.priority.length!==0)throw new Error('Bottom-three selected team must be vetoed even with strong form, short odds and opponent exceptions')
+if(out.meta.bottom3TeamResultBlocked!==1)throw new Error('Bottom-three veto must be counted in board metadata')
+
+out=applyWinSafety(board(row({odds:2.80})),[fixture({home:{id:1,name:'Alpha',winRate:20,position:9,leagueSize:10,goalsConceded:1}})])
+if(out.priority.length!==0)throw new Error('Bottom-three selected team must not downgrade to DNB/1X/X2')
+
+const goalRow=row({market:'O2.5',selectedTeamId:0,selectedTeam:'Over 2.5 goals',odds:1.72})
+out=applyWinSafety(board(goalRow),[fixture({home:{id:1,name:'Alpha',winRate:20,position:9,leagueSize:10,goalsConceded:1}})])
+if(out.priority[0]?.market!=='O2.5')throw new Error('Bottom-three veto must not remove unrelated goals-market picks')
 
 const safe=applyWinSafety(board(row()),[fixture()])
 const live=mergeLifecycleBoard({meta:{},groups:{single:[],two:[],threePlus:[]},priority:[]},safe,{'1':{statusGroup:'live',statusShort:'2H',elapsed:67,homeScore:1,awayScore:0}})
