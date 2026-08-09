@@ -1,0 +1,118 @@
+/* Stats2Pitch v1.7.8 — deterministic dashboard scroll container */
+
+/*
+ * Stop depending on browser/body scroll behavior. The dashboard itself owns
+ * vertical scrolling, which is reliable across desktop Chrome/Opera, Android,
+ * Samsung Internet, tablets and Samsung Z Fold cover/unfolded modes.
+ */
+html,body{
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  max-height:100%!important;
+  margin:0!important;
+  overflow:hidden!important;
+}
+body{
+  position:relative!important;
+  touch-action:auto!important;
+}
+#root{
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  max-height:100%!important;
+  overflow:hidden!important;
+}
+
+.app-shell,
+.s2p-shell-v173{
+  width:100%!important;
+  height:100dvh!important;
+  min-height:0!important;
+  max-height:100dvh!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-x:none!important;
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-y pinch-zoom!important;
+  scrollbar-gutter:stable;
+  padding-bottom:calc(64px + env(safe-area-inset-bottom))!important;
+}
+
+/* JS writes the exact visual viewport height for mobile browser chrome. */
+html.s2p-scroll-container-ready .app-shell,
+html.s2p-scroll-container-ready .s2p-shell-v173{
+  height:var(--s2p-dashboard-height,100dvh)!important;
+  max-height:var(--s2p-dashboard-height,100dvh)!important;
+}
+
+/* Sign-in also gets its own scroll surface so small/folded screens never clip. */
+.auth-page{
+  width:100%!important;
+  height:100dvh!important;
+  min-height:0!important;
+  max-height:100dvh!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-y pinch-zoom!important;
+  align-content:start!important;
+  padding-bottom:calc(36px + env(safe-area-inset-bottom))!important;
+}
+html.s2p-scroll-container-ready .auth-page{
+  height:var(--s2p-dashboard-height,100dvh)!important;
+  max-height:var(--s2p-dashboard-height,100dvh)!important;
+}
+
+/* Never let nested board sections become accidental vertical scroll traps. */
+.controls,.filter-panel,.summary-grid,.prediction-panel,.table-wrap,
+.priority-compact,.priority-compact-v17,.s2p-board-tabs,.footnote{
+  max-height:none!important;
+}
+.prediction-panel,.priority-compact,.priority-compact-v17{
+  overflow:visible!important;
+}
+.table-wrap{overflow-x:auto!important;overflow-y:visible!important}
+
+/* Keep the Details popup independently scrollable without locking the board. */
+.modal-backdrop{overscroll-behavior:contain!important}
+.detail-modal,.detail-modal-v17{
+  max-height:min(92dvh,calc(var(--s2p-dashboard-height,100dvh) * .92))!important;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+
+/* Make it obvious to mobile browsers that vertical panning belongs to the board. */
+.app-shell *:not(input):not(select):not(button):not(textarea),
+.s2p-shell-v173 *:not(input):not(select):not(button):not(textarea){
+  touch-action:pan-y pinch-zoom;
+}
+
+/* Desktop/laptop scrollbar remains usable even with very long match lists. */
+@media (min-width:821px){
+  .app-shell,.s2p-shell-v173{scrollbar-width:auto}
+  .app-shell::-webkit-scrollbar,.s2p-shell-v173::-webkit-scrollbar{width:12px}
+  .app-shell::-webkit-scrollbar-track,.s2p-shell-v173::-webkit-scrollbar-track{background:#02070b}
+  .app-shell::-webkit-scrollbar-thumb,.s2p-shell-v173::-webkit-scrollbar-thumb{background:#243747;border:3px solid #02070b;border-radius:999px}
+}
+
+/* Tablets / unfolded foldables */
+@media (max-width:1100px){
+  .app-shell,.s2p-shell-v173{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
+}
+
+/* Phones / Z Fold */
+@media (max-width:600px){
+  .app-shell,.s2p-shell-v173{
+    padding-bottom:calc(92px + env(safe-area-inset-bottom))!important;
+    scroll-padding-bottom:calc(92px + env(safe-area-inset-bottom));
+  }
+  .s2p-board-tabs{position:static!important}
+}
+
+@media (max-width:390px){
+  .app-shell,.s2p-shell-v173{padding-bottom:calc(104px + env(safe-area-inset-bottom))!important}
+}
