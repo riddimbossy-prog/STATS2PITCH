@@ -9,12 +9,13 @@
   const keyFor=r=>`${r?.fixtureId}|${r?.market}|${r?.selectedTeamId||r?.selectedTeam}`
   const allRows=b=>[...(b?.groups?.threePlus||[]),...(b?.groups?.two||[]),...(b?.groups?.single||[])]
   const token=()=>localStorage.getItem(ACCESS_KEY)||''
+  const selectedDate=()=>document.getElementById('date')?.value||new Date().toISOString().slice(0,10)
 
   function rebuild(){rows=new Map(allRows(board).map(r=>[keyFor(r),r]))}
   async function loadBoard(){
     const t=token();if(!t)return null
     try{
-      const r=await fetch('/api/board',{headers:{Authorization:`Bearer ${t}`},cache:'no-store'})
+      const r=await fetch(`/api/board?date=${encodeURIComponent(selectedDate())}`,{headers:{Authorization:`Bearer ${t}`},cache:'no-store'})
       if(!r.ok)return null
       board=await r.json();rebuild();return board
     }catch{return null}
@@ -26,11 +27,15 @@
     if(Number.isNaN(d.getTime()))return String(row?.kickoffLocal||'').split(',').pop()?.trim()||''
     return new Intl.DateTimeFormat(undefined,{hour:'2-digit',minute:'2-digit'}).format(d)
   }
+  function scoreText(row){
+    const h=row?.homeScore,a=row?.awayScore
+    return h!==null&&h!==undefined&&a!==null&&a!==undefined&&Number.isFinite(Number(h))&&Number.isFinite(Number(a))?`${Number(h)}–${Number(a)}`:''
+  }
   function statusLabel(row){
-    const group=row?.statusGroup||'upcoming'
-    const score=Number.isFinite(Number(row?.homeScore))&&Number.isFinite(Number(row?.awayScore))?`${Number(row.homeScore)}–${Number(row.awayScore)}`:''
-    if(group==='live')return `LIVE${Number.isFinite(Number(row?.elapsed))?` ${Number(row.elapsed)}′`:''}${score?` · ${score}`:''}`
+    const group=row?.statusGroup||'upcoming',score=scoreText(row)
+    if(group==='live')return `LIVE${row?.elapsed!==null&&row?.elapsed!==undefined&&Number.isFinite(Number(row.elapsed))?` ${Number(row.elapsed)}′`:''}${score?` · ${score}`:''}`
     if(group==='settled')return `${row?.statusShort||'FT'}${score?` · ${score}`:''}`
+    if(group==='postponed')return row?.statusShort==='CANC'?'Cancelled':row?.statusShort==='ABD'?'Abandoned':'Postponed'
     return 'Upcoming'
   }
   function selectedLabel(row){
@@ -48,7 +53,7 @@
     if(!label){
       label=document.createElement('label')
       label.className='s2p-status-control'
-      label.innerHTML='<span>Match status</span><select id="s2p-status"><option value="all">All statuses</option><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="settled">Settled</option></select>'
+      label.innerHTML='<span>Match status</span><select id="s2p-status"><option value="all">All statuses</option><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="settled">Settled</option><option value="postponed">Postponed / Cancelled</option></select>'
       const refresh=grid.querySelector('#refresh,.refresh')
       if(refresh)grid.insertBefore(label,refresh);else grid.appendChild(label)
       label.querySelector('select').addEventListener('change',e=>{
@@ -122,10 +127,9 @@
   }
   function schedule(){clearTimeout(timer);timer=setTimeout(boot,100)}
 
-  // Core renders replace the app shell at #root. Observe only that boundary so
-  // this layer cannot create another deep MutationObserver render loop.
   const root=document.getElementById('root')
   if(root)new MutationObserver(schedule).observe(root,{childList:true})
+  document.addEventListener('change',e=>{if(e.target?.id==='date')schedule()},true)
   window.addEventListener('s2p:tabchange',()=>requestAnimationFrame(apply),{passive:true})
   window.addEventListener('pageshow',schedule,{passive:true})
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule()
