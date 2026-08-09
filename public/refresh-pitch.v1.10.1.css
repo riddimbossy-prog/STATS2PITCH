@@ -34,6 +34,17 @@ body.s2p-refresh-active {
   box-sizing: border-box;
 }
 
+/* Real football asset replaces the old CSS-drawn ball on both startup and refresh loaders. */
+.s2p-loader-ball-real {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 7px 7px rgba(0,0,0,.45));
+  animation: s2pBallSpin .68s linear infinite;
+}
+
 .s2p-refresh-overlay .s2p-loader-text {
   margin-top: 2px;
 }
@@ -62,5 +73,11 @@ body.s2p-refresh-active {
 @media (max-width: 600px) {
   .s2p-refresh-overlay .s2p-loader-scene {
     width: 94vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .s2p-loader-ball-real {
+    animation: none;
   }
 }
