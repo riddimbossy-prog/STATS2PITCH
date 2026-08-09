@@ -20,13 +20,22 @@ out=applyWinSafety(board(row({odds:1.85})),[fixture()])
 if(out.priority.length!==0)throw new Error('Under-60 split full-time win at 2.00 or below must be blocked without an exception')
 
 out=applyWinSafety(board(row()),[fixture({away:{position:10,goalsConceded:1.2}})])
-if(out.priority[0]?.market!=='1X2')throw new Error('Last-place AWAY-split opponent must allow the straight-win exception')
+if(out.priority[0]?.market!=='1X2')throw new Error('Last-place AWAY-split opponent must allow the straight-win exception after all hard gates pass')
 
 out=applyWinSafety(board(row()),[fixture({away:{position:6,goalsConceded:2.31}})])
-if(out.priority[0]?.market!=='1X2')throw new Error('Opponent conceding above 2.30 in AWAY split must allow the straight-win exception')
+if(out.priority[0]?.market!=='1X2')throw new Error('Opponent conceding above 2.30 in AWAY split must allow the straight-win exception after all hard gates pass')
+
+out=applyWinSafety(board(row({contradiction:'HIGH',odds:1.81,negativeSignals:['PPG <1','scores <1','FTS 40%','won fewer than 2/5']})),[fixture({away:{position:10,goalsConceded:3.1}})])
+if(out.priority.length!==0||out.meta.highContradictionBlocked!==1)throw new Error('HIGH contradiction must veto a straight win even when opponent is last and concedes above 2.30')
+
+out=applyWinSafety(board(row({contradiction:'MODERATE',odds:1.90})),[fixture({home:{winRate:80},away:{position:10,goalsConceded:3.1}})])
+if(out.priority.length!==0||out.meta.moderateContradictionBlocked!==1)throw new Error('MODERATE contradiction must not publish a straight win at 2.00 or below')
+
+out=applyWinSafety(board(row({contradiction:'MODERATE',odds:2.40})),[fixture({home:{winRate:80},away:{position:10,goalsConceded:3.1}})])
+if(out.priority.length!==1||out.priority[0].market!=='DNB'||out.meta.moderateContradictionDowngraded!==1)throw new Error('MODERATE contradiction above 2.00 must downgrade rather than publish a straight win')
 
 out=applyWinSafety(board(row()),[fixture({home:{winRate:60,position:4}})])
-if(out.priority[0]?.market!=='1X2')throw new Error('60% HOME-split last-five win rate must allow a straight win for a non-bottom-three selection')
+if(out.priority[0]?.market!=='1X2')throw new Error('60% HOME-split last-five win rate must allow a LOW-contradiction straight win for a non-bottom-three selection')
 
 out=applyWinSafety(board(row()),[fixture({home:{winRate:null,seasonWinRate:60,played:5,position:4}})])
 if(out.priority[0]?.market!=='1X2'||out.priority[0]?.winRateSource!=='season-split')throw new Error('Mature 60% HOME season-split rate must safely recover when recent split history is unavailable')

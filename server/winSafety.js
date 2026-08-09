@@ -39,12 +39,13 @@ function fallbackMarket(fixture,isHome,teamName){
   return null
 }
 
-export const WIN_SAFETY_POLICY='strict-split-bottom3-veto-under60-v4'
+export const WIN_SAFETY_POLICY='strict-split-bottom3-veto-under60-contradiction-v5'
 
 export function applyWinSafety(board,fixtures){
   const byId=new Map((fixtures||[]).map(f=>[String(f.fixtureId),f]))
   const kept=[]
   let straightWinsBlocked=0,downgraded=0,exceptionWins=0,bottom3TeamResultBlocked=0,missingSplitBlocked=0,seasonSplitFallbacks=0
+  let highContradictionBlocked=0,moderateContradictionBlocked=0,moderateContradictionDowngraded=0
 
   for(const row of allRows(board)){
     if(row?.market!=='1X2'){kept.push(row);continue}
@@ -67,6 +68,30 @@ export function applyWinSafety(board,fixtures){
       continue
     }
 
+    // Contradiction policy is a HARD gate and is evaluated BEFORE the 60% rule
+    // and BEFORE weak-opponent exceptions. A weak opponent can never rescue a
+    // selected team whose own split profile is strongly contradictory.
+    const contradiction=String(row?.contradiction||'LOW').toUpperCase()
+    if(contradiction==='HIGH'){
+      highContradictionBlocked++
+      straightWinsBlocked++
+      continue
+    }
+    if(contradiction==='MODERATE'){
+      if(Number(row.odds)>2){
+        const fallback=fallbackMarket(fixture,isHome,selected.name)
+        if(fallback){
+          downgraded++
+          moderateContradictionDowngraded++
+          kept.push({...row,...fallback,contradiction:'MODERATE',winSafety:'downgraded-moderate-contradiction',originalMarket:'1X2',originalOdds:row.odds,shortReason:`Safer market used because ${selected.name}'s ${selected.venue} profile contains meaningful contradictions.`})
+          continue
+        }
+      }
+      moderateContradictionBlocked++
+      straightWinsBlocked++
+      continue
+    }
+
     const venue=selected.venue
     const recentWinRate=metric(selected?.winRate)
     const seasonWinRate=metric(selected?.seasonWinRate)
@@ -76,9 +101,7 @@ export function applyWinSafety(board,fixtures){
 
     // If the provider cannot return the chronological venue history but the
     // standings themselves contain a mature 5+ HOME/AWAY sample, use that exact
-    // split season record. This remains strict venue data; overall form is never
-    // substituted. It prevents a transient history endpoint failure from
-    // deleting every team-result prediction on the board.
+    // split season record. Overall form is never substituted.
     if(winRate===null&&seasonSplitPlayed!==null&&seasonSplitPlayed>=5&&seasonWinRate!==null){
       winRate=seasonWinRate
       winRateSource='season-split'
@@ -90,6 +113,8 @@ export function applyWinSafety(board,fixtures){
       continue
     }
 
+    // Exceptions are only considered after the selected team has passed the
+    // Bottom-3 and contradiction gates.
     const opponentIsLast=Number.isFinite(Number(opponent?.position))&&Number.isFinite(Number(opponent?.leagueSize))&&Number(opponent.position)===Number(opponent.leagueSize)
     const opponentConcedesHeavy=metric(opponent?.goalsConceded)!==null&&Number(opponent.goalsConceded)>2.3
     if(opponentIsLast||opponentConcedesHeavy){
@@ -116,7 +141,20 @@ export function applyWinSafety(board,fixtures){
   }
   return{
     ...board,
-    meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins,bottom3TeamResultBlocked,missingSplitBlocked,seasonSplitWinFallbacks:seasonSplitFallbacks},
+    meta:{
+      ...board?.meta,
+      qualified:kept.length,
+      winSafetyPolicy:WIN_SAFETY_POLICY,
+      straightWinsBlocked,
+      downgradedWins:downgraded,
+      exceptionWins,
+      bottom3TeamResultBlocked,
+      missingSplitBlocked,
+      seasonSplitWinFallbacks:seasonSplitFallbacks,
+      highContradictionBlocked,
+      moderateContradictionBlocked,
+      moderateContradictionDowngraded
+    },
     groups,
     priority:[...kept].sort(sortPicks)
   }

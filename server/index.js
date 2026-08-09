@@ -12,7 +12,7 @@ import { applyWinSafety, WIN_SAFETY_POLICY } from './winSafety.js'
 import { buildLifecycleMap, mergeLifecycleBoard } from './lifecycle.js'
 import { createRefreshJobs } from './refreshJobs.js'
 
-const VERSION='1.9.2'
+const VERSION='1.9.3'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -97,6 +97,9 @@ async function runRefresh(requestedDate,progress=()=>{}){
         finalQualified:merged?.meta?.qualified??0,
         straightWinsBlocked:safeBoard?.meta?.straightWinsBlocked??0,
         bottom3TeamResultBlocked:safeBoard?.meta?.bottom3TeamResultBlocked??0,
+        highContradictionBlocked:safeBoard?.meta?.highContradictionBlocked??0,
+        moderateContradictionBlocked:safeBoard?.meta?.moderateContradictionBlocked??0,
+        moderateContradictionDowngraded:safeBoard?.meta?.moderateContradictionDowngraded??0,
         seasonSplitWinFallbacks:safeBoard?.meta?.seasonSplitWinFallbacks??0,
         lifecycleSource
       }
@@ -113,7 +116,7 @@ const refreshJobs=createRefreshJobs(runRefresh,{ttlMs:Number(process.env.REFRESH
 
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,refreshMode:'background-job',candidatePolicy:'priced-after-maturity',time:new Date().toISOString()})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,winSafetyPolicy:WIN_SAFETY_POLICY,refreshMode:'background-job',candidatePolicy:'priced-after-maturity',contradictionPolicy:'high-veto-moderate-safer-only',time:new Date().toISOString()})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false})
@@ -131,6 +134,7 @@ const server=http.createServer(async(req,res)=>{try{
   const board=await loadLatestSnapshot()
   if(board&&!snapshotHasStrictMaturityPolicy(board))return json(res,200,emptyMatureBoard({date:board?.meta?.date||null,generatedAt:board?.meta?.generatedAt||null,sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,stale:true,maturityReason:`Saved board was built before the ${MIN_LEAGUE_GAMES}-game league maturity rule. Refresh real data.`}))
   if(board&&!snapshotHasStrictSplitPolicy(board))return json(res,200,emptyMatureBoard({date:board?.meta?.date||null,generatedAt:board?.meta?.generatedAt||null,sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,stale:true,splitReason:'Saved board used overall/legacy football metrics. Refresh real data to build strict home-vs-away split predictions.'}))
+  if(board&&board?.meta?.winSafetyPolicy!==WIN_SAFETY_POLICY)return json(res,200,emptyMatureBoard({date:board?.meta?.date||null,generatedAt:board?.meta?.generatedAt||null,sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,stale:true,safetyReason:'Saved board predates the hard contradiction veto. Refresh real data to rebuild the board under the current safety policy.'}))
   return json(res,200,board||emptyMatureBoard())
  }
  if(u.pathname==='/api/refresh-status'&&req.method==='GET'){
