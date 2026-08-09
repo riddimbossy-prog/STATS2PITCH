@@ -1,6 +1,6 @@
 function pct(n,d){ return d ? Math.round((n/d)*100) : null }
 
-export const MIN_LEAGUE_GAMES = 10
+export const MIN_LEAGUE_GAMES = 4
 
 function playedValues(standings) {
   if (!Array.isArray(standings) || !standings.length) return []
@@ -14,12 +14,12 @@ function playedValues(standings) {
  * Strict early-season maturity value.
  *
  * This is intentionally NOT the number of fixtures completed by the whole
- * competition. In an 18-team league, 10 total competition fixtures can be
- * reached after barely one round and is still far too early.
+ * competition. In a large league, a few total competition fixtures can be
+ * reached before every club has a useful sample.
  *
- * Instead, Stats2Pitch uses the least-played team in the current standings.
- * A league therefore reaches "10 games" only when EVERY team represented in
- * that standings table has played at least 10 overall league matches.
+ * Stats2Pitch therefore uses the least-played team in the current standings.
+ * A league reaches "4 games" only when EVERY team represented in that
+ * standings table has played at least 4 overall league matches.
  */
 export function leagueGamesPlayed(standings) {
   const values = playedValues(standings)
