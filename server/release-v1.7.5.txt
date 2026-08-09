@@ -1,0 +1,2 @@
+Stats2Pitch v1.7.5
+Early-season threshold: every team in the standings and both teams in the fixture must have played at least 4 league matches.
