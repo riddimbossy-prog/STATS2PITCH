@@ -6,11 +6,11 @@ const memory = new Map()
 
 function cacheKey(path, params){ return `${path}?${new URLSearchParams(params).toString()}` }
 
-async function request(path, params={}) {
+async function request(path, params={}, opts={}) {
   if (!KEY) throw new Error('API_FOOTBALL_KEY is not configured on the server.')
   const key = cacheKey(path, params)
   const cached = memory.get(key)
-  if (cached && Date.now() - cached.at < CACHE_TTL) return cached.data
+  if (!opts.bypassCache && cached && Date.now() - cached.at < CACHE_TTL) return cached.data
 
   const url = new URL(`${BASE}${path}`)
   for (const [k,v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v))
@@ -29,6 +29,10 @@ export async function football(path, params={}) {
 
 export async function getFixturesByDate(date) {
   return football('/fixtures', { date, timezone: process.env.APP_TIMEZONE || 'UTC' })
+}
+
+export async function getFixturesByDateFresh(date) {
+  return (await request('/fixtures', { date, timezone: process.env.APP_TIMEZONE || 'UTC' }, {bypassCache:true})).response
 }
 
 export async function getStandings(league, season) {
