@@ -100,7 +100,8 @@ function walk(node,fixture,rows,book='',depth=0,seen=new Set()){
     for(const child of node)walk(child,fixture,rows,book,depth+1,seen)
     return
   }
-  const nextBook=text(node.bookmaker?.name??node.bookmaker??node.sportsbook?.name??node.provider?.name??node.provider??node.name&&node.markets?node.name:book)||book
+  const namedBook=node.bookmaker?.name??node.sportsbook?.name??node.provider?.name??(typeof node.bookmaker==='string'?node.bookmaker:null)??(typeof node.provider==='string'?node.provider:null)??(node.markets&&typeof node.name==='string'?node.name:null)??book
+  const nextBook=text(namedBook)||book
   const rawMarket=node.market?.name??node.market_name??node.market??node.bet_name??node.bet??node.key??node.type
   if(rawMarket && (node.outcomes||node.values||node.selections||node.prices||node.runners||node.options||node.choices)){
     pushMarket(rows,typeof rawMarket==='object'?(rawMarket.name||rawMarket.key||'Market'):rawMarket,node,fixture,nextBook)
