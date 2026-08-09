@@ -2,6 +2,7 @@ import { buildBoard } from './engine.js'
 import { buildVerifiedOdds } from './oddsV2.js'
 import { leagueGamesPlayed, leagueTotalCompletedGames, hasMinimumLeagueGames, MIN_LEAGUE_GAMES } from './stats.js'
 import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, EARLY_SEASON_POLICY } from './maturity.js'
+import { selectMatureCandidates } from './enrich.js'
 
 const fixtureShape={teams:{home:{name:'Alpha'},away:{name:'Beta'}}}
 
@@ -28,6 +29,25 @@ if(hasMinimumLeagueGames(oneTeamStillThree,MIN_LEAGUE_GAMES)) throw new Error('L
 if(leagueGamesPlayed(allTeamsFour)!==4) throw new Error('All-teams-four maturity value failed')
 if(!hasMinimumLeagueGames(allTeamsFour,MIN_LEAGUE_GAMES)) throw new Error('League where every team has 4 should be allowed')
 if(hasMinimumLeagueGames([],MIN_LEAGUE_GAMES)) throw new Error('Missing standings must not bypass early-season gate')
+
+// Regression for the 595 scanned / 0 picks bug. The old implementation sliced
+// the first N fixtures BEFORE maturity filtering. Here the first three fixtures
+// are immature and the mature ones appear later. With max=2, both mature later
+// fixtures must still be selected.
+const preflightFixtures=[
+  {fixture:{id:101},league:{id:1,season:2026,name:'Early A'}},
+  {fixture:{id:102},league:{id:2,season:2026,name:'Early B'}},
+  {fixture:{id:103},league:{id:3,season:2026,name:'Early C'}},
+  {fixture:{id:201},league:{id:4,season:2026,name:'Mature A'}},
+  {fixture:{id:202},league:{id:5,season:2026,name:'Mature B'}}
+]
+const standingsByLeague=new Map([
+  [1,largeEarlyLeague],[2,largeEarlyLeague],[3,largeEarlyLeague],[4,allTeamsFour],[5,allTeamsFour]
+])
+const preflight=await selectMatureCandidates(preflightFixtures,async league=>standingsByLeague.get(league)||[],2)
+if(preflight.selected.length!==2) throw new Error('Maturity-first candidate selection did not fill the enrichment cap')
+if(preflight.selected[0].f.fixture.id!==201||preflight.selected[1].f.fixture.id!==202) throw new Error('Later mature fixtures were not reached after early-season skips')
+if(preflight.earlySeasonSkipped!==3) throw new Error('Preflight early-season skip count is incorrect')
 
 const statsPayload={data:{bookmakers:[
   {bookmaker:'Pinnacle',markets:{match_odds:{home:{last_seen:1.45},draw:{last_seen:4.40},away:{last_seen:7.00}},total_goals:{'1.5':{over:{last_seen:1.18},under:{last_seen:4.90}},'2.5':{over:{last_seen:1.72},under:{last_seen:2.10}},'3.5':{over:{last_seen:2.62},under:{last_seen:1.47}}},btts:{yes:{last_seen:1.85},no:{last_seen:1.95}},double_chance:{home_or_draw:{last_seen:1.10},home_or_away:{last_seen:1.20},draw_or_away:{last_seen:2.60}}}},
@@ -66,4 +86,4 @@ const unpricedFixture={...fixture,fixtureId:2,match:'Gamma vs Delta',marketOdds:
 const unpricedBoard=buildBoard(filterMatureFixtures([unpricedFixture]),{fixturesScanned:1,generatedAt:new Date().toISOString(),earlySeasonPolicy:EARLY_SEASON_POLICY,minimumLeagueGames:MIN_LEAGUE_GAMES})
 if(unpricedBoard.priority.length!==0) throw new Error('Unpriced fixture was incorrectly published')
 
-console.log(JSON.stringify({ok:true,earlySeasonGate:{minimumPerTeam:MIN_LEAGUE_GAMES,largeLeagueTotalFixtures:leagueTotalCompletedGames(largeEarlyLeague),largeLeagueLeastPlayed:leagueGamesPlayed(largeEarlyLeague),oneTeamOnThreeAllowed:false,allTeamsOnFourAllowed:true,policy:EARLY_SEASON_POLICY},pricingPolicy:board.meta.pricingPolicy,unpricedFixturePublished:unpricedBoard.priority.length,filters:board.groups.threePlus[0].filterCount,home:parsed.home,draw:parsed.draw,away:parsed.away,over25:parsed.over25},null,2))
+console.log(JSON.stringify({ok:true,earlySeasonGate:{minimumPerTeam:MIN_LEAGUE_GAMES,largeLeagueTotalFixtures:leagueTotalCompletedGames(largeEarlyLeague),largeLeagueLeastPlayed:leagueGamesPlayed(largeEarlyLeague),oneTeamOnThreeAllowed:false,allTeamsOnFourAllowed:true,policy:EARLY_SEASON_POLICY},maturityFirstSelection:{earlySkipped:preflight.earlySeasonSkipped,selected:preflight.selected.map(x=>x.f.fixture.id)},pricingPolicy:board.meta.pricingPolicy,unpricedFixturePublished:unpricedBoard.priority.length,filters:board.groups.threePlus[0].filterCount,home:parsed.home,draw:parsed.draw,away:parsed.away,over25:parsed.over25},null,2))
