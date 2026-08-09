@@ -1,0 +1,33 @@
+/* Stats2Pitch v1.8.0 — kickoff + match status + safer market labels */
+.controls .control-grid{grid-template-columns:1fr .85fr 1fr 1fr .95fr .9fr auto!important;align-items:end!important}
+.s2p-status-control{min-width:0!important}
+.s2p-status-control>span{display:block;margin-bottom:6px}
+.s2p-status-hidden{display:none!important}
+
+.priority-compact-match{position:relative}
+.priority-compact-match::before{content:attr(data-kickoff) ' · ' attr(data-status-label);display:block;color:#89a0b2;font-size:11px;font-weight:700;line-height:1.2;margin-bottom:3px;letter-spacing:.01em}
+.priority-compact-match[data-status-label^='LIVE']::before{color:#82f000}
+.priority-compact-match[data-status-label^='FT']::before,.priority-compact-match[data-status-label^='AET']::before,.priority-compact-match[data-status-label^='PEN']::before{color:#a8b6c2}
+
+.s2p-selection-override{font-size:0!important}
+.s2p-selection-override::after{content:attr(data-selection-label);font-size:13px;font-weight:800;color:var(--s2p-green,#7ee600)}
+.pred-table td[data-label='Prediction'].s2p-selection-override::after{font-size:inherit}
+
+.pred-table td[data-label='Time'][data-s2p-status]::after{content:attr(data-s2p-status);display:block;margin-top:4px;font-size:10px;font-weight:800;color:#8da0af;letter-spacing:.03em;text-transform:uppercase}
+.pred-table tr[data-s2p-status='live'] td[data-label='Time']::after{color:#7ee600}
+
+@media(max-width:1200px){
+  .controls .control-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .controls .control-grid .refresh{grid-column:1/-1!important;width:100%!important}
+}
+@media(max-width:760px){
+  .controls .control-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .controls .control-grid .refresh{grid-column:1/-1!important}
+  .priority-compact-match::before{font-size:10px}
+}
+@media(max-width:520px){
+  .controls .control-grid{grid-template-columns:1fr!important}
+  .controls .control-grid>*{grid-column:auto!important}
+  .controls .control-grid .refresh{grid-column:auto!important}
+  .s2p-status-control select{min-height:48px!important}
+}
