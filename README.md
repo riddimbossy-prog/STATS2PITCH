@@ -2,7 +2,7 @@
 
 **From stats to the pitch.**
 
-Stats2Pitch.com is a login-gated football intelligence website built for GitHub, Render and Supabase, with live enrichment from API-Football / API-Sports v3.
+Stats2Pitch.com v1.1.1 is a login-gated football intelligence website built for GitHub, Render and Supabase, with live enrichment from API-Football / API-Sports v3.
 
 ## Brand
 
@@ -31,13 +31,7 @@ Supported access:
 
 To allow a new email/password account to enter Stats2Pitch immediately without clicking a verification email:
 
-1. Open your Supabase project.
-2. Go to **Authentication → Providers → Email**.
-3. Keep Email/Password enabled.
-4. Turn **Confirm email** / **Email confirmations** **OFF**.
-5. Keep new-user signup enabled if `ALLOW_PUBLIC_SIGNUP=true`.
-
-Stats2Pitch detects the common misconfiguration: if a signup succeeds but Supabase still refuses login because confirmation is required, the login screen tells you exactly which setting to change.
+Stats2Pitch v1.1.1 no longer depends on Supabase email-confirmation settings for website signup. The Render server uses the Supabase service-role API to create each website account as **already confirmed**, then the browser signs in immediately. No verification email is required. The service-role key never reaches the browser.
 
 If you want the site to be invite/admin-created users only, set `ALLOW_PUBLIC_SIGNUP=false` on Render. Existing confirmed users can still sign in.
 

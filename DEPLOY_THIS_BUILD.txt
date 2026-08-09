@@ -1,0 +1,17 @@
+STATS2PITCH.COM — FULL REPLACE BUILD v1.1.1
+
+This build fixes the old "Modular Football Agent" screen continuing to appear after deployment.
+
+IMPORTANT:
+1. Replace the old repository contents with THIS build. Do not upload it into a subfolder.
+2. Commit and push to the branch Render is actually deploying.
+3. In Render, deploy the latest commit / clear build cache and deploy.
+4. After deploy, open: https://YOUR-DOMAIN/api/health
+   It must show: "brand":"Stats2Pitch.com" and "version":"1.1.1"
+5. The login page must show the Stats2Pitch logo and "Stats2Pitch.com • build v1.1.1" at the bottom.
+
+CACHE FIX:
+The web app now uses versioned JS/CSS filenames and no-store headers, so the old MF / Modular Football Agent frontend cannot be reused from browser cache after this version is deployed.
+
+NO EMAIL VERIFICATION:
+Website signup is handled through Render -> Supabase Admin and creates the user with email_confirm=true. Users can sign in immediately after creating an account. The Supabase service-role key stays on the Render server and is never sent to the browser.

@@ -13,3 +13,18 @@ export async function saveSnapshot(board,date){
 export async function loadLatestSnapshot(){
  need(); const r=await fetch(`${url}/rest/v1/prediction_snapshots?select=payload,generated_at,snapshot_date&order=generated_at.desc&limit=1`,{headers:{apikey:service,Authorization:`Bearer ${service}`}}); if(!r.ok)throw new Error(`Supabase snapshot read failed (${r.status})`); const rows=await r.json(); return rows?.[0]?.payload||null
 }
+export async function createConfirmedUser(email,password){
+ need();
+ const r=await fetch(`${url}/auth/v1/admin/users`,{
+  method:'POST',
+  headers:{apikey:service,Authorization:`Bearer ${service}`,'Content-Type':'application/json'},
+  body:JSON.stringify({email,password,email_confirm:true})
+ });
+ const body=await r.json().catch(()=>({}));
+ if(!r.ok){
+  const msg=body?.msg||body?.message||body?.error_description||body?.error||`Supabase admin user creation failed (${r.status})`;
+  const err=new Error(msg); err.status=r.status; throw err;
+ }
+ return body;
+}
+
