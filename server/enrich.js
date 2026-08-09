@@ -1,5 +1,5 @@
-import { getFixturesByDate, getStandings, getRecent, getFixtureOdds } from './apiFootball.js'
-import { deriveRecentStats, standingMetrics, parse1x2Odds, leagueGamesPlayed, leagueTotalCompletedGames, leagueAverageTeamPlayed, hasMinimumLeagueGames, MIN_LEAGUE_GAMES } from './stats.js'
+import { getFixturesByDate, getStandings, getRecentLeagueVenue, getFixtureOdds } from './apiFootball.js'
+import { deriveVenueRecentStats, splitStandingMetrics, overallStandingMetrics, parse1x2Odds, leagueGamesPlayed, leagueTotalCompletedGames, leagueAverageTeamPlayed, hasMinimumLeagueGames, MIN_LEAGUE_GAMES, SPLIT_ENGINE_POLICY } from './stats.js'
 import { getStatsOddsForFixture, statsApiConfigured } from './statsApi.js'
 import { getStatsOddsFallback } from './statsFallback.js'
 import { buildVerifiedOdds } from './oddsV2.js'
@@ -36,17 +36,6 @@ async function statsOddsFor(fixture){
   return null
 }
 
-/**
- * IMPORTANT: maturity is checked BEFORE the expensive enrichment cap is used.
- *
- * The previous code did `upcoming.slice(0, max)` first. On busy days that meant
- * the first 60 fixtures could all be Round 1-3 competitions; every one was then
- * rejected by the 4-game rule and later mature fixtures were never inspected.
- *
- * This helper walks the whole upcoming pool (with standings cached per league),
- * skips immature competitions, and only counts a fixture toward `max` after it
- * has passed the 4-game league gate.
- */
 export async function selectMatureCandidates(upcoming, standingsFor, max=60) {
   const selected=[]
   let earlySeasonSkipped=0
@@ -62,7 +51,7 @@ export async function selectMatureCandidates(upcoming, standingsFor, max=60) {
 
       if (!hasMinimumLeagueGames(st, MIN_LEAGUE_GAMES)) {
         earlySeasonSkipped++
-        console.log(`Skipping early-season fixture ${f.fixture?.id}: ${f.league?.name||'league'} least-played team has ${leagueMinimumPlayed}/${MIN_LEAGUE_GAMES} matches.`)
+        console.log(`Skipping early-season fixture ${f.fixture?.id}: ${f.league?.name||'league'} least-played team has ${leagueMinimumPlayed}/${MIN_LEAGUE_GAMES} overall matches.`)
         continue
       }
 
@@ -72,7 +61,6 @@ export async function selectMatureCandidates(upcoming, standingsFor, max=60) {
       console.warn('Standings unavailable while pre-screening fixture',f.fixture?.id,e.message)
     }
   }
-
   return {selected,earlySeasonSkipped,standingsUnavailable}
 }
 
@@ -88,25 +76,23 @@ export async function enrichDate(requestedDate){
     if(!standingCache.has(k)) standingCache.set(k, await getStandings(league,season))
     return standingCache.get(k)
   }
-  async function recent(team){
-    if(!recentCache.has(team)) recentCache.set(team, await getRecent(team))
-    return recentCache.get(team)
+  async function recentSplit(team,league,season,venue){
+    const k=`${team}:${league}:${season}:${venue}`
+    if(!recentCache.has(k))recentCache.set(k,getRecentLeagueVenue(team,league,season,venue,10))
+    return recentCache.get(k)
   }
 
-  // v1.7.7: scan for mature competitions first, then spend recent-form/odds API
-  // calls on up to `max` fixtures that are actually eligible.
   const preflight=await selectMatureCandidates(upcoming,standings,max)
   const enriched=[]
-  let earlySeasonSkipped=preflight.earlySeasonSkipped
   let teamGateSkipped=0
 
   for (const candidate of preflight.selected) {
     const {f,st,leagueMinimumPlayed,leagueAveragePlayed,leagueTotalGames}=candidate
     try {
       const leagueSize=st.length || null
-      const [hr,ar,apiOddsRaw,statsOdds] = await Promise.all([
-        recent(f.teams.home.id),
-        recent(f.teams.away.id),
+      const [homeVenueRows,awayVenueRows,apiOddsRaw,statsOdds] = await Promise.all([
+        recentSplit(f.teams.home.id,f.league.id,f.league.season,'home'),
+        recentSplit(f.teams.away.id,f.league.id,f.league.season,'away'),
         getFixtureOdds(f.fixture.id).catch(e => {
           console.warn('Primary odds unavailable for fixture',f.fixture?.id,e.message)
           return []
@@ -114,21 +100,31 @@ export async function enrichDate(requestedDate){
         statsOddsFor(f)
       ])
 
-      const hm={...deriveRecentStats(hr,f.teams.home.id),...standingMetrics(st,f.teams.home.id)}
-      const am={...deriveRecentStats(ar,f.teams.away.id),...standingMetrics(st,f.teams.away.id)}
+      const homeOverall=overallStandingMetrics(st,f.teams.home.id)
+      const awayOverall=overallStandingMetrics(st,f.teams.away.id)
+      const hm={
+        ...deriveVenueRecentStats(homeVenueRows,f.teams.home.id,'home'),
+        ...splitStandingMetrics(st,f.teams.home.id,'home'),
+        overall:homeOverall
+      }
+      const am={
+        ...deriveVenueRecentStats(awayVenueRows,f.teams.away.id,'away'),
+        ...splitStandingMetrics(st,f.teams.away.id,'away'),
+        overall:awayOverall
+      }
 
-      // Independent fixture-team check remains in place. A competition may be
-      // mature, but a malformed/missing standings row must never sneak through.
-      if (Number(hm.played||0) < MIN_LEAGUE_GAMES || Number(am.played||0) < MIN_LEAGUE_GAMES) {
+      // Four-game maturity remains an OVERALL league-sample rule. It must not
+      // accidentally become a four-home / four-away requirement after the split
+      // engine change.
+      if (Number(hm.overallPlayed||0) < MIN_LEAGUE_GAMES || Number(am.overallPlayed||0) < MIN_LEAGUE_GAMES) {
         teamGateSkipped++
-        console.log(`Skipping fixture ${f.fixture?.id}: ${f.teams.home.name} played ${hm.played||0}, ${f.teams.away.name} played ${am.played||0}; both need ${MIN_LEAGUE_GAMES}+.`)
+        console.log(`Skipping fixture ${f.fixture?.id}: overall games are ${hm.overallPlayed||0}/${am.overallPlayed||0}; both need ${MIN_LEAGUE_GAMES}+.`)
         continue
       }
 
       const verified=buildVerifiedOdds({apiPayload:apiOddsRaw,statsPayload:statsOdds?.payload,fixture:f})
       const api1x2=parse1x2Odds(apiOddsRaw) || {}
       const odds=withFallback(verified.canonical,api1x2)
-      const marketOdds=verified.marketOdds
 
       enriched.push({
         fixtureId:f.fixture.id,
@@ -143,14 +139,16 @@ export async function enrichDate(requestedDate){
         leagueAveragePlayed,
         leagueTotalCompletedGames:leagueTotalGames,
         earlySeasonEligible:true,
+        splitPolicy:SPLIT_ENGINE_POLICY,
+        splitMode:'home-vs-away',
         home:{id:f.teams.home.id,name:f.teams.home.name,logo:f.teams.home.logo||null,leagueSize,...hm},
         away:{id:f.teams.away.id,name:f.teams.away.name,logo:f.teams.away.logo||null,leagueSize,...am},
         odds,
-        marketOdds
+        marketOdds:verified.marketOdds
       })
       await sleep(35)
     } catch (e) {
-      console.warn('Skipping fixture during enrichment',f.fixture?.id,e.message)
+      console.warn('Skipping fixture during split enrichment',f.fixture?.id,e.message)
     }
   }
 
@@ -160,7 +158,8 @@ export async function enrichDate(requestedDate){
     rawCount:raw.length,
     upcomingCount:upcoming.length,
     maturityCandidates:preflight.selected.length,
-    earlySeasonSkipped:earlySeasonSkipped+teamGateSkipped,
-    standingsUnavailable:preflight.standingsUnavailable
+    earlySeasonSkipped:preflight.earlySeasonSkipped+teamGateSkipped,
+    standingsUnavailable:preflight.standingsUnavailable,
+    splitPolicy:SPLIT_ENGINE_POLICY
   }
 }
