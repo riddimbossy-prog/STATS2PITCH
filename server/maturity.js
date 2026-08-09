@@ -1,6 +1,6 @@
 import { MIN_LEAGUE_GAMES } from './stats.js'
 
-export const EARLY_SEASON_POLICY = 'every-team-minimum-10'
+export const EARLY_SEASON_POLICY = 'every-team-minimum-4'
 
 const n = v => Number(v)
 
@@ -8,8 +8,8 @@ const n = v => Number(v)
  * Fail-closed fixture maturity check.
  * A fixture is eligible only when:
  *  - enrichment explicitly marked it eligible,
- *  - the least-played team in the league has 10+ matches,
- *  - both teams in this fixture individually have 10+ matches.
+ *  - the least-played team in the league has 4+ matches,
+ *  - both teams in this fixture individually have 4+ matches.
  */
 export function isMatureFixture(fixture, minimum=MIN_LEAGUE_GAMES) {
   const required = Number(minimum || MIN_LEAGUE_GAMES)
@@ -24,8 +24,8 @@ export function filterMatureFixtures(fixtures, minimum=MIN_LEAGUE_GAMES) {
 }
 
 /**
- * Old saved snapshots were generated before the strict policy existed and can
- * contain early-season picks. Fail closed instead of showing them after deploy.
+ * Saved snapshots must have been produced under the current four-game policy.
+ * Older policy snapshots fail closed until a fresh refresh is generated.
  */
 export function snapshotHasStrictMaturityPolicy(board) {
   return board?.meta?.earlySeasonPolicy === EARLY_SEASON_POLICY &&
