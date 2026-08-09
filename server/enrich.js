@@ -36,11 +36,51 @@ async function statsOddsFor(fixture){
   return null
 }
 
+/**
+ * IMPORTANT: maturity is checked BEFORE the expensive enrichment cap is used.
+ *
+ * The previous code did `upcoming.slice(0, max)` first. On busy days that meant
+ * the first 60 fixtures could all be Round 1-3 competitions; every one was then
+ * rejected by the 4-game rule and later mature fixtures were never inspected.
+ *
+ * This helper walks the whole upcoming pool (with standings cached per league),
+ * skips immature competitions, and only counts a fixture toward `max` after it
+ * has passed the 4-game league gate.
+ */
+export async function selectMatureCandidates(upcoming, standingsFor, max=60) {
+  const selected=[]
+  let earlySeasonSkipped=0
+  let standingsUnavailable=0
+
+  for (const f of Array.isArray(upcoming)?upcoming:[]) {
+    if (selected.length >= max) break
+    try {
+      const st=await standingsFor(f.league.id,f.league.season)
+      const leagueMinimumPlayed=leagueGamesPlayed(st)
+      const leagueAveragePlayed=leagueAverageTeamPlayed(st)
+      const leagueTotalGames=leagueTotalCompletedGames(st)
+
+      if (!hasMinimumLeagueGames(st, MIN_LEAGUE_GAMES)) {
+        earlySeasonSkipped++
+        console.log(`Skipping early-season fixture ${f.fixture?.id}: ${f.league?.name||'league'} least-played team has ${leagueMinimumPlayed}/${MIN_LEAGUE_GAMES} matches.`)
+        continue
+      }
+
+      selected.push({f,st,leagueMinimumPlayed,leagueAveragePlayed,leagueTotalGames})
+    } catch (e) {
+      standingsUnavailable++
+      console.warn('Standings unavailable while pre-screening fixture',f.fixture?.id,e.message)
+    }
+  }
+
+  return {selected,earlySeasonSkipped,standingsUnavailable}
+}
+
 export async function enrichDate(requestedDate){
   const date=/^\d{4}-\d{2}-\d{2}$/.test(requestedDate||'')?requestedDate:localDate()
   const raw=await getFixturesByDate(date)
-  const max=Number(process.env.MAX_FIXTURES_PER_REFRESH||60)
-  const fixtures=raw.filter(f=>f.fixture?.status?.short==='NS' || f.fixture?.status?.short==='TBD').slice(0,max)
+  const max=Math.max(1,Number(process.env.MAX_FIXTURES_PER_REFRESH||60))
+  const upcoming=raw.filter(f=>f.fixture?.status?.short==='NS' || f.fixture?.status?.short==='TBD')
   const standingCache=new Map(), recentCache=new Map()
 
   async function standings(league,season){
@@ -53,26 +93,16 @@ export async function enrichDate(requestedDate){
     return recentCache.get(team)
   }
 
+  // v1.7.7: scan for mature competitions first, then spend recent-form/odds API
+  // calls on up to `max` fixtures that are actually eligible.
+  const preflight=await selectMatureCandidates(upcoming,standings,max)
   const enriched=[]
-  let earlySeasonSkipped=0
-  for (const f of fixtures) {
+  let earlySeasonSkipped=preflight.earlySeasonSkipped
+  let teamGateSkipped=0
+
+  for (const candidate of preflight.selected) {
+    const {f,st,leagueMinimumPlayed,leagueAveragePlayed,leagueTotalGames}=candidate
     try {
-      const st=await standings(f.league.id,f.league.season)
-      const leagueMinimumPlayed=leagueGamesPlayed(st)
-      const leagueAveragePlayed=leagueAverageTeamPlayed(st)
-      const leagueTotalGames=leagueTotalCompletedGames(st)
-
-      // STRICT EARLY-SEASON SAFETY GATE:
-      // The previous implementation counted total fixtures across the whole
-      // competition. That could reach 10 after only 1-2 rounds in a large league.
-      // Now the least-played team in the standings must have 10+ matches.
-      // Missing/empty standings fail closed.
-      if (!hasMinimumLeagueGames(st, MIN_LEAGUE_GAMES)) {
-        earlySeasonSkipped++
-        console.log(`Skipping early-season fixture ${f.fixture?.id}: ${f.league?.name||'league'} least-played team has ${leagueMinimumPlayed}/${MIN_LEAGUE_GAMES} matches (league average ${leagueAveragePlayed}, total competition fixtures ${leagueTotalGames}).`)
-        continue
-      }
-
       const leagueSize=st.length || null
       const [hr,ar,apiOddsRaw,statsOdds] = await Promise.all([
         recent(f.teams.home.id),
@@ -87,9 +117,10 @@ export async function enrichDate(requestedDate){
       const hm={...deriveRecentStats(hr,f.teams.home.id),...standingMetrics(st,f.teams.home.id)}
       const am={...deriveRecentStats(ar,f.teams.away.id),...standingMetrics(st,f.teams.away.id)}
 
-      // Extra fail-closed check for the two teams actually playing.
+      // Independent fixture-team check remains in place. A competition may be
+      // mature, but a malformed/missing standings row must never sneak through.
       if (Number(hm.played||0) < MIN_LEAGUE_GAMES || Number(am.played||0) < MIN_LEAGUE_GAMES) {
-        earlySeasonSkipped++
+        teamGateSkipped++
         console.log(`Skipping fixture ${f.fixture?.id}: ${f.teams.home.name} played ${hm.played||0}, ${f.teams.away.name} played ${am.played||0}; both need ${MIN_LEAGUE_GAMES}+.`)
         continue
       }
@@ -119,8 +150,17 @@ export async function enrichDate(requestedDate){
       })
       await sleep(35)
     } catch (e) {
-      console.warn('Skipping fixture',f.fixture?.id,e.message)
+      console.warn('Skipping fixture during enrichment',f.fixture?.id,e.message)
     }
   }
-  return {date, fixtures:enriched, rawCount:raw.length, earlySeasonSkipped}
+
+  return {
+    date,
+    fixtures:enriched,
+    rawCount:raw.length,
+    upcomingCount:upcoming.length,
+    maturityCandidates:preflight.selected.length,
+    earlySeasonSkipped:earlySeasonSkipped+teamGateSkipped,
+    standingsUnavailable:preflight.standingsUnavailable
+  }
 }
