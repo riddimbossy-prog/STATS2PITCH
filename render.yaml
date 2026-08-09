@@ -22,8 +22,6 @@ services:
         value: true
       - key: ALLOW_PUBLIC_SIGNUP
         value: true
-      - key: ENABLE_GITHUB_LOGIN
-        value: true
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
@@ -34,3 +32,17 @@ services:
         sync: false
       - key: API_FOOTBALL_BASE
         value: https://v3.football.api-sports.io
+      - key: STATS_API_KEY
+        sync: false
+      - key: STATS_API_BASE_URL
+        value: https://api.thestatsapi.com/api
+      - key: STATS_API_MIN_INTERVAL_MS
+        value: 300
+      - key: STATS_API_REQUESTS_PER_MINUTE
+        value: 40
+      - key: STATS_VALUE_CACHE_TTL_SECONDS
+        value: 1800
+      - key: STATS_API_COMPETITION_PAGES
+        value: 5
+      - key: STATS_API_MAX_MATCH_PAGES
+        value: 5

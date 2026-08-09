@@ -1,8 +1,11 @@
 import { getFixturesByDate, getStandings, getRecent, getFixtureOdds } from './apiFootball.js'
 import { deriveRecentStats, standingMetrics, parse1x2Odds } from './stats.js'
+import { getStatsOddsForFixture, parseStatsApiMarkets, parseApiFootballMarkets, mergeMarkets, canonicalOddsFromMarkets, statsApiConfigured } from './statsApi.js'
 
 const sleep = ms => new Promise(r=>setTimeout(r,ms))
 const localDate = () => new Intl.DateTimeFormat('en-CA',{timeZone:process.env.APP_TIMEZONE||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+
+function has1x2(o){ return o && Number.isFinite(Number(o.home)) && Number.isFinite(Number(o.draw)) && Number.isFinite(Number(o.away)) }
 
 export async function enrichDate(requestedDate){
   const date=/^\d{4}-\d{2}-\d{2}$/.test(requestedDate||'')?requestedDate:localDate()
@@ -19,15 +22,33 @@ export async function enrichDate(requestedDate){
     try {
       const st=await standings(f.league.id,f.league.season)
       const leagueSize=st.length || null
-      const [hr,ar,oraw]=await Promise.all([recent(f.teams.home.id),recent(f.teams.away.id),getFixtureOdds(f.fixture.id)])
+      const statsOddsPromise = statsApiConfigured()
+        ? getStatsOddsForFixture(f).catch(e => { console.warn('Stats odds enrichment skipped for fixture',f.fixture?.id,e.message); return null })
+        : Promise.resolve(null)
+      const [hr,ar,apiOddsRaw,statsOdds] = await Promise.all([
+        recent(f.teams.home.id),
+        recent(f.teams.away.id),
+        getFixtureOdds(f.fixture.id).catch(e => { console.warn('Football odds unavailable for fixture',f.fixture?.id,e.message); return [] }),
+        statsOddsPromise
+      ])
       const hm={...deriveRecentStats(hr,f.teams.home.id),...standingMetrics(st,f.teams.home.id)}
       const am={...deriveRecentStats(ar,f.teams.away.id),...standingMetrics(st,f.teams.away.id)}
-      const odds=parse1x2Odds(oraw)
+
+      const apiMarkets=parseApiFootballMarkets(apiOddsRaw)
+      const statsMarkets=parseStatsApiMarkets(statsOdds?.payload)
+      const marketOdds=mergeMarkets(apiMarkets,statsMarkets)
+      let odds=canonicalOddsFromMarkets(marketOdds)
+      const api1x2=parse1x2Odds(apiOddsRaw)
+      if (!has1x2(odds) && api1x2) odds={...odds,...api1x2}
+
       enriched.push({
         fixtureId:f.fixture.id, match:`${f.teams.home.name} vs ${f.teams.away.name}`, league:f.league.name, country:f.league.country || '', kickoff:f.fixture.date,
         kickoffLocal:new Date(f.fixture.date).toLocaleString('en-GB',{timeZone:process.env.APP_TIMEZONE||'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),
         leagueLogo:f.league.logo||null, countryFlag:f.league.flag||null,
-        home:{id:f.teams.home.id,name:f.teams.home.name,logo:f.teams.home.logo||null,leagueSize,...hm}, away:{id:f.teams.away.id,name:f.teams.away.name,logo:f.teams.away.logo||null,leagueSize,...am}, odds
+        home:{id:f.teams.home.id,name:f.teams.home.name,logo:f.teams.home.logo||null,leagueSize,...hm},
+        away:{id:f.teams.away.id,name:f.teams.away.name,logo:f.teams.away.logo||null,leagueSize,...am},
+        odds,
+        marketOdds
       })
       await sleep(35)
     } catch (e) {

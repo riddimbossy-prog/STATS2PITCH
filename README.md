@@ -2,7 +2,7 @@
 
 **From stats to the pitch.**
 
-Stats2Pitch.com v1.1.1 is a login-gated football intelligence website built for GitHub, Render and Supabase, with live enrichment from API-Football / API-Sports v3.
+Stats2Pitch.com v1.3.0 is a login-gated football intelligence website built for GitHub, Render and Supabase, with live enrichment from API-Football / API-Sports v3 plus TheStatsAPI for broader odds and market coverage.
 
 ## Brand
 
@@ -22,7 +22,6 @@ Supported access:
 
 - Email + password sign in
 - Email + password account creation (controlled by `ALLOW_PUBLIC_SIGNUP`)
-- GitHub OAuth (controlled by `ENABLE_GITHUB_LOGIN`)
 - JWT verification on every protected Render API request
 - Refresh-token session renewal
 - Server-side sign-out + local token cleanup
@@ -42,7 +41,13 @@ If you want the site to be invite/admin-created users only, set `ALLOW_PUBLIC_SI
 - Season goals scored/conceded per match
 - Last-5 win/loss rates
 - Last-10 O/U 1.5, 2.5 and 3.5 hit rates
-- Real 1X2 + draw odds where API-Football supplies them
+- Real 1X2 + draw odds merged from API-Football and TheStatsAPI where available
+- Broader market prices preserved from both providers, including totals, BTTS, double chance and any additional market containers returned
+- Goal picks now show their real available market price when found
+- Per-match **See markets** view with all normalized available prices
+- Filter picker that can show matches meeting **any** or **all** selected conditions
+- Sorting by selected filters, most reasons, lowest price, kickoff time or team name
+- Plain-English user-facing explanations; provider/backend diagnostics stay off the public board
 - Single / 2 / 3+ modular classification
 - Opponent-weakness logic
 - Contradiction grading
@@ -88,18 +93,22 @@ Required secrets:
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `API_FOOTBALL_KEY`
+- `STATS_API_KEY` (recommended for broader odds/market coverage)
 
 Useful switches:
 
 - `ALLOW_PUBLIC_SIGNUP=true`
-- `ENABLE_GITHUB_LOGIN=true`
 - `ALLOW_MANUAL_REFRESH=true`
 - `MAX_FIXTURES_PER_REFRESH=60`
 - `CACHE_TTL_SECONDS=900`
 
-## API-Football usage
+## Football data usage
 
-The server calls API-Sports v3 endpoints for fixtures, standings, recent team fixtures and odds. Identical calls are cached in memory to reduce API consumption. Missing odds/stats are never invented.
+API-Football remains the canonical fixture, standings and recent-form source. Its odds feed is also parsed for every market it returns.
+
+TheStatsAPI is an additive odds source using `https://api.thestatsapi.com/api`. The server matches Stats API competitions and fixtures to the canonical API-Football fixture, requests `/football/matches/<matchId>/odds`, normalizes every market it can safely identify, and merges the best available price for each choice. The integration is fail-safe: if Stats API is unavailable or a fixture cannot be matched, the API-Football data remains usable.
+
+The `STATS_API_KEY` is server-side only and is never sent to the browser. Missing data is never invented.
 
 ## Board stability
 

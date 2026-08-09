@@ -12,17 +12,6 @@
 8. If you want only admin-created/invited users, set Render `ALLOW_PUBLIC_SIGNUP=false`.
 9. Copy your project URL, anon/public key and service-role key.
 
-### Optional GitHub login
-
-If you want the **Continue with GitHub** button:
-
-1. Supabase → Authentication → Providers → GitHub.
-2. Enable GitHub and configure its OAuth credentials.
-3. Use the callback URL Supabase shows for the GitHub provider.
-4. After Render deploys, add the Render URL and then `https://stats2pitch.com` to Supabase Auth URL Configuration / Redirect URLs.
-5. Keep Render `ENABLE_GITHUB_LOGIN=true`.
-
-If you do not want GitHub OAuth, set `ENABLE_GITHUB_LOGIN=false`.
 
 ## 2. GitHub
 
@@ -45,10 +34,12 @@ If you do not want GitHub OAuth, set `ENABLE_GITHUB_LOGIN=false`.
    - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `API_FOOTBALL_KEY`
-5. Keep `API_FOOTBALL_BASE=https://v3.football.api-sports.io` unless your provider says otherwise.
-6. Deploy.
-7. Open `/api/health` on the Render domain. It should return JSON with `"ok": true`.
-8. Open the main site and use **Create account** or **Sign in**.
+   - `STATS_API_KEY`
+5. Keep `API_FOOTBALL_BASE=https://v3.football.api-sports.io`.
+6. Keep `STATS_API_BASE_URL=https://api.thestatsapi.com/api`.
+7. Deploy.
+8. Open `/api/health` on the Render domain. It should return JSON with `"ok": true` and version `1.3.0`.
+9. Open the main site and use **Create account** or **Sign in**.
 
 ### Quick login test with no verification
 
@@ -80,12 +71,16 @@ After the Render service works on its temporary Render URL:
 3. Calculates position, season PPG, season goals scored/game and conceded/game.
 4. Downloads each team's recent completed matches.
 5. Calculates Last-5 win/loss form and Last-10 O/U hit rates.
-6. Loads real 1X2 odds where API-Football provides them.
-7. Runs the modular filters and contradiction checks.
-8. Separates Single / 2 / 3+ filter matches.
-9. Stores the board in Supabase.
-10. If a later refresh fails, keeps the last good board instead of clearing it.
+6. Loads API-Football odds and every available market returned.
+7. Uses TheStatsAPI as an additive odds source, matches the same fixture and loads its available markets.
+8. Merges the available prices without inventing missing data.
+9. Runs the modular filters and consistency checks.
+10. Separates one-reason, two-reason and strong multi-reason matches.
+11. Stores the board in Supabase.
+12. If a later refresh fails, keeps the last good board instead of clearing it.
 
-## 6. API limits
+## 6. Data-service limits
 
-`MAX_FIXTURES_PER_REFRESH` defaults to `60`. Reduce it if your API plan has a lower request allowance. Identical API requests are cached for `CACHE_TTL_SECONDS` (default `900`).
+`MAX_FIXTURES_PER_REFRESH` defaults to `60`. Reduce it if your API-Football plan has a lower request allowance. Identical API-Football requests are cached for `CACHE_TTL_SECONDS` (default `900`).
+
+TheStatsAPI defaults to `40` requests per minute and a `300ms` minimum spacing, with a `1800` second value cache. You can tune `STATS_API_REQUESTS_PER_MINUTE`, `STATS_API_MIN_INTERVAL_MS`, `STATS_VALUE_CACHE_TTL_SECONDS`, `STATS_API_COMPETITION_PAGES`, and `STATS_API_MAX_MATCH_PAGES` on Render if your plan needs different limits.
