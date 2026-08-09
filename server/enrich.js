@@ -32,6 +32,9 @@ function apiHasPublishableCoverage(verified){
   const completeBtts=validOdd(c.bttsYes)&&validOdd(c.bttsNo)
   return complete1x2||completeGoalLine||completeBtts
 }
+function hasEnginePrice(odds){
+  return ['home','away','over15','under15','over25','under25','over35','under35'].some(k=>validOdd(odds?.[k]))
+}
 
 async function statsOddsFor(fixture){
   if(!statsApiConfigured())return null
@@ -63,7 +66,6 @@ export async function selectMatureCandidates(upcoming, standingsFor, max=60, onP
 
       if (!hasMinimumLeagueGames(st, MIN_LEAGUE_GAMES)) {
         earlySeasonSkipped++
-        console.log(`Skipping early-season fixture ${f.fixture?.id}: ${f.league?.name||'league'} least-played team has ${leagueMinimumPlayed}/${MIN_LEAGUE_GAMES} overall matches.`)
       } else {
         selected.push({f,st,leagueMinimumPlayed,leagueAveragePlayed,leagueTotalGames})
       }
@@ -85,6 +87,9 @@ export async function enrichDate(requestedDate,options={}){
   const raw=await getFixturesByDate(date)
   const max=Math.max(1,Number(process.env.MAX_FIXTURES_PER_REFRESH||60))
   const upcoming=raw.filter(f=>f.fixture?.status?.short==='NS' || f.fixture?.status?.short==='TBD')
+  const defaultPreflight=Math.max(max,Math.min(upcoming.length,max*4))
+  const preflightLimit=Math.max(max,Math.min(upcoming.length,Number(process.env.MAX_MATURE_PREFLIGHT||defaultPreflight)))
+  const maxStatsFallbacks=Math.max(0,Number(process.env.MAX_STATS_ODDS_FALLBACKS_PER_REFRESH||20))
   const standingCache=new Map(), recentCache=new Map()
   emit(onProgress,{phase:'fixtures',message:`Loaded ${raw.length} fixtures; ${upcoming.length} are pre-kickoff.`,current:raw.length,total:raw.length})
 
@@ -99,58 +104,78 @@ export async function enrichDate(requestedDate,options={}){
     return recentCache.get(k)
   }
 
-  const preflight=await selectMatureCandidates(upcoming,standings,max,onProgress)
+  // v1.9.1 stopped after the first 60 mature fixtures even if all 60 were
+  // unpriced. On a large fixture day that could still produce a zero board while
+  // later mature fixtures had usable prices. Preflight a broader mature pool and
+  // only spend the final 60-slot budget on priced, enrichable fixtures.
+  const preflight=await selectMatureCandidates(upcoming,standings,preflightLimit,onProgress)
   const enriched=[]
   let teamGateSkipped=0
   let statsOddsFallbacks=0
+  let statsFallbackCapSkipped=0
+  let unpricedSkipped=0
+  let shortSplitHistory=0
+  let enrichmentErrors=0
+  let candidatesAttempted=0
 
-  for (let i=0;i<preflight.selected.length;i++) {
+  for (let i=0;i<preflight.selected.length&&enriched.length<max;i++) {
     const candidate=preflight.selected[i]
     const {f,st,leagueMinimumPlayed,leagueAveragePlayed,leagueTotalGames}=candidate
-    emit(onProgress,{phase:'enrich',message:`Enriching mature fixtures: ${i+1}/${preflight.selected.length}`,current:i+1,total:preflight.selected.length,selected:enriched.length})
+    candidatesAttempted++
+    emit(onProgress,{phase:'enrich',message:`Finding priced split fixtures: ${enriched.length}/${max} ready (${i+1}/${preflight.selected.length} candidates checked)`,current:i+1,total:preflight.selected.length,selected:enriched.length})
     try {
       const leagueSize=st.length || null
-      const [homeVenueRows,awayVenueRows,apiOddsRaw] = await Promise.all([
-        recentSplit(f.teams.home.id,f.league.id,f.league.season,'home'),
-        recentSplit(f.teams.away.id,f.league.id,f.league.season,'away'),
-        getFixtureOdds(f.fixture.id).catch(e => {
-          console.warn('Primary odds unavailable for fixture',f.fixture?.id,e.message)
-          return []
-        })
-      ])
-
       const homeOverall=overallStandingMetrics(st,f.teams.home.id)
       const awayOverall=overallStandingMetrics(st,f.teams.away.id)
-      const hm={
-        ...deriveVenueRecentStats(homeVenueRows,f.teams.home.id,'home'),
-        ...splitStandingMetrics(st,f.teams.home.id,'home'),
-        overall:homeOverall
-      }
-      const am={
-        ...deriveVenueRecentStats(awayVenueRows,f.teams.away.id,'away'),
-        ...splitStandingMetrics(st,f.teams.away.id,'away'),
-        overall:awayOverall
-      }
+      const homeStanding=splitStandingMetrics(st,f.teams.home.id,'home')
+      const awayStanding=splitStandingMetrics(st,f.teams.away.id,'away')
 
-      if (Number(hm.overallPlayed||0) < MIN_LEAGUE_GAMES || Number(am.overallPlayed||0) < MIN_LEAGUE_GAMES) {
+      if (Number(homeOverall.played||0) < MIN_LEAGUE_GAMES || Number(awayOverall.played||0) < MIN_LEAGUE_GAMES) {
         teamGateSkipped++
-        console.log(`Skipping fixture ${f.fixture?.id}: overall games are ${hm.overallPlayed||0}/${am.overallPlayed||0}; both need ${MIN_LEAGUE_GAMES}+.`)
         continue
       }
 
-      // API-Football is the fast primary odds source. TheStatsAPI is now a true
-      // fallback only when the primary feed has no complete publishable market.
-      // This avoids the 40-requests/minute secondary-feed queue making an
-      // interactive refresh take many minutes on a 60-fixture board.
+      // Price first. There is no reason to spend two split-history requests on a
+      // fixture the engine cannot publish because no verified market price exists.
+      const apiOddsRaw=await getFixtureOdds(f.fixture.id).catch(e => {
+        console.warn('Primary odds unavailable for fixture',f.fixture?.id,e.message)
+        return []
+      })
       const apiVerified=buildVerifiedOdds({apiPayload:apiOddsRaw,statsPayload:null,fixture:f})
       let statsOdds=null
-      if(!apiHasPublishableCoverage(apiVerified)){
+      if(!apiHasPublishableCoverage(apiVerified)&&statsOddsFallbacks<maxStatsFallbacks){
         statsOddsFallbacks++
         statsOdds=await statsOddsFor(f)
+      }else if(!apiHasPublishableCoverage(apiVerified)&&statsOddsFallbacks>=maxStatsFallbacks){
+        statsFallbackCapSkipped++
       }
       const verified=statsOdds?.payload?buildVerifiedOdds({apiPayload:apiOddsRaw,statsPayload:statsOdds.payload,fixture:f}):apiVerified
       const api1x2=parse1x2Odds(apiOddsRaw) || {}
       const odds=withFallback(verified.canonical,api1x2)
+      if(!hasEnginePrice(odds)){
+        unpricedSkipped++
+        continue
+      }
+
+      // Split history is fail-soft. If the chronological provider route is
+      // unavailable, strict season HOME/AWAY standings remain usable and recent
+      // form/goal-hit-rate filters simply stay null.
+      const [homeVenueRows,awayVenueRows] = await Promise.all([
+        recentSplit(f.teams.home.id,f.league.id,f.league.season,'home').catch(e=>{console.warn('Home split history unavailable',f.fixture?.id,e.message);return[]}),
+        recentSplit(f.teams.away.id,f.league.id,f.league.season,'away').catch(e=>{console.warn('Away split history unavailable',f.fixture?.id,e.message);return[]})
+      ])
+      if(homeVenueRows.length<5||awayVenueRows.length<5)shortSplitHistory++
+
+      const hm={
+        ...deriveVenueRecentStats(homeVenueRows,f.teams.home.id,'home'),
+        ...homeStanding,
+        overall:homeOverall
+      }
+      const am={
+        ...deriveVenueRecentStats(awayVenueRows,f.teams.away.id,'away'),
+        ...awayStanding,
+        overall:awayOverall
+      }
 
       enriched.push({
         fixtureId:f.fixture.id,
@@ -172,23 +197,30 @@ export async function enrichDate(requestedDate,options={}){
         odds,
         marketOdds:verified.marketOdds
       })
-      await sleep(35)
+      await sleep(20)
     } catch (e) {
+      enrichmentErrors++
       console.warn('Skipping fixture during split enrichment',f.fixture?.id,e.message)
     }
   }
 
-  emit(onProgress,{phase:'enrich',message:`Enrichment finished: ${enriched.length} mature fixtures ready.`,current:preflight.selected.length,total:preflight.selected.length,selected:enriched.length})
+  emit(onProgress,{phase:'enrich',message:`Enrichment finished: ${enriched.length} priced mature fixtures ready.`,current:candidatesAttempted,total:preflight.selected.length,selected:enriched.length})
   return {
     date,
     fixtures:enriched,
     rawFixtures:raw,
     rawCount:raw.length,
     upcomingCount:upcoming.length,
+    preflightLimit,
     maturityCandidates:preflight.selected.length,
+    candidatesAttempted,
     earlySeasonSkipped:preflight.earlySeasonSkipped+teamGateSkipped,
     standingsUnavailable:preflight.standingsUnavailable,
     statsOddsFallbacks,
+    statsFallbackCapSkipped,
+    unpricedSkipped,
+    shortSplitHistory,
+    enrichmentErrors,
     splitPolicy:SPLIT_ENGINE_POLICY
   }
 }
