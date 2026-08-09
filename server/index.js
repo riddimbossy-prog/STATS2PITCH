@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { verifyBearer, saveSnapshot, loadLatestSnapshot, loadSnapshotByDate, createConfirmedUser, accountExists } from './supabaseAdmin.js'
 import { enrichDate } from './enrich.js'
-import { getFixturesByDate } from './apiFootball.js'
+import { getFixturesByDateFresh } from './apiFootball.js'
 import { buildBoard } from './engine.js'
 import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
 import { MIN_LEAGUE_GAMES } from './stats.js'
@@ -75,9 +75,9 @@ const server=http.createServer(async(req,res)=>{try{
     })
     const safeBoard=applyWinSafety(baseBoard,matureFixtures)
 
-    // Re-reading the day's fixtures is served from API-Football's in-process cache
-    // after enrichDate, so this adds status/score truth without another paid scan.
-    const statusFixtures=await getFixturesByDate(date)
+    // Status/score truth bypasses the long enrichment cache so Live and Settled
+    // reflect the latest API-Football state whenever the user refreshes.
+    const statusFixtures=await getFixturesByDateFresh(date)
     const lifecycleMap=buildLifecycleMap(statusFixtures)
     const previous=await loadSnapshotByDate(date).catch(()=>null)
     const compatiblePrevious=previous?.meta?.winSafetyPolicy===WIN_SAFETY_POLICY?previous:null
