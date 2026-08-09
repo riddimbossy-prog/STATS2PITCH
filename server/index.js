@@ -8,7 +8,7 @@ import { buildBoard } from './engine.js'
 import { filterMatureFixtures, snapshotHasStrictMaturityPolicy, emptyMatureBoard, EARLY_SEASON_POLICY } from './maturity.js'
 import { MIN_LEAGUE_GAMES } from './stats.js'
 
-const VERSION='1.7.5'
+const VERSION='1.7.6'
 const __dirname=path.dirname(fileURLToPath(import.meta.url))
 const publicDir=path.resolve(__dirname,'../public')
 const port=Number(process.env.PORT||3000)
@@ -26,14 +26,9 @@ function allowLookupAttempt(ip){return allowBucket(lookupBuckets,ip,20)}
 async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>20_000)throw new Error('Request too large.')}try{return JSON.parse(raw||'{}')}catch{throw new Error('Invalid JSON.')}}
 const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'');return raw&&!/^https?:\/\//i.test(raw)?`https://${raw}`:raw}
 
-// The normal board only exposes the odd attached to each chosen prediction.
-// It also refuses to expose snapshots created before the current strict
-// league-maturity policy, preventing outdated early-season picks from returning.
 function publicBoard(board){
  if(!board)return emptyMatureBoard({fixturesScanned:0,sourceFixtures:0,generatedAt:null})
- if(!snapshotHasStrictMaturityPolicy(board)){
-  return emptyMatureBoard({...board.meta,blockedLegacySnapshot:true})
- }
+ if(!snapshotHasStrictMaturityPolicy(board))return emptyMatureBoard({...board.meta,blockedLegacySnapshot:true})
  return{...board,oddsByFixture:{},availableMarkets:[]}
 }
 
@@ -59,20 +54,9 @@ const server=http.createServer(async(req,res)=>{try{
   try{
     const requested=u.searchParams.get('date')||''
     const {date,fixtures,rawCount,earlySeasonSkipped=0}=await enrichDate(requested)
-    // Second independent fail-closed gate. Even if enrichment changes later, a
-    // fixture cannot reach buildBoard unless the league and both teams satisfy
-    // the current minimum-game threshold.
     const matureFixtures=filterMatureFixtures(fixtures,MIN_LEAGUE_GAMES)
     const secondGateSkipped=Math.max(0,fixtures.length-matureFixtures.length)
-    const board=buildBoard(matureFixtures,{
-      date,
-      fixturesScanned:matureFixtures.length,
-      sourceFixtures:rawCount,
-      generatedAt:new Date().toISOString(),
-      earlySeasonPolicy:EARLY_SEASON_POLICY,
-      minimumLeagueGames:MIN_LEAGUE_GAMES,
-      earlySeasonSkipped:earlySeasonSkipped+secondGateSkipped
-    })
+    const board=buildBoard(matureFixtures,{date,fixturesScanned:matureFixtures.length,sourceFixtures:rawCount,generatedAt:new Date().toISOString(),earlySeasonPolicy:EARLY_SEASON_POLICY,minimumLeagueGames:MIN_LEAGUE_GAMES,earlySeasonSkipped:earlySeasonSkipped+secondGateSkipped})
     await saveSnapshot(board,date)
     return json(res,200,publicBoard(board))
   }catch(e){
