@@ -1,7 +1,7 @@
 /* Stats2Pitch v1.11.7 — one-time UI cache cleanup without a service-worker boot dependency. */
 (()=>{
   'use strict'
-  const BUILD='1.13.0'
+  const BUILD='1.13.1'
   const BUILD_KEY='s2p_ui_build'
   const KEEP_LOCAL=new Set(['s2p_access_token','s2p_refresh_token','s2p_saved_picks_v111'])
 
