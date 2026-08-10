@@ -1,5 +1,7 @@
-/* Stats2Pitch UI v1.12.1 — startup de-duplication and loader escape hatch.
- * Keeps the prediction engine untouched. This layer only coordinates browser boot.
+/* Stats2Pitch UI v1.12.5 — non-blocking legacy bootstrap + shared real board read.
+ * The first legacy /api/board call may never decide whether the UI exists.
+ * It receives an immediate shell board while the real request continues once
+ * in the background for the modern board runtime to reuse.
  */
 (()=>{
   'use strict'
@@ -35,6 +37,24 @@
     meta:{date,generatedAt:null,sourceFixtures:0,fixturesScanned:0,qualified:0,bootShellOnly:true},
     groups:{single:[],two:[],threePlus:[]},priority:[],bestPicks:[],oddsByFixture:{},availableMarkets:[]
   })
+  const bootResponse=date=>new Response(JSON.stringify(emptyBootBoard(date)),{
+    status:200,
+    headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Stats2Pitch-Boot-Fallback':'1'}
+  })
+
+  function beginRealRead(input,init,key){
+    if(pending.has(key))return pending.get(key)
+    const task=(async()=>{
+      const response=await upstreamFetch(input,init)
+      if(response.ok){
+        try{cache.set(key,{at:Date.now(),response:response.clone()})}catch{}
+      }
+      return response
+    })()
+    pending.set(key,task)
+    task.finally(()=>{if(pending.get(key)===task)pending.delete(key)}).catch(()=>{})
+    return task
+  }
 
   window.fetch=async function(input,init={}){
     const url=toUrl(input),key=keyFor(url,init)
@@ -43,36 +63,28 @@
     const cached=readCached(key)
     if(cached)return cached
 
-    if(pending.has(key)){
-      try{return (await pending.get(key)).clone()}catch{}
+    // Critical v1.12.5 rule: the legacy app's first board request is only a
+    // bootstrap signal. Return immediately so renderBoard() can create .app-shell,
+    // while the real board read runs once in the background. As soon as the
+    // modern runtime asks for the same board, it awaits/reuses that real request.
+    const isBootstrapBoard=url?.pathname==='/api/board'&&!document.querySelector('.app-shell')
+    if(isBootstrapBoard){
+      bootstrapFallbackUsed=true
+      beginRealRead(input,init,key).catch(()=>{})
+      return bootResponse(boardDate(url))
     }
 
-    const task=(async()=>{
-      try{
-        const response=await upstreamFetch(input,init)
-        if(response.ok){
-          try{cache.set(key,{at:Date.now(),response:response.clone()})}catch{}
-        }
-        // The legacy app must be allowed to create .app-shell even if its first
-        // board request hits a temporary 5xx. The modern runtime immediately
-        // performs/reuses the real board read after the shell exists.
-        if(url?.pathname==='/api/board'&&response.status>=500&&!document.querySelector('.app-shell')){
-          bootstrapFallbackUsed=true
-          return new Response(JSON.stringify(emptyBootBoard(boardDate(url))),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Stats2Pitch-Boot-Fallback':'1'}})
-        }
-        return response
-      }catch(err){
-        if(url?.pathname==='/api/board'&&!document.querySelector('.app-shell')){
-          bootstrapFallbackUsed=true
-          return new Response(JSON.stringify(emptyBootBoard(boardDate(url))),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Stats2Pitch-Boot-Fallback':'1'}})
-        }
-        throw err
-      }
-    })()
+    if(pending.has(key)){
+      try{return (await pending.get(key)).clone()}catch(err){throw err}
+    }
 
-    pending.set(key,task)
-    try{return (await task).clone()}
-    finally{pending.delete(key)}
+    try{
+      return (await beginRealRead(input,init,key)).clone()
+    }catch(err){
+      // Once the app shell exists, real request failures belong to the modern
+      // board recovery path. Never replace the entire app with another splash.
+      throw err
+    }
   }
 
   function exposeRecoveryState(){
@@ -94,8 +106,6 @@
   if(root)new MutationObserver(exposeRecoveryState).observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['data-s2p-state']})
   document.addEventListener('s2p:board-ready',exposeRecoveryState,{passive:true})
 
-  // A real board request has its own bounded timeout. If it reaches an error,
-  // show that state instead of trapping the user behind the football loader.
   setTimeout(()=>{
     const host=document.getElementById('s2p-card-board')
     if(host?.dataset?.s2pState==='error')exposeRecoveryState()
