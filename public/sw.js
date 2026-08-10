@@ -1,5 +1,5 @@
-/* Stats2Pitch v1.11.4 — network-only cleanup service worker. */
-const BUILD='1.11.4'
+/* Stats2Pitch v1.11.5 — network-only cleanup service worker. */
+const BUILD='1.11.5'
 
 async function purge(){
   const keys=await caches.keys()
@@ -14,8 +14,6 @@ self.addEventListener('activate',event=>{
   event.waitUntil((async()=>{
     await purge()
     await self.clients.claim()
-    const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true})
-    await Promise.all(clients.map(client=>client.navigate?.(client.url).catch?.(()=>{})||Promise.resolve()))
   })())
 })
 
