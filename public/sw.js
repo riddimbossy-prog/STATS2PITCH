@@ -1,5 +1,5 @@
-/* Stats2Pitch v1.11.5 — network-only cleanup service worker. */
-const BUILD='1.11.5'
+/* Stats2Pitch v1.11.6 — network-only cleanup service worker. */
+const BUILD='1.11.6'
 
 async function purge(){
   const keys=await caches.keys()
