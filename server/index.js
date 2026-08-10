@@ -15,7 +15,7 @@ import { claimRefreshJob, saveRefreshJob, loadRefreshJob, refreshStoreMode } fro
 import { withDeadline } from './providerFetch.js'
 import { getDailyLiveScores } from './liveScores.js'
 
-const VERSION='1.11.5'
+const VERSION='1.11.6'
 const __dirname=path.dirname(fileURLToPath(import.meta.url)),publicDir=path.resolve(__dirname,'../public'),port=Number(process.env.PORT||3000)
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon','.webmanifest':'application/manifest+json; charset=utf-8'}
 function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data))}
