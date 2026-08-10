@@ -8,7 +8,7 @@
   if(!root)return
 
   const ACCESS_KEY='s2p_access_token'
-  let timer=0
+  let timer=0,kickTimer=0,kickCount=0
 
   const token=()=>{try{return localStorage.getItem(ACCESS_KEY)||''}catch{return''}}
   const authVisible=()=>Boolean(document.querySelector('.auth-page'))
@@ -30,6 +30,18 @@
     const shell=document.querySelector('.app-shell.s2p-bootstrap-shell')
     if(shell)shell.classList.remove('s2p-bootstrap-shell')
     shell?.removeAttribute('aria-busy')
+    clearTimeout(kickTimer)
+    kickCount=0
+  }
+
+  function kickRuntime(){
+    clearTimeout(kickTimer)
+    if(authVisible()||!token()||boardState()!=='loading')return
+    // board-runtime-v1.11.6 already listens to this event. Repeating it briefly
+    // removes script-order races when the surface is created before its listener.
+    window.dispatchEvent(new Event('s2p:tabchange'))
+    kickCount++
+    if(kickCount<8)kickTimer=setTimeout(kickRuntime,Math.min(1800,350+kickCount*180))
   }
 
   function ensureSurface(){
@@ -58,6 +70,8 @@
     }
 
     document.dispatchEvent(new CustomEvent('s2p:shell-ready',{detail:{source:'bootstrap-surface',state:host.dataset.s2pState}}))
+    kickCount=0
+    kickTimer=setTimeout(kickRuntime,80)
     return true
   }
 
@@ -66,6 +80,7 @@
     timer=setTimeout(()=>{
       if(authVisible()||!token())return
       if(!boardHost())ensureSurface()
+      else if(boardState()==='loading')kickRuntime()
     },delay)
   }
 
