@@ -2,6 +2,7 @@ import { buildCoherentOdds } from './oddsPolicy.js'
 import { flattenStandingGroups } from './apiFootball.js'
 import { splitStandingMetrics } from './stats.js'
 import { statusGroup } from './lifecycle.js'
+import { isValidPreKickoffFixture, PREKICKOFF_GRACE_MS } from './enrich.js'
 import { oneBestPerFixture } from './engine.js'
 import { withDeadline } from './providerFetch.js'
 
@@ -22,10 +23,15 @@ const t3=splitStandingMetrics(flat,3,'home')
 if(t3.leagueSize!==2||t3.groupName!=='West')throw new Error('Split rank must be calculated inside the team’s own standings group')
 if(statusGroup('PST')!=='postponed'||statusGroup('CANC')!=='postponed'||statusGroup('NS')!=='upcoming')throw new Error('Postponed/cancelled matches must not appear as upcoming')
 
+const kickoffNow=Date.parse('2026-08-09T17:00:00Z')
+const staleNs={fixture:{status:{short:'NS'},date:'2026-08-09T17:00:00Z'}}
+if(isValidPreKickoffFixture(staleNs,kickoffNow+PREKICKOFF_GRACE_MS+1))throw new Error('Past-kickoff NS/TBD fixture must not consume enrichment time')
+if(!isValidPreKickoffFixture(staleNs,kickoffNow+PREKICKOFF_GRACE_MS-1))throw new Error('Kickoff grace window must remain eligible')
+
 const rows=[{fixtureId:1,market:'O2.5',familyCount:1,familyStrength:1.6,contradiction:'LOW',score:4,odds:1.6,filterCount:3},{fixtureId:1,market:'1X2',familyCount:4,familyStrength:4.2,contradiction:'LOW',score:12,odds:1.9,filterCount:4},{fixtureId:2,market:'O1.5',familyCount:1,familyStrength:1.5,contradiction:'LOW',score:3,odds:1.3,filterCount:3}]
 const best=oneBestPerFixture(rows)
 if(best.length!==2||best.find(x=>x.fixtureId===1)?.market!=='1X2')throw new Error('Best Picks must contain only the strongest market per fixture')
 let timedOut=false
 try{await withDeadline(new Promise(r=>setTimeout(r,1200)),1000,'test operation')}catch{timedOut=true}
 if(!timedOut)throw new Error('Overall operation deadline did not fail closed')
-console.log(JSON.stringify({ok:true,oddsPolicy:odds.policy,groups:flat.length,bestPicks:best.length},null,2))
+console.log(JSON.stringify({ok:true,oddsPolicy:odds.policy,groups:flat.length,bestPicks:best.length,stalePreKickoffGuard:true},null,2))
