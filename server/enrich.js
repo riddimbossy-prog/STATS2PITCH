@@ -10,7 +10,7 @@ const validOdd=v=>Number.isFinite(Number(v))&&Number(v)>1.001
 const emit=(cb,data)=>{try{if(typeof cb==='function')cb(data)}catch{}}
 export const PREKICKOFF_GRACE_MS=15*60*1000
 
-function hasEnginePrice(odds){return['home','away','over15','under15','over25','under25','over35','under35'].some(k=>validOdd(odds?.[k]))}
+function hasEnginePrice(odds){return['home','away','over15','under15','over25','under25','over35','under35','bttsYes','bttsNo'].some(k=>validOdd(odds?.[k]))}
 export function isValidPreKickoffFixture(fixture,now=Date.now()){
   const short=String(fixture?.fixture?.status?.short||'').toUpperCase()
   if(!['NS','TBD'].includes(short))return false
@@ -111,7 +111,7 @@ export async function enrichDate(requestedDate,options={}){
       let coherent=buildCoherentOdds({apiPayload:apiOddsRaw,statsPayload:null,fixture:f}),statsOdds=null
 
       // Only call the slower secondary provider when API-Football has no complete
-      // engine-usable market at all. A coherent API-Football market is sufficient.
+      // engine-usable market at all. Coherent 1X2, totals or BTTS pricing is sufficient.
       if(!hasEnginePrice(coherent.canonical)){
         if(statsOddsFallbacks<maxStatsFallbacks){
           statsOddsFallbacks++
