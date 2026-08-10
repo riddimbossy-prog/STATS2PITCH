@@ -13,8 +13,9 @@ import { buildLifecycleMap, mergeLifecycleBoard } from './lifecycle.js'
 import { createRefreshJobs } from './refreshJobs.js'
 import { claimRefreshJob, saveRefreshJob, loadRefreshJob, refreshStoreMode } from './refreshStore.js'
 import { withDeadline } from './providerFetch.js'
+import { getDailyLiveScores } from './liveScores.js'
 
-const VERSION='1.11.2'
+const VERSION='1.11.3'
 const __dirname=path.dirname(fileURLToPath(import.meta.url)),publicDir=path.resolve(__dirname,'../public'),port=Number(process.env.PORT||3000)
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon','.webmanifest':'application/manifest+json; charset=utf-8'}
 function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data))}
@@ -49,7 +50,7 @@ const refreshJobs=createRefreshJobs(runRefresh,{ttlMs:Number(process.env.REFRESH
 
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,engineIntegrityPolicy:ENGINE_INTEGRITY_POLICY,winSafetyPolicy:WIN_SAFETY_POLICY,refreshMode:'background-job',refreshPersistence:refreshStoreMode(),candidatePolicy:'full-maturity-discovery-priced-enrichment',oddsPolicy:'single-bookmaker-coherent-v1',rankingPolicy:'family-diversity-first-v1',contradictionPolicy:'high-veto-moderate-safer-only',lifecycleClockPolicy:'kickoff-plus-15m-provider-sanity-v1',refreshPerformancePolicy:'parallel-maturity-and-enrichment-v1',time:new Date().toISOString()})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,engineIntegrityPolicy:ENGINE_INTEGRITY_POLICY,winSafetyPolicy:WIN_SAFETY_POLICY,refreshMode:'background-job',refreshPersistence:refreshStoreMode(),candidatePolicy:'full-maturity-discovery-priced-enrichment',oddsPolicy:'single-bookmaker-coherent-v1',rankingPolicy:'family-diversity-first-v1',contradictionPolicy:'high-veto-moderate-safer-only',lifecycleClockPolicy:'kickoff-plus-15m-provider-sanity-v1',refreshPerformancePolicy:'parallel-maturity-and-enrichment-v1',liveScores:'api-football-20s-cache',time:new Date().toISOString()})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false});const ip=clientIp(req);if(!allowBucket(lookupBuckets,ip,20))return json(res,429,{error:'Too many attempts. Try again later.'})
@@ -60,6 +61,11 @@ const server=http.createServer(async(req,res)=>{try{
   try{const body=await readJson(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||'');if(!/^\S+@\S+\.\S+$/.test(email))return json(res,400,{error:'Enter a valid email address.'});if(password.length<6)return json(res,400,{error:'Password must be at least 6 characters.'});const user=await createConfirmedUser(email,password);return json(res,201,{ok:true,userId:user.id,email:user.email,confirmed:true})}catch(e){const msg=String(e.message||'Signup failed.'),duplicate=/already|registered|exists/i.test(msg);return json(res,duplicate?409:400,{error:duplicate?'An account with this email already exists.':'Account could not be created right now. Please try again.'})}
  }
  if(u.pathname==='/api/me'){const user=await authed(req,res);if(user)return json(res,200,{id:user.id,email:user.email});return}
+ if(u.pathname==='/api/live-scores'&&req.method==='GET'){
+  if(!await authed(req,res))return
+  const date=normalizeDate(u.searchParams.get('date')||''),force=u.searchParams.get('fresh')==='1'
+  try{return json(res,200,await getDailyLiveScores(date,{force}))}catch(e){console.error('Live scores failed:',e.message);return json(res,502,{error:'Live scores are temporarily unavailable.'})}
+ }
  if(u.pathname==='/api/board'){
   if(!await authed(req,res))return;const date=normalizeDate(u.searchParams.get('date')||''),board=await loadSnapshotByDate(date)
   const staleMeta=reason=>({date:board?.meta?.date||date,generatedAt:board?.meta?.generatedAt||null,sourceFixtures:board?.meta?.sourceFixtures??board?.meta?.fixturesScanned??0,stale:true,...reason})
