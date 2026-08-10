@@ -1,0 +1,28 @@
+/* Stats2Pitch v1.11.4 — legacy UI hard cut.
+ * Prevents the old table board from flashing/reappearing before the modern board boots.
+ */
+html.s2p-ui-current .app-shell>.topbar,
+html.s2p-ui-current .app-shell>.summary-grid,
+html.s2p-ui-current .app-shell>.section-title,
+html.s2p-ui-current .app-shell>.prediction-panel,
+html.s2p-ui-current .app-shell>.priority-compact,
+html.s2p-ui-current .app-shell>.s2p-board-tabs,
+html.s2p-ui-current .app-shell>.notice,
+html.s2p-ui-current .app-shell>.footnote,
+html.s2p-ui-current .app-shell>.filter-panel{
+  display:none!important;
+}
+
+/* Legacy controls only exist as the hamburger drawer in the current UI. */
+html.s2p-ui-current .app-shell>.controls{display:none!important}
+html.s2p-ui-current.s2p-v111-controls-open .app-shell>.controls{display:block!important}
+html.s2p-ui-current.s2p-v111-controls-open .app-shell>.filter-panel{display:block!important}
+
+/* Never expose a stale table while the current renderer is starting. */
+html.s2p-ui-current .app-shell:not(:has(#s2p-card-board))>.prediction-panel,
+html.s2p-ui-current .app-shell:not(:has(#s2p-card-board))>.summary-grid,
+html.s2p-ui-current .app-shell:not(:has(#s2p-card-board))>.section-title{display:none!important}
+
+/* Current board always owns the user-facing surface. */
+html.s2p-ui-current #s2p-card-board{display:block!important;visibility:visible}
+html.s2p-ui-current.s2p-refresh-active #s2p-card-board{visibility:hidden!important}
