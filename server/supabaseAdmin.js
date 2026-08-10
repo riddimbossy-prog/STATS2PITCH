@@ -1,28 +1,34 @@
+import { fetchWithPolicy } from './providerFetch.js'
+
 const rawUrl = String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
 const url = rawUrl && !/^https?:\/\//i.test(rawUrl) ? `https://${rawUrl}` : rawUrl
 const anon = process.env.SUPABASE_ANON_KEY
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_TIMEOUT_MS=Math.max(2500,Number(process.env.SUPABASE_FETCH_TIMEOUT_MS||6000))
 
 function need(){ if(!url||!anon||!service) throw new Error('Supabase server environment variables are missing.') }
+function supaFetch(target,options={}){
+ return fetchWithPolicy(target,options,{timeoutMs:SUPABASE_TIMEOUT_MS,retries:0,retryStatuses:[]})
+}
 export async function verifyBearer(header){
  need(); const token=String(header||'').replace(/^Bearer\s+/i,''); if(!token)return null
- const r=await fetch(`${url}/auth/v1/user`,{headers:{apikey:anon,Authorization:`Bearer ${token}`}}); if(!r.ok)return null; return r.json()
+ const r=await supaFetch(`${url}/auth/v1/user`,{headers:{apikey:anon,Authorization:`Bearer ${token}`}}); if(!r.ok)return null; return r.json()
 }
 export async function saveSnapshot(board,date){
- need(); const r=await fetch(`${url}/rest/v1/prediction_snapshots?on_conflict=snapshot_date`,{method:'POST',headers:{apikey:service,Authorization:`Bearer ${service}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({snapshot_date:date,payload:board,generated_at:new Date().toISOString()})}); if(!r.ok)throw new Error(`Supabase snapshot write failed (${r.status}): ${await r.text()}`)
+ need(); const r=await supaFetch(`${url}/rest/v1/prediction_snapshots?on_conflict=snapshot_date`,{method:'POST',headers:{apikey:service,Authorization:`Bearer ${service}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({snapshot_date:date,payload:board,generated_at:new Date().toISOString()})}); if(!r.ok)throw new Error(`Supabase snapshot write failed (${r.status}): ${await r.text()}`)
 }
 export async function loadLatestSnapshot(){
- need(); const r=await fetch(`${url}/rest/v1/prediction_snapshots?select=payload,generated_at,snapshot_date&order=generated_at.desc&limit=1`,{headers:{apikey:service,Authorization:`Bearer ${service}`}}); if(!r.ok)throw new Error(`Supabase snapshot read failed (${r.status})`); const rows=await r.json(); return rows?.[0]?.payload||null
+ need(); const r=await supaFetch(`${url}/rest/v1/prediction_snapshots?select=payload,generated_at,snapshot_date&order=generated_at.desc&limit=1`,{headers:{apikey:service,Authorization:`Bearer ${service}`}}); if(!r.ok)throw new Error(`Supabase snapshot read failed (${r.status})`); const rows=await r.json(); return rows?.[0]?.payload||null
 }
 export async function loadSnapshotByDate(date){
  need(); const d=String(date||'').trim(); if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return null
- const r=await fetch(`${url}/rest/v1/prediction_snapshots?select=payload&snapshot_date=eq.${encodeURIComponent(d)}&limit=1`,{headers:{apikey:service,Authorization:`Bearer ${service}`}})
+ const r=await supaFetch(`${url}/rest/v1/prediction_snapshots?select=payload&snapshot_date=eq.${encodeURIComponent(d)}&limit=1`,{headers:{apikey:service,Authorization:`Bearer ${service}`}})
  if(!r.ok)throw new Error(`Supabase dated snapshot read failed (${r.status})`)
  const rows=await r.json(); return rows?.[0]?.payload||null
 }
 export async function createConfirmedUser(email,password){
  need();
- const r=await fetch(`${url}/auth/v1/admin/users`,{
+ const r=await supaFetch(`${url}/auth/v1/admin/users`,{
   method:'POST',
   headers:{apikey:service,Authorization:`Bearer ${service}`,'Content-Type':'application/json'},
   body:JSON.stringify({email,password,email_confirm:true})
@@ -41,7 +47,7 @@ export async function accountExists(email){
  if(!target)return false;
  const maxPages=Math.max(1,Number(process.env.SUPABASE_USER_LOOKUP_MAX_PAGES||5));
  for(let page=1;page<=maxPages;page++){
-  const r=await fetch(`${url}/auth/v1/admin/users?page=${page}&per_page=200`,{headers:{apikey:service,Authorization:`Bearer ${service}`}});
+  const r=await supaFetch(`${url}/auth/v1/admin/users?page=${page}&per_page=200`,{headers:{apikey:service,Authorization:`Bearer ${service}`}});
   if(!r.ok)throw new Error(`Account lookup failed (${r.status})`);
   const body=await r.json().catch(()=>({}));
   const users=Array.isArray(body?.users)?body.users:Array.isArray(body)?body:[];
