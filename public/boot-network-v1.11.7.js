@@ -1,59 +1,54 @@
-/* Stats2Pitch v1.11.7 — bounded startup fetch timeouts + automatic board recovery. */
+/* Stats2Pitch UI v1.12.2 — fast bounded startup + non-blocking automatic board recovery. */
 (()=>{
   'use strict'
   const nativeFetch=window.fetch.bind(window)
-  const STARTUP_PATHS=new Set(['/api/config','/api/me','/api/board'])
+  const STARTUP_TIMEOUTS=new Map([
+    ['/api/config',4500],
+    ['/api/me',4500],
+    ['/api/board',7500]
+  ])
 
-  const sleep=ms=>new Promise(r=>setTimeout(r,ms))
   const toUrl=input=>{try{return new URL(typeof input==='string'?input:input?.url||'',location.href)}catch{return null}}
 
-  async function timedFetch(input,init={},timeoutMs=9000){
+  async function timedFetch(input,init={},timeoutMs=6000){
     const externalSignal=init?.signal
     const controller=new AbortController()
     const timer=setTimeout(()=>controller.abort(new DOMException('Request timed out','AbortError')),timeoutMs)
+    const onAbort=()=>controller.abort(externalSignal?.reason)
     if(externalSignal){
       if(externalSignal.aborted)controller.abort(externalSignal.reason)
-      else externalSignal.addEventListener('abort',()=>controller.abort(externalSignal.reason),{once:true})
+      else externalSignal.addEventListener('abort',onAbort,{once:true})
     }
     try{return await nativeFetch(input,{...init,signal:controller.signal})}
-    finally{clearTimeout(timer)}
+    finally{
+      clearTimeout(timer)
+      if(externalSignal)externalSignal.removeEventListener?.('abort',onAbort)
+    }
   }
 
-  window.fetch=async function(input,init={}){
+  window.fetch=function(input,init={}){
     const url=toUrl(input)
     const method=String(init?.method||'GET').toUpperCase()
-    const startup=method==='GET'&&url&&url.origin===location.origin&&STARTUP_PATHS.has(url.pathname)
-    if(!startup)return nativeFetch(input,init)
-
-    let lastError=null
-    for(let attempt=0;attempt<3;attempt++){
-      try{
-        const response=await timedFetch(input,init,9000)
-        if(response.status<500&&response.status!==429)return response
-        if(attempt===2)return response
-      }catch(err){
-        lastError=err
-        if(attempt===2)throw err
-      }
-      await sleep(700*(attempt+1))
-    }
-    if(lastError)throw lastError
-    return nativeFetch(input,init)
+    const timeout=url&&url.origin===location.origin&&method==='GET'?STARTUP_TIMEOUTS.get(url.pathname):null
+    return timeout?timedFetch(input,init,timeout):nativeFetch(input,init)
   }
 
   let recoveryTimer=0,recoveryAttempt=0
   function scheduleBoardRecovery(){
     clearTimeout(recoveryTimer)
     const host=document.getElementById('s2p-card-board')
-    if(host?.dataset?.s2pState!=='error'){
-      if(host?.dataset?.s2pState==='ready')recoveryAttempt=0
+    const state=host?.dataset?.s2pState||''
+    if(state==='ready'){
+      recoveryAttempt=0
+      document.documentElement.classList.add('s2p-ui-ready')
       return
     }
+    if(state!=='error')return
 
-    /* Error is internal only: keep the football-pitch loader visible to users. */
-    document.documentElement.classList.remove('s2p-ui-ready')
+    // Recovery happens behind the visible app. Never put the full-screen loader
+    // back on top of the UI after the initial splash has finished.
     recoveryAttempt++
-    const delay=Math.min(15000,1800*Math.max(1,recoveryAttempt))
+    const delay=Math.min(15000,2200*Math.max(1,recoveryAttempt))
     recoveryTimer=setTimeout(()=>{
       const current=document.getElementById('s2p-card-board')
       if(current?.dataset?.s2pState!=='error')return
