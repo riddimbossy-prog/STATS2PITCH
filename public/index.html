@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#02070b" />
 <meta name="description" content="Stats2Pitch.com — from stats to the pitch." />
 <title>Stats2Pitch.com | Prediction Board</title>
-<script>document.documentElement.classList.add('s2p-ui-current');document.documentElement.dataset.s2pUiBuild='1.11.5'</script>
-<script src="/cache-reset-v1.11.5.js?v=1.11.5"></script>
+<script>document.documentElement.classList.add('s2p-ui-current');document.documentElement.dataset.s2pUiBuild='1.11.6'</script>
+<script src="/cache-reset-v1.11.6.js?v=1.11.6"></script>
 <style>
   .s2p-boot-guard{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 42%,rgba(141,255,0,.08),transparent 30%),#02070b;color:#f7fbff;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;transition:opacity .22s ease,visibility .22s ease}
   .s2p-boot-inner{display:flex;min-width:min(86vw,360px);flex-direction:column;align-items:center;gap:13px;text-align:center}
@@ -18,30 +18,32 @@
   .s2p-boot-inner button{display:none;border:1px solid rgba(156,255,0,.45);border-radius:12px;background:#9cff00;color:#071007;padding:11px 18px;font:800 14px/1 system-ui;cursor:pointer}
   .s2p-boot-guard.is-slow .s2p-boot-inner button{display:inline-flex}
   html.s2p-ui-ready .s2p-boot-guard{opacity:0;visibility:hidden;pointer-events:none}
+  .s2p-board-error{min-height:260px;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+  .s2p-board-error button{margin-top:8px;border:1px solid rgba(156,255,0,.5);border-radius:12px;background:#9cff00;color:#071007;padding:11px 18px;font:800 14px/1 system-ui;cursor:pointer}
   @keyframes s2pBootSpin{to{transform:rotate(360deg)}}
 </style>
 <link rel="icon" type="image/png" href="/assets/favicon.png" />
 <link rel="apple-touch-icon" href="/assets/stats2pitch-icon-192.png" />
-<link rel="manifest" href="/manifest.webmanifest?v=1.11.5" />
-<link rel="stylesheet" href="/styles.v1.5.0.css?v=1.11.5" />
-<link rel="stylesheet" href="/splash-animation.v1.5.1.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.6.0.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.7.0.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.7.3.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.7.6.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.7.8.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.7.9.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.8.0.css?v=1.11.5" />
-<link rel="stylesheet" href="/refresh-pitch.v1.10.1.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.10.2.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui.v1.10.4.css?v=1.11.5" />
-<link rel="stylesheet" href="/board-v1.11.0.css?v=1.11.5" />
-<link rel="stylesheet" href="/board-v1.11.1.css?v=1.11.5" />
-<link rel="stylesheet" href="/board-responsive-v1.11.2.css?v=1.11.5" />
-<link rel="stylesheet" href="/live-scores-v1.11.3.css?v=1.11.5" />
-<link rel="stylesheet" href="/ui-hard-cut-v1.11.4.css?v=1.11.5" />
+<link rel="manifest" href="/manifest.webmanifest?v=1.11.6" />
+<link rel="stylesheet" href="/styles.v1.5.0.css?v=1.11.6" />
+<link rel="stylesheet" href="/splash-animation.v1.5.1.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.6.0.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.7.0.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.7.3.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.7.6.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.7.8.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.7.9.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.8.0.css?v=1.11.6" />
+<link rel="stylesheet" href="/refresh-pitch.v1.10.1.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.10.2.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui.v1.10.4.css?v=1.11.6" />
+<link rel="stylesheet" href="/board-v1.11.0.css?v=1.11.6" />
+<link rel="stylesheet" href="/board-v1.11.1.css?v=1.11.6" />
+<link rel="stylesheet" href="/board-responsive-v1.11.2.css?v=1.11.6" />
+<link rel="stylesheet" href="/live-scores-v1.11.3.css?v=1.11.6" />
+<link rel="stylesheet" href="/ui-hard-cut-v1.11.4.css?v=1.11.6" />
 <meta name="application-name" content="Stats2Pitch.com" />
-<meta name="stats2pitch-build" content="1.11.5" />
+<meta name="stats2pitch-build" content="1.11.6" />
 </head>
 <body>
 <div id="s2p-boot-guard" class="s2p-boot-guard" role="status" aria-live="polite">
@@ -54,24 +56,24 @@
   </div>
 </div>
 <div id="root"><div class="splash"><img src="/assets/brand-mark.png" alt="" /><span>Opening Stats2Pitch…</span></div></div>
-<script src="/boot-guard-v1.11.5.js?v=1.11.5"></script>
-<script src="/date-board-router.v1.10.0.js?v=1.11.5"></script>
-<script src="/splash-animation.v1.5.1.js?v=1.11.5" defer></script>
-<script type="module" src="/app.v1.5.0.js?v=1.11.5"></script>
-<script src="/ui.v1.6.0.js?v=1.11.5" defer></script>
-<script src="/ui.v1.7.0.js?v=1.11.5" defer></script>
-<script src="/odds-ui.v1.7.2.js?v=1.11.5" defer></script>
-<script src="/ui.v1.7.3.js?v=1.11.5" defer></script>
-<script src="/ui.v1.7.6.js?v=1.11.5" defer></script>
-<script src="/ui.v1.7.8.js?v=1.11.5" defer></script>
-<script src="/ui.v1.7.9.js?v=1.11.5" defer></script>
-<script src="/ui.v1.8.0.js?v=1.11.5" defer></script>
-<script src="/ui.v1.10.0.js?v=1.11.5" defer></script>
-<script src="/status-clock.v1.10.2.js?v=1.11.5" defer></script>
-<script src="/refresh-resilience.v1.10.1.js?v=1.11.5" defer></script>
-<script src="/status-selection-fix.v1.10.4.js?v=1.11.5" defer></script>
-<script src="/board-v1.11.0.js?v=1.11.5" defer></script>
-<script src="/board-responsive-v1.11.2.js?v=1.11.5" defer></script>
-<script src="/live-scores-v1.11.3.js?v=1.11.5" defer></script>
+<script src="/boot-guard-v1.11.6.js?v=1.11.6"></script>
+<script src="/date-board-router.v1.10.0.js?v=1.11.6"></script>
+<script src="/splash-animation.v1.5.1.js?v=1.11.6" defer></script>
+<script type="module" src="/app.v1.5.0.js?v=1.11.6"></script>
+<script src="/ui.v1.6.0.js?v=1.11.6" defer></script>
+<script src="/ui.v1.7.0.js?v=1.11.6" defer></script>
+<script src="/odds-ui.v1.7.2.js?v=1.11.6" defer></script>
+<script src="/ui.v1.7.3.js?v=1.11.6" defer></script>
+<script src="/ui.v1.7.6.js?v=1.11.6" defer></script>
+<script src="/ui.v1.7.8.js?v=1.11.6" defer></script>
+<script src="/ui.v1.7.9.js?v=1.11.6" defer></script>
+<script src="/ui.v1.8.0.js?v=1.11.6" defer></script>
+<script src="/ui.v1.10.0.js?v=1.11.6" defer></script>
+<script src="/status-clock.v1.10.2.js?v=1.11.6" defer></script>
+<script src="/refresh-resilience.v1.10.1.js?v=1.11.6" defer></script>
+<script src="/status-selection-fix.v1.10.4.js?v=1.11.6" defer></script>
+<script src="/board-runtime-v1.11.6.js?v=1.11.6" defer></script>
+<script src="/board-responsive-v1.11.2.js?v=1.11.6" defer></script>
+<script src="/live-scores-v1.11.3.js?v=1.11.6" defer></script>
 </body>
 </html>
