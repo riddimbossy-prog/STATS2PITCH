@@ -1,12 +1,12 @@
 /* Stats2Pitch v1.11.7 — one-time UI cache cleanup without a service-worker boot dependency. */
 (()=>{
   'use strict'
-  const BUILD='1.11.7'
+  const BUILD='1.13.0'
   const BUILD_KEY='s2p_ui_build'
   const KEEP_LOCAL=new Set(['s2p_access_token','s2p_refresh_token','s2p_saved_picks_v111'])
 
   document.documentElement.classList.add('s2p-ui-current')
-  document.documentElement.dataset.s2pUiBuild=BUILD
+  if(!document.documentElement.dataset.s2pUiBuild)document.documentElement.dataset.s2pUiBuild=BUILD
 
   let changed=true
   try{changed=localStorage.getItem(BUILD_KEY)!==BUILD}catch{}
