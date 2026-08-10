@@ -5,23 +5,28 @@ const metric=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))?Numb
 const norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()
 const allRows=board=>[...(board?.groups?.threePlus||[]),...(board?.groups?.two||[]),...(board?.groups?.single||[])]
 function fixtureSides(fixture,row){const selected=String(row?.selectedTeamId)===String(fixture?.home?.id)?fixture.home:String(row?.selectedTeamId)===String(fixture?.away?.id)?fixture.away:null;if(!selected)return null;const isHome=String(selected.id)===String(fixture.home?.id);return{selected,opponent:isHome?fixture.away:fixture.home,isHome}}
+function isTopThree(team){const p=Number(team?.position);return team?.positionSampleReady===true&&Number.isFinite(p)&&p<=3}
 function isBottomThree(team){const p=Number(team?.position),n=Number(team?.leagueSize);return team?.positionSampleReady===true&&Number.isFinite(p)&&Number.isFinite(n)&&n>=3&&p>n-3}
 function market(fixture,key){return(fixture?.marketOdds||[]).find(m=>m?.marketKey===key)||null}
 function outcomePrice(marketRow,names){if(!marketRow)return null;const wanted=names.map(norm);for(const o of marketRow.outcomes||[]){if(wanted.includes(norm(o?.name))){const p=odd(o?.odd);if(p)return p}}return null}
 function fallbackMarket(fixture,isHome,teamName){const dnb=market(fixture,'draw-no-bet'),dnbPrice=outcomePrice(dnb,isHome?['Home',teamName]:['Away',teamName]);if(dnbPrice)return{market:'DNB',selectionLabel:`${teamName} DNB`,odds:dnbPrice,downgradeMarket:'Draw no bet'};const dc=market(fixture,'double-chance'),names=isHome?['Home or draw','1X']:['Draw or away','X2'],dcPrice=outcomePrice(dc,names);if(dcPrice)return{market:'DC',selectionLabel:`${teamName} ${isHome?'1X':'X2'}`,odds:dcPrice,downgradeMarket:isHome?'1X':'X2'};return null}
 
-export const WIN_SAFETY_POLICY='strict-split-bottom3-veto-under60-contradiction-v6-sample-guard'
+export const WIN_SAFETY_POLICY='strict-split-top3-only-result-v7'
 
 export function applyWinSafety(board,fixtures){
   const byId=new Map((fixtures||[]).map(f=>[String(f.fixtureId),f])),kept=[]
-  let straightWinsBlocked=0,downgraded=0,exceptionWins=0,bottom3TeamResultBlocked=0,missingSplitBlocked=0,seasonSplitFallbacks=0,highContradictionBlocked=0,moderateContradictionBlocked=0,moderateContradictionDowngraded=0,lastPlaceSampleBlocked=0
+  let straightWinsBlocked=0,downgraded=0,exceptionWins=0,bottom3TeamResultBlocked=0,nonTop3TeamResultBlocked=0,missingSplitBlocked=0,seasonSplitFallbacks=0,highContradictionBlocked=0,moderateContradictionBlocked=0,moderateContradictionDowngraded=0,lastPlaceSampleBlocked=0
   for(const row of allRows(board)){
     if(row?.market!=='1X2'){kept.push(row);continue}
     const fixture=byId.get(String(row.fixtureId)),sides=fixtureSides(fixture,row);if(!fixture||!sides){straightWinsBlocked++;continue}
     const {selected,opponent,isHome}=sides
     if(!['home','away'].includes(selected?.venue)||!['home','away'].includes(opponent?.venue)){missingSplitBlocked++;straightWinsBlocked++;continue}
     if(selected?.positionSampleReady!==true||opponent?.positionSampleReady!==true){missingSplitBlocked++;straightWinsBlocked++;continue}
-    if(isBottomThree(selected)){bottom3TeamResultBlocked++;straightWinsBlocked++;continue}
+
+    // Absolute result-market eligibility: selected team must be Top 3 in its relevant split.
+    // This gate is before contradiction/form/odds exceptions so DNB/DC can never rescue positions 4+.
+    if(!isTopThree(selected)){nonTop3TeamResultBlocked++;if(isBottomThree(selected))bottom3TeamResultBlocked++;straightWinsBlocked++;continue}
+
     const contradiction=String(row?.contradiction||'LOW').toUpperCase()
     if(contradiction==='HIGH'){highContradictionBlocked++;straightWinsBlocked++;continue}
     if(contradiction==='MODERATE'){
@@ -41,5 +46,5 @@ export function applyWinSafety(board,fixtures){
   }
   kept.sort(comparePicks)
   const groups={single:kept.filter(r=>Number(r.filterCount)===1),two:kept.filter(r=>Number(r.filterCount)===2),threePlus:kept.filter(r=>Number(r.filterCount)>=3)}
-  return{...board,meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins,bottom3TeamResultBlocked,missingSplitBlocked,seasonSplitWinFallbacks:seasonSplitFallbacks,highContradictionBlocked,moderateContradictionBlocked,moderateContradictionDowngraded,lastPlaceSampleBlocked},groups,priority:kept,bestPicks:oneBestPerFixture(kept)}
+  return{...board,meta:{...board?.meta,qualified:kept.length,winSafetyPolicy:WIN_SAFETY_POLICY,straightWinsBlocked,downgradedWins:downgraded,exceptionWins,bottom3TeamResultBlocked,nonTop3TeamResultBlocked,missingSplitBlocked,seasonSplitWinFallbacks:seasonSplitFallbacks,highContradictionBlocked,moderateContradictionBlocked,moderateContradictionDowngraded,lastPlaceSampleBlocked},groups,priority:kept,bestPicks:oneBestPerFixture(kept)}
 }
