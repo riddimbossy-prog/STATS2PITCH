@@ -11,7 +11,12 @@ self.addEventListener('install',event=>{
 })
 
 self.addEventListener('activate',event=>{
-  event.waitUntil((async()=>{await purge();await self.clients.claim()})())
+  event.waitUntil((async()=>{
+    await purge()
+    await self.clients.claim()
+    const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true})
+    await Promise.all(clients.map(client=>client.navigate?.(client.url).catch?.(()=>{})||Promise.resolve()))
+  })())
 })
 
 self.addEventListener('message',event=>{
