@@ -41,16 +41,26 @@
     return nativeFetch(input,init)
   }
 
-  let recoveryTimer=0
+  let recoveryTimer=0,recoveryAttempt=0
   function scheduleBoardRecovery(){
     clearTimeout(recoveryTimer)
     const host=document.getElementById('s2p-card-board')
-    if(host?.dataset?.s2pState!=='error')return
+    if(host?.dataset?.s2pState!=='error'){
+      if(host?.dataset?.s2pState==='ready')recoveryAttempt=0
+      return
+    }
+
+    /* Error is internal only: keep the football-pitch loader visible to users. */
+    document.documentElement.classList.remove('s2p-ui-ready')
+    recoveryAttempt++
+    const delay=Math.min(15000,1800*Math.max(1,recoveryAttempt))
     recoveryTimer=setTimeout(()=>{
-      const retry=host.querySelector('[data-board-retry]')
+      const current=document.getElementById('s2p-card-board')
+      if(current?.dataset?.s2pState!=='error')return
+      const retry=current.querySelector('[data-board-retry]')
       if(retry){retry.click();return}
       document.dispatchEvent(new CustomEvent('s2p:board-recover'))
-    },2200)
+    },delay)
   }
 
   const root=document.getElementById('root')
