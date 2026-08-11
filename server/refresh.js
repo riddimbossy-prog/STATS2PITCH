@@ -1,7 +1,7 @@
-import {getFixturesByDateFresh,getStandings,getRecentLeagueVenue,getFixtureOdds} from './apiFootball.js'
+import {getFixturesByDateFresh,getStandings,getLeagueFinishedFixtures,getFixtureOdds} from './apiFootball.js'
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {buildCoherentOdds} from './oddsPolicy.js'
-import {leagueMature,makeTeamProfile,buildBoard,ENGINE_VERSION} from './engine.js'
+import {leagueMature,makeTeamProfile,buildBoard,ENGINE_VERSION,PROFILE_SOURCE,FORM_TABLE_SAMPLE} from './engine.js'
 import {saveBoard} from './store.js'
 
 const jobs=new Map()
@@ -17,31 +17,39 @@ function extraOdds(marketOdds){
 }
 function enginePriced(c){return Object.values(c||{}).some(validOdd)}
 async function mapLimit(items,limit,fn){const out=new Array(items.length);let i=0;async function worker(){while(true){const x=i++;if(x>=items.length)return;out[x]=await fn(items[x],x)}}await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out}
-function normalize(raw,standings,homeHistory,awayHistory,odds){
+function normalize(raw,standings,leagueHistory,odds){
   const f=raw.fixture||{},league=raw.league||{},homeTeam=raw.teams?.home||{},awayTeam=raw.teams?.away||{}
-  const home=makeTeamProfile({standings,history:homeHistory,team:homeTeam,venue:'home'}),away=makeTeamProfile({standings,history:awayHistory,team:awayTeam,venue:'away'})
+  const home=makeTeamProfile({standings,leagueHistory,team:homeTeam,venue:'home'}),away=makeTeamProfile({standings,leagueHistory,team:awayTeam,venue:'away'})
   return{fixtureId:f.id,match:`${home.name} vs ${away.name}`,league:league.name||'League',country:league.country||'',leagueLogo:league.logo||null,countryFlag:league.flag||null,kickoff:f.date,kickoffLocal:new Date(f.date).toLocaleString('en-GB',{timeZone:process.env.APP_TIMEZONE||'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),home,away,odds:{...odds.canonical,...extraOdds(odds.marketOdds)},marketOdds:odds.marketOdds}
 }
 async function buildFresh(date,onProgress=()=>{}){
-  const raw=await getFixturesByDateFresh(date),scheduled=raw.filter(x=>!liveStatus(x?.fixture?.status?.short)),standingCache=new Map()
+  const raw=await getFixturesByDateFresh(date),scheduled=raw.filter(x=>!liveStatus(x?.fixture?.status?.short)),leagueCache=new Map()
   const keys=[...new Set(scheduled.map(x=>`${x?.league?.id}|${x?.league?.season}`).filter(x=>!x.startsWith('undefined')))]
-  onProgress({stage:'standings',sourceFixtures:raw.length,scheduledFixtures:scheduled.length,leagueCount:keys.length})
-  await mapLimit(keys,6,async k=>{const[league,season]=k.split('|');try{standingCache.set(k,await getStandings(league,season,{bypassCache:true}))}catch{standingCache.set(k,[])}})
-  const mature=scheduled.filter(x=>{const k=`${x?.league?.id}|${x?.league?.season}`,s=standingCache.get(k)||[];return leagueMature(s,x?.teams?.home?.id,x?.teams?.away?.id)}).slice(0,maxFixtures)
+  onProgress({stage:'form-tables',sourceFixtures:raw.length,scheduledFixtures:scheduled.length,leagueCount:keys.length})
+  await mapLimit(keys,6,async k=>{
+    const[league,season]=k.split('|')
+    try{
+      // Standings are metadata only for group membership. No rank, PPG, W/D/L or goals
+      // from the normal table are used by the engine.
+      const [standings,history]=await Promise.all([getStandings(league,season,{bypassCache:true}),getLeagueFinishedFixtures(league,season,{bypassCache:true})])
+      leagueCache.set(k,{standings,history})
+    }catch{leagueCache.set(k,{standings:[],history:[]})}
+  })
+  const mature=scheduled.filter(x=>{
+    const k=`${x?.league?.id}|${x?.league?.season}`,data=leagueCache.get(k)||{standings:[],history:[]}
+    return leagueMature(data.history,data.standings,x?.teams?.home?.id,x?.teams?.away?.id)
+  }).slice(0,maxFixtures)
   let done=0,priced=0
   const enriched=await mapLimit(mature,concurrency,async rawFixture=>{
-    const k=`${rawFixture?.league?.id}|${rawFixture?.league?.season}`,standings=standingCache.get(k)||[],fixtureId=rawFixture?.fixture?.id
+    const k=`${rawFixture?.league?.id}|${rawFixture?.league?.season}`,data=leagueCache.get(k)||{standings:[],history:[]},fixtureId=rawFixture?.fixture?.id
     try{
       const apiOdds=await getFixtureOdds(fixtureId,{bypassCache:true});let odds=buildCoherentOdds({apiPayload:apiOdds,fixture:rawFixture})
       if(!enginePriced(odds.canonical)&&statsApiConfigured()){try{const stats=await getStatsOddsForFixture(rawFixture,{bypassCache:true});odds=buildCoherentOdds({apiPayload:apiOdds,statsPayload:stats?.payload,fixture:rawFixture})}catch{}}
       if(!enginePriced(odds.canonical)){done++;onProgress({stage:'enrich',done,total:mature.length,priced});return null}
-      priced++
-      const league=rawFixture?.league?.id,season=rawFixture?.league?.season
-      const [hh,ah]=await Promise.all([getRecentLeagueVenue(rawFixture?.teams?.home?.id,league,season,'home',10,{bypassCache:true}),getRecentLeagueVenue(rawFixture?.teams?.away?.id,league,season,'away',10,{bypassCache:true})])
-      done++;onProgress({stage:'enrich',done,total:mature.length,priced});return normalize(rawFixture,standings,hh,ah,odds)
+      priced++;done++;onProgress({stage:'enrich',done,total:mature.length,priced});return normalize(rawFixture,data.standings,data.history,odds)
     }catch{done++;onProgress({stage:'enrich',done,total:mature.length,priced});return null}
   })
-  const fixtures=enriched.filter(Boolean),board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,matureFixtures:mature.length,enrichedFixtures:fixtures.length,engineVersion:ENGINE_VERSION})
+  const fixtures=enriched.filter(Boolean),board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,matureFixtures:mature.length,enrichedFixtures:fixtures.length,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE})
   await saveBoard(date,board);return board
 }
 export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}

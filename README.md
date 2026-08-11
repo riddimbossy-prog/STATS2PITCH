@@ -1,18 +1,40 @@
-# Stats2Pitch 2.0 — Simple Engine Reset
+# Stats2Pitch 2.1 — HOME/AWAY Form Table Engine
 
-This is a clean replacement of the accumulated Stats2Pitch codebase. There are no legacy board renderers, compatibility boot scripts, service-worker cache layers, duplicated safety engines, or historical version wrappers.
+Stats2Pitch uses one canonical football profile source: the recent venue Form Table.
 
-## Engine
+## Engine source of truth
 
-- Overall league maturity: every team in the standings plus both fixture teams must have at least 4 overall league games.
-- HOME team analysis is HOME-only; AWAY team analysis is AWAY-only.
-- Split table ranking needs 3 venue matches and ranks by PPG, GD/game, GF/game, win rate, then points/tiebreakers.
-- Strict Last-5 venue form needs 5 matches; Last-10 is confirmation only.
-- Team-result markets are Top-3-only in the relevant split. Position 4+ can never be rescued by Win/DNB/DC.
-- HIGH contradiction removes team results. MODERATE can only use a safer market when original win odds are above 2.00.
-- Straight wins require 60%+ split win rate unless the relevant opponent is last with 5+ split games or concedes more than 2.30 per split game.
-- Goal markets require both HOME/AWAY hit rates >=60% plus matching attack/defence profile confirmation.
-- GG requires both split BTTS rates >=60%, both teams scoring and conceding at least 1.0, and is vetoed by FTS >=40% or clean sheets >=60%.
+- HOME team calculations come only from the HOME Form Table.
+- AWAY team calculations come only from the AWAY Form Table.
+- The Form Table sample is the most recent 5 finished league matches at the relevant venue.
+- PPG is calculated directly from that Form Table: `(wins × 3 + draws) / 5`.
+- Form Table position is ranked by PPG, then goal difference per game, goals scored per game, win rate and points/tiebreakers.
+- The relevant group Form Table must be complete before it can produce engine calculations. Stats2Pitch does not substitute normal-table numbers when the Form Table is incomplete.
+- API-Football normal standings are used only to identify competition/group membership. Normal-table rank, PPG, W/D/L, goals and form are never used as prediction inputs.
+
+That same HOME/AWAY Form Table now supplies all football calculations used by the engine:
+
+- PPG and Top-3 / Bottom-3 position;
+- wins, losses and result safety;
+- goals scored and conceded per game;
+- Over/Under 1.5, 2.5 and 3.5 hit rates;
+- BTTS/GG rate;
+- failed-to-score rate;
+- clean-sheet rate;
+- opponent-strength and opponent-weakness signals;
+- contradiction checks;
+- Win/DNB/DC eligibility;
+- goal-market and GG confirmation.
+
+There is no Last-10 or normal-season fallback in engine calculations.
+
+## Market safety
+
+- Team-result markets are Top-3-only in the relevant HOME/AWAY Form Table. Position 4+ can never be rescued by Win/DNB/DC.
+- HIGH contradiction removes team results. MODERATE can use a safer market only when the original win odd is above 2.00 and a coherent DNB/DC price exists.
+- Straight wins normally require a 60%+ Form Table win rate, with the existing last-place/heavy-concede opponent exceptions evaluated from the same Form Table.
+- Goal markets require both HOME/AWAY Form Table hit rates >=60% plus matching Form Table attack/defence confirmation.
+- GG requires both Form Table BTTS rates >=60%, both teams scoring and conceding at least 1.0 per game, and is vetoed by FTS >=40% or clean sheets >=60%.
 - Every published market requires a real coherent bookmaker price.
 - Best Picks contains one strongest market per fixture.
 

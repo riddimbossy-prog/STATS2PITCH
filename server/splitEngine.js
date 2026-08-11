@@ -1,12 +1,61 @@
-import {num,pct,avg,MIN_LEAGUE_GAMES,MIN_SPLIT_TABLE_SAMPLE,MIN_SPLIT_FORM_SAMPLE,SPLIT_LONG_SAMPLE} from './engineConfig.js'
-function rowsForGroup(standings,teamId){const rows=Array.isArray(standings)?standings:[],own=rows.find(r=>String(r?.team?.id)===String(teamId)),gi=own?._s2pGroupIndex;if(gi===null||gi===undefined)return rows;const g=rows.filter(r=>r?._s2pGroupIndex===gi);return g.length?g:rows}
-const overallPlayed=row=>Math.max(0,num(row?.all?.played)??0)
-export function leagueMature(standings,homeId,awayId){if(!Array.isArray(standings)||!standings.length)return false;const min=Math.min(...standings.map(overallPlayed)),h=standings.find(r=>String(r?.team?.id)===String(homeId)),a=standings.find(r=>String(r?.team?.id)===String(awayId));return min>=MIN_LEAGUE_GAMES&&overallPlayed(h)>=MIN_LEAGUE_GAMES&&overallPlayed(a)>=MIN_LEAGUE_GAMES}
-function record(row,venue){const r=row?.[venue]||{},played=Math.max(0,num(r.played)??0),win=Math.max(0,num(r.win)??0),draw=Math.max(0,num(r.draw)??0),lose=Math.max(0,num(r.lose)??0),gf=num(r.goals?.for),ga=num(r.goals?.against),points=win*3+draw,gd=gf!==null&&ga!==null?gf-ga:null;return{played,win,draw,lose,gf,ga,points,ppg:played?points/played:null,gd,gdpg:played&&gd!==null?gd/played:null,gfpg:played&&gf!==null?gf/played:null,winRate:played?win/played:null}}
-const strengthSort=(a,b)=>Number(b.ppg??-999)-Number(a.ppg??-999)||Number(b.gdpg??-999)-Number(a.gdpg??-999)||Number(b.gfpg??-999)-Number(a.gfpg??-999)||Number(b.winRate??-999)-Number(a.winRate??-999)||b.points-a.points||Number(b.gd??-999)-Number(a.gd??-999)||Number(b.gf??-999)-Number(a.gf??-999)||b.win-a.win
-export function splitStandingProfile(standings,teamId,venue){const base=rowsForGroup(standings,teamId).map(row=>({id:row?.team?.id,name:row?.team?.name||'',overallPosition:num(row?.rank),...record(row,venue)})).filter(x=>x.id!==null&&x.id!==undefined),ranked=[...base].filter(x=>x.played>0).sort(strengthSort),rank=new Map(ranked.map((x,i)=>[String(x.id),i+1])),row=base.find(x=>String(x.id)===String(teamId));if(!row)return null;const ready=row.played>=MIN_SPLIT_TABLE_SAMPLE;return{venue,position:ready?(rank.get(String(row.id))??null):null,positionSampleReady:ready,leagueSize:base.length,played:row.played,ppg:row.played?+(row.ppg||0).toFixed(2):null,goalsScored:row.played&&row.gf!==null?+(row.gf/row.played).toFixed(2):null,goalsConceded:row.played&&row.ga!==null?+(row.ga/row.played).toFixed(2):null,seasonWinRate:row.played?pct(row.win,row.played):null,seasonLossRate:row.played?pct(row.lose,row.played):null,overallPosition:row.overallPosition}}
+import {num,pct,avg,FORM_TABLE_SAMPLE,PROFILE_SOURCE} from './engineConfig.js'
+
+function rowsForGroup(standings,teamId){
+  const rows=Array.isArray(standings)?standings:[],own=rows.find(r=>String(r?.team?.id)===String(teamId)),gi=own?._s2pGroupIndex
+  if(gi===null||gi===undefined)return rows
+  const grouped=rows.filter(r=>r?._s2pGroupIndex===gi)
+  return grouped.length?grouped:rows
+}
 const finished=f=>['FT','AET','PEN'].includes(String(f?.fixture?.status?.short||''))
 const atVenue=(f,id,v)=>v==='home'?String(f?.teams?.home?.id)===String(id):String(f?.teams?.away?.id)===String(id)
 function goals(f,id){const h=num(f?.goals?.home),a=num(f?.goals?.away);if(h===null||a===null)return null;return String(f?.teams?.home?.id)===String(id)?{own:h,opp:a,total:h+a}:{own:a,opp:h,total:h+a}}
-export function recentVenueProfile(fixtures,id,venue){const rows=(Array.isArray(fixtures)?fixtures:[]).filter(f=>finished(f)&&atVenue(f,id,venue)&&goals(f,id)).sort((a,b)=>new Date(b?.fixture?.date)-new Date(a?.fixture?.date)).slice(0,SPLIT_LONG_SAMPLE),last5=rows.slice(0,5),s5=last5.length>=MIN_SPLIT_FORM_SAMPLE?last5:[],s10=rows.length>=SPLIT_LONG_SAMPLE?rows:[],gr=rows.length>=MIN_SPLIT_FORM_SAMPLE?rows:[],rate=(set,fn)=>set.length?pct(set.filter(fn).length,set.length):null,wr=rate(s5,f=>goals(f,id).own>goals(f,id).opp),lr=rate(s5,f=>goals(f,id).own<goals(f,id).opp),wr10=rate(s10,f=>goals(f,id).own>goals(f,id).opp),lr10=rate(s10,f=>goals(f,id).own<goals(f,id).opp),metric=fn=>rate(gr,fn),o15=metric(f=>goals(f,id).total>1.5),o25=metric(f=>goals(f,id).total>2.5),o35=metric(f=>goals(f,id).total>3.5);let agreement='INSUFFICIENT';if(s10.length){if(wr>=60&&wr10>=60)agreement='WIN_STRONG';else if(lr>=60&&lr10>=60)agreement='LOSS_STRONG';else if((wr>=60&&wr10<50)||(lr>=60&&lr10<50))agreement='CONFLICT';else agreement='NEUTRAL'}return{formSample:last5.length,goalsSample:gr.length,winRate:wr,lossRate:lr,winRate10:wr10,lossRate10:lr10,formAgreement:agreement,over15:o15,under15:o15===null?null:100-o15,over25:o25,under25:o25===null?null:100-o25,over35:o35,under35:o35===null?null:100-o35,bttsRate:metric(f=>goals(f,id).own>0&&goals(f,id).opp>0),cleanSheetRate:metric(f=>goals(f,id).opp===0),failedToScoreRate:metric(f=>goals(f,id).own===0),recentGoalsScored:avg(gr.map(f=>goals(f,id).own)),recentGoalsConceded:avg(gr.map(f=>goals(f,id).opp))}}
-export function makeTeamProfile({standings,history,team,venue}){return{id:team.id,name:team.name,logo:team.logo||null,venue,...(splitStandingProfile(standings,team.id,venue)||{}),...recentVenueProfile(history,team.id,venue)}}
+function fixtureDate(f){const t=Date.parse(f?.fixture?.date||'');return Number.isFinite(t)?t:0}
+function inferredTeams(fixtures){
+  const by=new Map()
+  for(const f of fixtures||[])for(const t of [f?.teams?.home,f?.teams?.away])if(t?.id!==undefined&&t?.id!==null&&!by.has(String(t.id)))by.set(String(t.id),{id:t.id,name:t.name||'',logo:t.logo||null})
+  return [...by.values()]
+}
+function groupTeams(standings,teamId,fixtures){
+  const rows=rowsForGroup(standings,teamId)
+  if(rows.length)return rows.map(r=>({id:r?.team?.id,name:r?.team?.name||'',logo:r?.team?.logo||null})).filter(x=>x.id!==undefined&&x.id!==null)
+  return inferredTeams(fixtures)
+}
+function teamFormRow(fixtures,team,venue){
+  const rows=(fixtures||[]).filter(f=>finished(f)&&atVenue(f,team.id,venue)&&goals(f,team.id)).sort((a,b)=>fixtureDate(b)-fixtureDate(a)).slice(0,FORM_TABLE_SAMPLE)
+  let win=0,draw=0,loss=0,gf=0,ga=0,btts=0,cs=0,fts=0,o15=0,o25=0,o35=0
+  for(const f of rows){const g=goals(f,team.id);gf+=g.own;ga+=g.opp;if(g.own>g.opp)win++;else if(g.own<g.opp)loss++;else draw++;if(g.own>0&&g.opp>0)btts++;if(g.opp===0)cs++;if(g.own===0)fts++;if(g.total>1.5)o15++;if(g.total>2.5)o25++;if(g.total>3.5)o35++}
+  const played=rows.length,points=win*3+draw,ready=played>=FORM_TABLE_SAMPLE,gd=gf-ga
+  return{id:team.id,name:team.name||'',logo:team.logo||null,venue,played,ready,win,draw,loss,points,ppg:played?points/played:null,gf,ga,gd,gfpg:played?gf/played:null,gapg:played?ga/played:null,gdpg:played?gd/played:null,winRate:played?win/played:null,lossRate:played?loss/played:null,bttsRate:played?btts/played:null,cleanSheetRate:played?cs/played:null,failedToScoreRate:played?fts/played:null,over15:played?o15/played:null,over25:played?o25/played:null,over35:played?o35/played:null,fixtures:rows}
+}
+const strengthSort=(a,b)=>Number(b.ppg??-999)-Number(a.ppg??-999)||Number(b.gdpg??-999)-Number(a.gdpg??-999)||Number(b.gfpg??-999)-Number(a.gfpg??-999)||Number(b.winRate??-999)-Number(a.winRate??-999)||b.points-a.points||b.gd-a.gd||b.gf-a.gf||b.win-a.win
+
+export function buildVenueFormTable(fixtures,standings,teamId,venue){
+  if(!['home','away'].includes(venue))throw new Error('Venue must be home or away')
+  const teams=groupTeams(standings,teamId,fixtures),rows=teams.map(team=>teamFormRow(fixtures,team,venue)),tableReady=rows.length>0&&rows.every(r=>r.ready),ranked=tableReady?[...rows].sort(strengthSort):[],rank=new Map(ranked.map((r,i)=>[String(r.id),i+1]))
+  return{source:PROFILE_SOURCE,venue,sample:FORM_TABLE_SAMPLE,tableReady,leagueSize:rows.length,rows:rows.map(r=>({...r,position:tableReady?(rank.get(String(r.id))??null):null}))}
+}
+
+export function formTableProfile(fixtures,standings,teamId,venue){
+  const table=buildVenueFormTable(fixtures,standings,teamId,venue),row=table.rows.find(r=>String(r.id)===String(teamId))
+  if(!row)return null
+  const ready=table.tableReady&&row.ready,rate=v=>ready?pct(Math.round((v||0)*FORM_TABLE_SAMPLE),FORM_TABLE_SAMPLE):null
+  return{source:PROFILE_SOURCE,venue,formTableSample:FORM_TABLE_SAMPLE,formTableReady:ready,position:ready?row.position:null,positionSampleReady:ready,leagueSize:table.leagueSize,played:ready?FORM_TABLE_SAMPLE:row.played,ppg:ready?+row.ppg.toFixed(2):null,goalsScored:ready?+row.gfpg.toFixed(2):null,goalsConceded:ready?+row.gapg.toFixed(2):null,winRate:ready?rate(row.winRate):null,lossRate:ready?rate(row.lossRate):null,goalsSample:ready?FORM_TABLE_SAMPLE:row.played,bttsRate:ready?rate(row.bttsRate):null,cleanSheetRate:ready?rate(row.cleanSheetRate):null,failedToScoreRate:ready?rate(row.failedToScoreRate):null,over15:ready?rate(row.over15):null,under15:ready?100-rate(row.over15):null,over25:ready?rate(row.over25):null,under25:ready?100-rate(row.over25):null,over35:ready?rate(row.over35):null,under35:ready?100-rate(row.over35):null,recentGoalsScored:ready?+row.gfpg.toFixed(2):null,recentGoalsConceded:ready?+row.gapg.toFixed(2):null,formAgreement:ready?'FORM_TABLE_ONLY':'INSUFFICIENT'}
+}
+
+// Maturity is now venue-form-table maturity, not normal standings maturity.
+// The normal standings payload is used only to identify competition/group membership.
+export function leagueMature(leagueHistory,standings,homeId,awayId){
+  const home=formTableProfile(leagueHistory,standings,homeId,'home'),away=formTableProfile(leagueHistory,standings,awayId,'away')
+  return home?.formTableReady===true&&away?.formTableReady===true
+}
+
+// Compatibility exports: both now read the exact same last-5 venue Form Table source.
+export function splitStandingProfile(standings,teamId,venue,leagueHistory=[]){return formTableProfile(leagueHistory,standings,teamId,venue)}
+export function recentVenueProfile(fixtures,id,venue){
+  const team=inferredTeams(fixtures).find(t=>String(t.id)===String(id))||{id,name:'',logo:null},row=teamFormRow(fixtures,team,venue),ready=row.ready,rate=v=>ready?pct(Math.round((v||0)*FORM_TABLE_SAMPLE),FORM_TABLE_SAMPLE):null
+  return{source:PROFILE_SOURCE,formSample:row.played,goalsSample:row.played,winRate:ready?rate(row.winRate):null,lossRate:ready?rate(row.lossRate):null,winRate10:null,lossRate10:null,formAgreement:ready?'FORM_TABLE_ONLY':'INSUFFICIENT',over15:ready?rate(row.over15):null,under15:ready?100-rate(row.over15):null,over25:ready?rate(row.over25):null,under25:ready?100-rate(row.over25):null,over35:ready?rate(row.over35):null,under35:ready?100-rate(row.over35):null,bttsRate:ready?rate(row.bttsRate):null,cleanSheetRate:ready?rate(row.cleanSheetRate):null,failedToScoreRate:ready?rate(row.failedToScoreRate):null,recentGoalsScored:ready?+row.gfpg.toFixed(2):null,recentGoalsConceded:ready?+row.gapg.toFixed(2):null}
+}
+export function makeTeamProfile({standings,leagueHistory,history,team,venue}){
+  const source=Array.isArray(leagueHistory)&&leagueHistory.length?leagueHistory:(history||[]),profile=formTableProfile(source,standings,team.id,venue)||{}
+  return{id:team.id,name:team.name,logo:team.logo||null,venue,...profile}
+}

@@ -1,12 +1,16 @@
-export const ENGINE_VERSION='simple-split-v1'
-export const MIN_LEAGUE_GAMES=4
-export const MIN_SPLIT_TABLE_SAMPLE=3
-export const MIN_SPLIT_FORM_SAMPLE=5
-export const SPLIT_LONG_SAMPLE=10
-export const TEAM_RESULT_POLICY='top3-only'
-export const GG_POLICY='btts-60-profile'
+export const ENGINE_VERSION='form-table-home-away-v2'
+export const FORM_TABLE_SAMPLE=5
+// Compatibility names now point to the same strict Form Table sample.
+// No engine calculation is allowed to fall back to the normal season table.
+export const MIN_LEAGUE_GAMES=FORM_TABLE_SAMPLE
+export const MIN_SPLIT_TABLE_SAMPLE=FORM_TABLE_SAMPLE
+export const MIN_SPLIT_FORM_SAMPLE=FORM_TABLE_SAMPLE
+export const SPLIT_LONG_SAMPLE=FORM_TABLE_SAMPLE
+export const TEAM_RESULT_POLICY='form-table-top3-only'
+export const GG_POLICY='form-table-btts-60-profile'
 export const ODDS_POLICY='single-bookmaker-coherent-v1'
-export const FAMILY={TABLE:'Table Strength',FORM:'Form',ATTACK:'Attack',DEFENCE:'Defence',MARKET:'Market/Odds',OPP:'Opponent Weakness',GOALS:'Goal Pattern'}
+export const PROFILE_SOURCE='venue-form-table-last5'
+export const FAMILY={TABLE:'Form Table Strength',FORM:'Form',ATTACK:'Attack',DEFENCE:'Defence',MARKET:'Market/Odds',OPP:'Opponent Weakness',GOALS:'Goal Pattern'}
 export const num=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null)
 export const odd=v=>{const n=num(v);return n!==null&&n>1.001&&n<1000?n:null}
 export const pct=(n,d)=>d?Math.round((n/d)*100):null
