@@ -4,13 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#061219">
-  <meta name="stats2pitch-build" content="2.0.0">
+  <meta name="stats2pitch-build" content="2.0.1">
   <title>Stats2Pitch</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=2.0.0">
-  <link rel="stylesheet" href="/styles.css?v=2.0.0">
+  <link rel="manifest" href="/manifest.webmanifest?v=2.0.1">
+  <link rel="stylesheet" href="/styles.css?v=2.0.1">
 </head>
 <body>
-  <div id="app"><div class="boot"><div class="logo">STATS<span>2</span>PITCH</div><p>Preparing the board…</p></div></div>
-  <script type="module" src="/app.js?v=2.0.0"></script>
+  <div id="app">
+    <div class="s2p-loader s2p-loader--page" role="status" aria-live="polite">
+      <div class="s2p-loader-scene" aria-hidden="true">
+        <div class="s2p-loader-trail"></div>
+        <div class="s2p-loader-ball-track">
+          <img class="s2p-loader-ball-real" src="/assets/football-real.svg?v=2.0.1" alt="">
+          <div class="s2p-loader-shadow"></div>
+        </div>
+        <div class="s2p-loader-pitch"><img src="/assets/brand-mark.png?v=2.0.1" alt=""></div>
+      </div>
+      <div class="s2p-loader-text">Loading <b>matches...</b></div>
+      <div class="s2p-loader-sub">FROM STATS TO THE PITCH</div>
+    </div>
+  </div>
+  <script type="module" src="/app.js?v=2.0.1"></script>
 </body>
 </html>
