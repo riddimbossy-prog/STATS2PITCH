@@ -14,6 +14,7 @@ import { createRefreshJobs } from './refreshJobs.js'
 import { claimRefreshJob, saveRefreshJob, loadRefreshJob, refreshStoreMode } from './refreshStore.js'
 import { withDeadline } from './providerFetch.js'
 import { getDailyLiveScores } from './liveScores.js'
+import { eliteFeedAuthorized, snapshotIsEliteCompatible, buildEliteFeed } from './eliteExport.js'
 
 const VERSION='1.14.0'
 const __dirname=path.dirname(fileURLToPath(import.meta.url)),publicDir=path.resolve(__dirname,'../public'),port=Number(process.env.PORT||3000)
@@ -28,6 +29,7 @@ async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk
 const normalizedSupabaseUrl=()=>{const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'');return raw&&!/^https?:\/\//i.test(raw)?`https://${raw}`:raw}
 const localDate=()=>new Intl.DateTimeFormat('en-CA',{timeZone:process.env.APP_TIMEZONE||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
 const normalizeDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))?String(value):localDate()
+const publicMachineJob=(job,date)=>({date:job?.date||date,status:job?.status||'idle',startedAt:job?.startedAt||null,updatedAt:job?.updatedAt||null,finishedAt:job?.finishedAt||null,progress:job?.progress||null,error:job?.error||null})
 
 async function runRefreshCore(requestedDate,progress=()=>{}){
   progress({phase:'start',message:'Starting fresh-provider integrity refresh.',current:0,total:null})
@@ -50,7 +52,7 @@ const refreshJobs=createRefreshJobs(runRefresh,{ttlMs:Number(process.env.REFRESH
 
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,engineIntegrityPolicy:ENGINE_INTEGRITY_POLICY,winSafetyPolicy:WIN_SAFETY_POLICY,teamResultEligibilityPolicy:TEAM_RESULT_ELIGIBILITY_POLICY,ggPolicy:GG_POLICY,refreshMode:'background-job',refreshPersistence:refreshStoreMode(),candidatePolicy:'full-maturity-discovery-priced-enrichment',oddsPolicy:'single-bookmaker-coherent-v1',rankingPolicy:'family-diversity-first-v1',contradictionPolicy:'high-veto-moderate-safer-only',lifecycleClockPolicy:'kickoff-plus-15m-provider-sanity-v1',refreshPerformancePolicy:'parallel-maturity-and-enrichment-v1',liveScores:'api-football-20s-cache',time:new Date().toISOString()})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,engineIntegrityPolicy:ENGINE_INTEGRITY_POLICY,winSafetyPolicy:WIN_SAFETY_POLICY,teamResultEligibilityPolicy:TEAM_RESULT_ELIGIBILITY_POLICY,ggPolicy:GG_POLICY,refreshMode:'background-job',refreshPersistence:refreshStoreMode(),candidatePolicy:'full-maturity-discovery-priced-enrichment',oddsPolicy:'single-bookmaker-coherent-v1',rankingPolicy:'family-diversity-first-v1',contradictionPolicy:'high-veto-moderate-safer-only',lifecycleClockPolicy:'kickoff-plus-15m-provider-sanity-v1',refreshPerformancePolicy:'parallel-maturity-and-enrichment-v1',liveScores:'api-football-20s-cache',eliteExport:'protected-snapshot-with-machine-refresh-v2',time:new Date().toISOString()})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false});const ip=clientIp(req);if(!allowBucket(lookupBuckets,ip,20))return json(res,429,{error:'Too many attempts. Try again later.'})
@@ -65,6 +67,26 @@ const server=http.createServer(async(req,res)=>{try{
   if(!await authed(req,res))return
   const date=normalizeDate(u.searchParams.get('date')||''),force=u.searchParams.get('fresh')==='1'
   try{return json(res,200,await getDailyLiveScores(date,{force}))}catch(e){console.error('Live scores failed:',e.message);return json(res,502,{error:'Live scores are temporarily unavailable.'})}
+ }
+ if(u.pathname==='/api/export/elite'&&req.method==='GET'){
+  if(!eliteFeedAuthorized(req))return json(res,401,{error:'Elite feed authorization required.'})
+  const date=normalizeDate(u.searchParams.get('date')||''),limit=Math.max(1,Math.min(10,Number(u.searchParams.get('limit')||10))),board=await loadSnapshotByDate(date)
+  if(!board)return json(res,200,{version:1,source:'stats2pitch',date,generated_at:null,count:0,max:10,items:[]})
+  if(!snapshotIsEliteCompatible(board))return json(res,409,{error:'Saved board must be refreshed before Elite export.',date})
+  return json(res,200,buildEliteFeed(board,{date,limit}))
+ }
+ if(u.pathname==='/api/export/elite/refresh'&&req.method==='POST'){
+  if(!eliteFeedAuthorized(req))return json(res,401,{error:'Elite feed authorization required.'})
+  if(String(process.env.ALLOW_ELITE_MACHINE_REFRESH||'true')!=='true')return json(res,403,{error:'Elite machine refresh is disabled.'})
+  const date=normalizeDate(u.searchParams.get('date')||''),existing=await loadSnapshotByDate(date).catch(()=>null)
+  if(existing&&snapshotIsEliteCompatible(existing))return json(res,200,{date,status:'ready',generated_at:existing?.meta?.generatedAt||null,count:buildEliteFeed(existing,{date,limit:10}).count})
+  const job=await refreshJobs.start(date)
+  return json(res,202,publicMachineJob(job,date))
+ }
+ if(u.pathname==='/api/export/elite/refresh-status'&&req.method==='GET'){
+  if(!eliteFeedAuthorized(req))return json(res,401,{error:'Elite feed authorization required.'})
+  const date=normalizeDate(u.searchParams.get('date')||''),job=await refreshJobs.get(date)
+  return json(res,200,publicMachineJob(job,date))
  }
  if(u.pathname==='/api/board'){
   if(!await authed(req,res))return;const date=normalizeDate(u.searchParams.get('date')||''),board=await loadSnapshotByDate(date)
