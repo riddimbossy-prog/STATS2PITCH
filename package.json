@@ -1,11 +1,12 @@
 {
   "name": "stats2pitch",
-  "version": "1.14.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "check": "node --check server/providerFetch.js && node --check server/stats.js && node --check server/apiFootball.js && node --check server/statsApi.js && node --check server/statsFallback.js && node --check server/oddsV2.js && node --check server/oddsPolicy.js && node --check server/maturity.js && node --check server/enrich.js && node --check server/engine.js && node --check server/index.js && node --check server/lifecycle.js && node --check server/liveScores.js && node --check server/winSafety.js && node --check server/refreshStore.js && node --check server/refreshJobs.js && node --check server/refreshJobs.test.js && node --check server/splitEngine.test.js && node --check server/integrity.test.js && node --check server/lifecycle.test.js && node --check server/top3GgPolicy.test.js && node --check server/winSafety.test.js && node --check server/bootBundle.test.js && node --check public/s2p-cache-reset-v1.14.0.js && node --check public/s2p-boot-v1.14.0.js && node --check public/s2p-ui-v1.14.0.js && node server/selftest.js && node server/splitEngine.test.js && node server/winSafety.test.js && node server/refreshJobs.test.js && node server/integrity.test.js && node server/lifecycle.test.js && node server/top3GgPolicy.test.js && node server/bootBundle.test.js"
+    "test": "node --test",
+    "check": "node --check server/providerFetch.js && node --check server/apiFootball.js && node --check server/statsApi.js && node --check server/oddsV2.js && node --check server/oddsPolicy.js && node --check server/engineConfig.js && node --check server/splitEngine.js && node --check server/pickUtils.js && node --check server/resultEngine.js && node --check server/goalEngine.js && node --check server/engine.js && node --check server/store.js && node --check server/refresh.js && node --check server/index.js && node --check public/core.js && node --check public/dialogs.js && node --check public/boardView.js && node --check public/dashboard.js && node --check public/app.js && npm test"
   },
   "engines": {
     "node": ">=20.19.0 <23"
