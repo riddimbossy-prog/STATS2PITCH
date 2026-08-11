@@ -1,11 +1,17 @@
-/* Stats2Pitch v1.10.0 — route legacy /api/board reads to the chosen fixture date. */
+/* Stats2Pitch v1.13.2 — route board reads to an explicit date, otherwise browser-local today. */
 (()=>{
   'use strict'
   const KEY='s2p_fixture_date'
   const valid=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))
+  const pad=n=>String(n).padStart(2,'0')
+  const browserToday=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
   const queryDate=()=>{try{const v=new URL(location.href).searchParams.get('date');return valid(v)?v:''}catch{return''}}
   const stored=()=>{const v=sessionStorage.getItem(KEY);return valid(v)?v:''}
-  const initial=queryDate()||stored()||new Date().toISOString().slice(0,10)
+
+  // A normal visit always starts on the browser's current calendar day. Historical
+  // or future browsing is preserved explicitly in the URL (?date=YYYY-MM-DD).
+  const explicit=queryDate()
+  const initial=explicit||browserToday()
   sessionStorage.setItem(KEY,initial)
 
   const nativeFetch=window.fetch.bind(window)
@@ -25,6 +31,17 @@
   }
 
   function syncInput(){const el=document.getElementById('date'),v=stored();if(el&&v&&el.value!==v)el.value=v}
+  function rolloverIfNeeded(){
+    // If the user intentionally chose a date, the URL owns that choice. Otherwise
+    // an open tab that crosses midnight must move from yesterday to today.
+    if(queryDate())return
+    const today=browserToday()
+    if(stored()===today)return
+    sessionStorage.setItem(KEY,today)
+    const el=document.getElementById('date');if(el)el.value=today
+    location.reload()
+  }
+
   document.addEventListener('change',e=>{
     if(e.target?.id!=='date'||!valid(e.target.value))return
     const next=e.target.value
@@ -34,7 +51,11 @@
     history.replaceState(null,'',u.pathname+u.search+u.hash)
     location.reload()
   },true)
+
   const root=document.getElementById('root')
   if(root)new MutationObserver(()=>requestAnimationFrame(syncInput)).observe(root,{childList:true})
+  window.addEventListener('pageshow',()=>{syncInput();rolloverIfNeeded()},{passive:true})
+  window.addEventListener('focus',rolloverIfNeeded,{passive:true})
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')rolloverIfNeeded()},{passive:true})
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncInput,{once:true});else syncInput()
 })()
