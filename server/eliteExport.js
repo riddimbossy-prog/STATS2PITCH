@@ -34,11 +34,25 @@ function finalMarket(row){
 }
 
 function fixtureName(row){
-  const direct=text(row?.fixture)
+  const direct=text(row?.fixture)||text(row?.match)
   if(direct)return direct
   const home=text(row?.homeTeam||row?.home_team||row?.home?.name)
   const away=text(row?.awayTeam||row?.away_team||row?.away?.name)
   return home&&away?`${home} vs ${away}`:home||away||'Fixture'
+}
+
+function teamNames(row){
+  const explicitHome=text(row?.homeTeam||row?.home_team||row?.home?.name)
+  const explicitAway=text(row?.awayTeam||row?.away_team||row?.away?.name)
+  if(explicitHome||explicitAway)return{home:explicitHome||null,away:explicitAway||null}
+  const venue=text(row?.venue).toLowerCase(),selected=text(row?.selectedTeam),opponent=text(row?.opponentTeam)
+  if(selected&&opponent&&opponent.toLowerCase()!=='whole match'){
+    if(venue==='home')return{home:selected,away:opponent}
+    if(venue==='away')return{home:opponent,away:selected}
+  }
+  const match=text(row?.match)
+  const parts=match.split(/\s+(?:vs?|—|-)\s+/i).map(text).filter(Boolean)
+  return{home:parts[0]||null,away:parts[1]||null}
 }
 
 export function buildEliteFeed(board,{date,limit=10}={}){
@@ -48,32 +62,35 @@ export function buildEliteFeed(board,{date,limit=10}={}){
     .filter(row=>text(row?.contradiction||'LOW').toUpperCase()!=='HIGH')
     .filter(row=>allowedPriority.has(text(row?.priorityLabel).toUpperCase()))
     .slice(0,safeLimit)
-    .map((row,index)=>({
-      id:`stats2pitch-${text(row?.fixtureId)||index}-${text(row?.market)||'market'}`,
-      source:'stats2pitch',
-      source_fixture_id:text(row?.fixtureId)||null,
-      prediction_date:date||board?.meta?.date||null,
-      fixture:fixtureName(row),
-      home_team:text(row?.homeTeam||row?.home_team||row?.home?.name)||null,
-      away_team:text(row?.awayTeam||row?.away_team||row?.away?.name)||null,
-      league:text(row?.league||row?.competition)||null,
-      country:text(row?.country)||null,
-      kickoff:row?.kickoff||row?.date||row?.fixtureDate||null,
-      market:finalMarket(row),
-      pick:finalSelection(row),
-      average_odds:number(row?.odds),
-      classification:text(row?.priorityLabel).toUpperCase()==='ELITE'?'elite_strong':'elite_supported',
-      label:'Stats2Pitch Elite',
-      elite_score:Math.round(number(row?.engineRating)??70),
-      engine_rating:number(row?.engineRating),
-      family_count:number(row?.familyCount),
-      families:Array.isArray(row?.families)?row.families:[],
-      contradiction:text(row?.contradiction||'LOW').toUpperCase(),
-      status:'upcoming',
-      reason:text(row?.shortReason||row?.reason)||'Qualified by Stats2Pitch split-stat and market safety rules.',
-      last_verified_at:board?.meta?.generatedAt||new Date().toISOString(),
-      evidence:{source:'stats2pitch',win_safety:row?.winSafety||null}
-    }))
+    .map((row,index)=>{
+      const teams=teamNames(row)
+      return{
+        id:`stats2pitch-${text(row?.fixtureId)||index}-${text(row?.market)||'market'}`,
+        source:'stats2pitch',
+        source_fixture_id:text(row?.fixtureId)||null,
+        prediction_date:date||board?.meta?.date||null,
+        fixture:fixtureName(row),
+        home_team:teams.home,
+        away_team:teams.away,
+        league:text(row?.league||row?.competition)||null,
+        country:text(row?.country)||null,
+        kickoff:row?.kickoff||row?.date||row?.fixtureDate||null,
+        market:finalMarket(row),
+        pick:finalSelection(row),
+        average_odds:number(row?.odds),
+        classification:text(row?.priorityLabel).toUpperCase()==='ELITE'?'elite_strong':'elite_supported',
+        label:'Stats2Pitch Elite',
+        elite_score:Math.round(number(row?.engineRating)??70),
+        engine_rating:number(row?.engineRating),
+        family_count:number(row?.familyCount),
+        families:Array.isArray(row?.filterFamilies)?row.filterFamilies:Array.isArray(row?.families)?row.families:[],
+        contradiction:text(row?.contradiction||'LOW').toUpperCase(),
+        status:'upcoming',
+        reason:text(row?.shortReason||row?.reason)||'Qualified by Stats2Pitch split-stat and market safety rules.',
+        last_verified_at:board?.meta?.generatedAt||new Date().toISOString(),
+        evidence:{source:'stats2pitch',win_safety:row?.winSafety||null}
+      }
+    })
   return{
     version:1,
     source:'stats2pitch',
