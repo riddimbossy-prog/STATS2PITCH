@@ -1,55 +1,16 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<meta name="theme-color" content="#02070b" />
-<meta name="description" content="Stats2Pitch.com — from stats to the pitch." />
-<title>Stats2Pitch.com | Prediction Board</title>
-<script>document.documentElement.classList.add('s2p-ui-current');document.documentElement.dataset.s2pUiBuild='1.14.0'</script>
-<script src="/s2p-cache-reset-v1.14.0.js?v=1.14.0"></script>
-<style>
-  .s2p-boot-guard{position:fixed;inset:0;z-index:2147483000;background:#010807;transition:opacity .22s ease,visibility .22s ease}
-  .s2p-boot-guard .s2p-loader{position:absolute;inset:0;width:100%;height:100%;min-height:100dvh}
-  .s2p-boot-guard .s2p-loader-scene{width:min(560px,88vw)}
-  .s2p-boot-guard .s2p-loader-ball-track{width:38px;height:38px}
-  .s2p-boot-guard .s2p-loader-ball-real{display:block;width:100%;height:100%;object-fit:contain;transform-origin:50% 50%;filter:drop-shadow(0 7px 7px rgba(0,0,0,.45));animation:s2pBallSpin .68s linear infinite}
-  .s2p-boot-guard .s2p-loader-text{font-size:clamp(18px,1.8vw,24px)}
-  .s2p-boot-guard .s2p-loader-sub{font-size:12px}
-  html.s2p-ui-ready .s2p-boot-guard,
-  html.s2p-recovery-visible .s2p-boot-guard{opacity:0;visibility:hidden;pointer-events:none}
-  .s2p-board-error [data-board-retry]{display:none!important}
-  .s2p-bootstrap-shell{display:grid;place-items:center;min-height:100vh}
-  .s2p-bootstrap-status{display:grid;justify-items:center;gap:12px;text-align:center;padding:26px;color:#f5f7f6}
-  .s2p-bootstrap-status img{width:min(300px,72vw);height:auto}
-  .s2p-bootstrap-status strong{font-size:20px}
-  .s2p-bootstrap-status span{color:#8ea79d;font-size:14px}
-</style>
-<link rel="icon" type="image/png" href="/assets/favicon.png" />
-<link rel="apple-touch-icon" href="/assets/stats2pitch-icon-192.png" />
-<link rel="manifest" href="/manifest.webmanifest?v=1.14.0" />
-<link rel="stylesheet" href="/s2p-styles-v1.14.0.css?v=1.14.0" />
-<meta name="application-name" content="Stats2Pitch.com" />
-<meta name="stats2pitch-build" content="1.14.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#061219">
+  <meta name="stats2pitch-build" content="2.0.0">
+  <title>Stats2Pitch</title>
+  <link rel="manifest" href="/manifest.webmanifest?v=2.0.0">
+  <link rel="stylesheet" href="/styles.css?v=2.0.0">
 </head>
 <body>
-<div id="s2p-boot-guard" class="s2p-boot-guard" role="status" aria-live="polite">
-  <div class="s2p-loader">
-    <div class="s2p-loader-scene" aria-hidden="true">
-      <div class="s2p-loader-trail"></div>
-      <div class="s2p-loader-ball-track">
-        <img class="s2p-loader-ball-real" src="/assets/football-real.svg?v=1.14.0" alt="" />
-        <div class="s2p-loader-shadow"></div>
-      </div>
-      <div class="s2p-loader-pitch"><img src="/assets/brand-mark.png?v=1.14.0" alt="" /></div>
-    </div>
-    <div class="s2p-loader-text">Loading <b>matches...</b></div>
-    <div class="s2p-loader-sub">FROM STATS TO THE PITCH</div>
-  </div>
-</div>
-<div id="root"><div class="splash"><img src="/assets/brand-mark.png" alt="" /><span>Opening Stats2Pitch…</span></div></div>
-<script src="/s2p-boot-v1.14.0.js?v=1.14.0"></script>
-<script type="module" src="/app.v1.5.0.js?v=1.14.0"></script>
-<script src="/s2p-ui-v1.14.0.js?v=1.14.0" defer></script>
+  <div id="app"><div class="boot"><div class="logo">STATS<span>2</span>PITCH</div><p>Preparing the board…</p></div></div>
+  <script type="module" src="/app.js?v=2.0.0"></script>
 </body>
 </html>

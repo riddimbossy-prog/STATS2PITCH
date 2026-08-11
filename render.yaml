@@ -14,39 +14,25 @@ services:
         value: 3000
       - key: APP_TIMEZONE
         value: UTC
-      - key: CACHE_TTL_SECONDS
-        value: 900
-      - key: MAX_FIXTURES_PER_REFRESH
-        value: 60
-      - key: ALLOW_MANUAL_REFRESH
-        value: true
       - key: ALLOW_PUBLIC_SIGNUP
         value: true
-      - key: STATS2PITCH_ELITE_FEED_TOKEN
+      - key: AUTO_REFRESH_TTL_MINUTES
+        value: 45
+      - key: MAX_FIXTURES_PER_REFRESH
+        value: 80
+      - key: REFRESH_CONCURRENCY
+        value: 4
+      - key: API_FOOTBALL_BASE
+        value: https://v3.football.api-sports.io
+      - key: API_FOOTBALL_KEY
         sync: false
-      - key: ALLOW_ELITE_MACHINE_REFRESH
-        value: true
+      - key: STATS_API_KEY
+        sync: false
+      - key: STATS_API_BASE_URL
+        value: https://api.thestatsapi.com/api
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: API_FOOTBALL_KEY
-        sync: false
-      - key: API_FOOTBALL_BASE
-        value: https://v3.football.api-sports.io
-      - key: STATS_API_KEY
-        sync: false
-      - key: STATS_API_BASE_URL
-        value: https://api.thestatsapi.com/api
-      - key: STATS_API_MIN_INTERVAL_MS
-        value: 300
-      - key: STATS_API_REQUESTS_PER_MINUTE
-        value: 40
-      - key: STATS_VALUE_CACHE_TTL_SECONDS
-        value: 1800
-      - key: STATS_API_COMPETITION_PAGES
-        value: 5
-      - key: STATS_API_MAX_MATCH_PAGES
-        value: 5

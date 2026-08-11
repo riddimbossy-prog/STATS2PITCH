@@ -1,69 +1,34 @@
-# Stats2Pitch.com v1.14.0
+# Stats2Pitch 2.0 — Simple Engine Reset
 
-**From stats to the pitch.**
+This is a clean replacement of the accumulated Stats2Pitch codebase. There are no legacy board renderers, compatibility boot scripts, service-worker cache layers, duplicated safety engines, or historical version wrappers.
 
-Stats2Pitch is a login-gated football prediction dashboard. The application uses API-Football for fixtures/form/standings and can enrich each fixture with broader odds markets from TheStatsAPI. Supabase handles accounts and the persisted prediction-board snapshot; Render hosts the Node application.
+## Engine
 
-## Interface
+- Overall league maturity: every team in the standings plus both fixture teams must have at least 4 overall league games.
+- HOME team analysis is HOME-only; AWAY team analysis is AWAY-only.
+- Split table ranking needs 3 venue matches and ranks by PPG, GD/game, GF/game, win rate, then points/tiebreakers.
+- Strict Last-5 venue form needs 5 matches; Last-10 is confirmation only.
+- Team-result markets are Top-3-only in the relevant split. Position 4+ can never be rescued by Win/DNB/DC.
+- HIGH contradiction removes team results. MODERATE can only use a safer market when original win odds are above 2.00.
+- Straight wins require 60%+ split win rate unless the relevant opponent is last with 5+ split games or concedes more than 2.30 per split game.
+- Goal markets require both HOME/AWAY hit rates >=60% plus matching attack/defence profile confirmation.
+- GG requires both split BTTS rates >=60%, both teams scoring and conceding at least 1.0, and is vetoed by FTS >=40% or clean sheets >=60%.
+- Every published market requires a real coherent bookmaker price.
+- Best Picks contains one strongest market per fixture.
 
-The site uses the black, white and green Stats2Pitch identity throughout. The login screen is football-first, account creation goes directly into the app without an email-verification step, and GitHub sign-in is not included.
+## Stack
 
-The Prediction Board has Market, Minimum Filters, Fixture Date, Choose Filters and Sort By controls. Chosen filters appear as removable chips. Inside Choose Filters you can use **Match any**, **Match all**, and **Put one selected filter first** to sort around a specific filter. User-facing reasons are written in normal football language rather than backend/statistical shorthand.
+- Node 22, no runtime npm dependencies.
+- API-Football primary football source.
+- TheStatsAPI optional odds fallback.
+- Supabase email/password auth and snapshot storage.
+- Render deployment via `render.yaml`.
 
-Each fixture can open **View details** to show its reasons and the available market prices that were collected for that match. Provider/admin information is deliberately not shown in the normal UI.
+## Setup
 
-## Run
+1. Run `supabase/schema.sql` once in Supabase SQL Editor.
+2. Set Render environment variables from `.env.example`.
+3. Disable Supabase email confirmation if immediate account access is desired.
+4. Deploy the repository.
 
-```bash
-npm ci
-npm start
-```
-
-Health check: `GET /api/health`
-
-Engine check:
-
-```bash
-npm run check
-```
-
-## Required Render secrets
-
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `API_FOOTBALL_KEY`
-
-For extra odds/markets:
-
-- `STATS_API_KEY`
-- `STATS_API_BASE_URL=https://api.thestatsapi.com/api`
-
-The Supabase URL may be entered either as the full `https://...supabase.co` URL or as the Supabase hostname; the server normalizes it.
-
-See `SETUP_GITHUB_RENDER_SUPABASE.md` for deployment steps.
-
-## Front-end file layout (v1.14.0)
-
-The front end is four files plus the app module. They load in this order and the
-order matters:
-
-| File | When it runs | Contains |
-| --- | --- | --- |
-| `s2p-cache-reset-v1.14.0.js` | head, blocking | one-time storage/cache cleanup, keyed on the build constant |
-| `s2p-styles-v1.14.0.css` | head | all 17 former stylesheets, cascade order preserved |
-| `s2p-boot-v1.14.0.js` | body, blocking | network guard, deterministic board bootstrap, boot guard, date router |
-| `app.v1.5.0.js` | deferred module | the application |
-| `s2p-ui-v1.14.0.js` | deferred, after the module | loading surface, UI layers, status clock, board runtime, responsive board, live scores |
-
-Inside each bundle, blocks are separated by `segment:` banners naming the file
-they came from, and each block is wrapped in its own try/catch. A failure logs
-`[s2p] segment failed: <name>` and the remaining segments still run.
-
-**Making changes:** edit the relevant segment in place inside the bundle. Do not
-add a new versioned file to `public/` — `npm run check` will fail if an unbundled
-script or stylesheet appears there, which is deliberate: that pattern is what
-grew the folder to 60 files. When you change a bundle, bump the version in the
-filename, in `index.html`, in `package.json`, in `server/index.js` (`VERSION`),
-and in `server/bootBundle.test.js` (`BUILD`) so the cache reset runs once for the
-new build.
+Health check: `/api/health`
