@@ -5,17 +5,17 @@ import {fileURLToPath} from 'node:url'
 import {verifyUser,loadBoard,publicConfig} from './store.js'
 import {startRefresh,refreshStatus} from './refresh.js'
 import {getFixturesByDateFresh} from './apiFootball.js'
-import {ENGINE_VERSION,MIN_LEAGUE_GAMES,TEAM_RESULT_POLICY,GG_POLICY,ODDS_POLICY} from './engine.js'
+import {ENGINE_VERSION,FORM_TABLE_SAMPLE,PROFILE_SOURCE,MIN_LEAGUE_GAMES,TEAM_RESULT_POLICY,GG_POLICY,ODDS_POLICY} from './engine.js'
 import {eliteFeedAuthorized,buildEliteFeed} from './eliteExport.js'
 
-const VERSION='2.0.2',PORT=Number(process.env.PORT||3000),PUBLIC=fileURLToPath(new URL('../public/',import.meta.url)),ttlMs=Math.max(5,Number(process.env.AUTO_REFRESH_TTL_MINUTES||45))*60000
+const VERSION='2.1.0',PORT=Number(process.env.PORT||3000),PUBLIC=fileURLToPath(new URL('../public/',import.meta.url)),ttlMs=Math.max(5,Number(process.env.AUTO_REFRESH_TTL_MINUTES||45))*60000
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg'}
 const dateOk=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))
 const send=(res,status,body,headers={})=>{const data=typeof body==='string'?body:JSON.stringify(body);res.writeHead(status,{'Content-Type':typeof body==='string'?'text/plain; charset=utf-8':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(data)}
 async function body(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>100000)throw new Error('Request too large')}return raw?JSON.parse(raw):{}}
 function token(req){const h=String(req.headers.authorization||'');return h.startsWith('Bearer ')?h.slice(7):''}
 async function user(req){return verifyUser(token(req))}
-function emptyBoard(date){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},groups:{single:[],two:[],threePlus:[]},priority:[],bestPicks:[],availableMarkets:[]}}
+function emptyBoard(date){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE,requiresRefresh:true},groups:{single:[],two:[],threePlus:[]},priority:[],bestPicks:[],availableMarkets:[]}}
 function stale(board){const t=Date.parse(board?.meta?.generatedAt||board?.meta?.storedAt||'');return !Number.isFinite(t)||Date.now()-t>ttlMs||Number(board?.meta?.sourceFixtures||0)===0}
 function normalizeLive(rows){return(rows||[]).map(x=>({fixtureId:x?.fixture?.id,status:x?.fixture?.status?.short||'',statusLong:x?.fixture?.status?.long||'',minute:x?.fixture?.status?.elapsed??null,kickoff:x?.fixture?.date,league:x?.league?.name||'',country:x?.league?.country||'',leagueLogo:x?.league?.logo||null,countryFlag:x?.league?.flag||null,home:{id:x?.teams?.home?.id,name:x?.teams?.home?.name||'',logo:x?.teams?.home?.logo||null,score:x?.goals?.home??null},away:{id:x?.teams?.away?.id,name:x?.teams?.away?.name||'',logo:x?.teams?.away?.logo||null,score:x?.goals?.away??null}}))}
 function eliteDate(url){return dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):new Date().toISOString().slice(0,10)}
@@ -40,7 +40,7 @@ async function machineElite(req,res,url){
   return send(res,404,{error:'Not found'})
 }
 async function api(req,res,url){
-  if(url.pathname==='/api/health')return send(res,200,{ok:true,version:VERSION,engineVersion:ENGINE_VERSION,minimumLeagueGames:MIN_LEAGUE_GAMES,teamResultPolicy:TEAM_RESULT_POLICY,ggPolicy:GG_POLICY,oddsPolicy:ODDS_POLICY})
+  if(url.pathname==='/api/health')return send(res,200,{ok:true,version:VERSION,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE,minimumLeagueGames:MIN_LEAGUE_GAMES,teamResultPolicy:TEAM_RESULT_POLICY,ggPolicy:GG_POLICY,oddsPolicy:ODDS_POLICY})
   if(url.pathname==='/api/config')return send(res,200,{...publicConfig(),version:VERSION})
   if(url.pathname.startsWith('/api/export/elite'))return machineElite(req,res,url)
   let me;try{me=await user(req)}catch(e){return send(res,401,{error:'Authentication required'})}
