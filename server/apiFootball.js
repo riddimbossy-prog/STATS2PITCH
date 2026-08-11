@@ -38,6 +38,9 @@ async function request(path, params={}, opts={}) {
 export async function football(path, params={}, opts={}) {return (await request(path,params,opts)).response}
 export async function getFixturesByDate(date,opts={}) {return football('/fixtures', { date, timezone: process.env.APP_TIMEZONE || 'UTC' },opts)}
 export async function getFixturesByDateFresh(date) {return getFixturesByDate(date,{bypassCache:true})}
+export async function getLeagueFinishedFixtures(league,season,opts={}) {
+  return football('/fixtures',{league,season,status:'FT',timezone:process.env.APP_TIMEZONE||'UTC'},opts)
+}
 
 export function flattenStandingGroups(payload){
   const groups=payload?.[0]?.league?.standings
