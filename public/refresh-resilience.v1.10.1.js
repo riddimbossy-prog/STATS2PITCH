@@ -1,15 +1,19 @@
-/* Stats2Pitch v1.10.1 — background refresh with full-screen pitch loader. */
+/* Stats2Pitch v1.13.2 — background refresh + automatic current-day population. */
 (()=>{
   'use strict'
   const ACCESS_KEY='s2p_access_token'
   const ACTIVE_KEY='s2p_refresh_active_date'
+  const AUTO_KEY='s2p_today_auto_refresh_date'
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))
+  const pad=n=>String(n).padStart(2,'0')
+  const browserToday=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
   let running=false
   let polling=false
   let resumedDate=''
+  let autoCheckedDate=''
 
   const token=()=>localStorage.getItem(ACCESS_KEY)||''
-  const selectedDate=()=>document.getElementById('date')?.value||sessionStorage.getItem('s2p_fixture_date')||new Date().toISOString().slice(0,10)
+  const selectedDate=()=>document.getElementById('date')?.value||sessionStorage.getItem('s2p_fixture_date')||browserToday()
 
   async function request(path,opts={}){
     const r=await fetch(path,{...opts,headers:{...(opts.headers||{}),Authorization:`Bearer ${token()}`,'Cache-Control':'no-store'}})
@@ -93,6 +97,7 @@
         const job=await request(`/api/refresh-status?date=${encodeURIComponent(date)}`)
         if(job.status==='complete'){
           setLoading(false)
+          sessionStorage.removeItem(AUTO_KEY)
           await sleep(250)
           location.reload()
           return
@@ -118,13 +123,15 @@
     }
   }
 
-  async function start(date){
+  async function start(date,{auto=false}={}){
     if(running)return
+    if(auto)sessionStorage.setItem(AUTO_KEY,date)
     setLoading(true,date)
     try{
       const job=await request(`/api/refresh?date=${encodeURIComponent(date)}`,{method:'POST'})
       if(job.status==='complete'){
         setLoading(false)
+        sessionStorage.removeItem(AUTO_KEY)
         location.reload()
         return
       }
@@ -152,12 +159,50 @@
         poll(date)
       }else if(job.status==='complete'&&sessionStorage.getItem(ACTIVE_KEY)===date){
         setLoading(false)
+        sessionStorage.removeItem(AUTO_KEY)
         location.reload()
       }else{
         setLoading(false)
       }
     }catch{
       setLoading(false)
+    }
+  }
+
+  async function realBoardFor(date){
+    // v1.13 may intentionally return one boot-shell board while the real read starts.
+    // Never mistake that shell response for a genuine empty current-day snapshot.
+    for(let i=0;i<3;i++){
+      const data=await request(`/api/board?date=${encodeURIComponent(date)}`)
+      if(!data?.meta?.bootShellOnly)return data
+      await sleep(300)
+    }
+    return null
+  }
+
+  async function maybeAutoPopulateToday(){
+    if(!token())return
+    const date=selectedDate(),today=browserToday()
+    if(date!==today||autoCheckedDate===date)return
+    autoCheckedDate=date
+    try{
+      const board=await realBoardFor(date)
+      if(!board)return
+      const meta=board.meta||{}
+      const sourceFixtures=Number(meta.sourceFixtures??meta.fixturesScanned??0)
+      const needsFresh=meta.noSnapshot===true||meta.stale===true||sourceFixtures===0
+      if(!needsFresh)return
+
+      const prior=sessionStorage.getItem(AUTO_KEY)
+      if(prior===date){
+        const job=await request(`/api/refresh-status?date=${encodeURIComponent(date)}`)
+        if(job.status==='running'){setLoading(true,date);poll(date)}
+        else if(job.status==='complete'){sessionStorage.removeItem(AUTO_KEY);location.reload()}
+        return
+      }
+      await start(date,{auto:true})
+    }catch{
+      // The visible board remains available. Manual refresh is still a fallback.
     }
   }
 
@@ -179,7 +224,8 @@
       const active=sessionStorage.getItem(ACTIVE_KEY)
       if(active&&active===selectedDate())setLoading(true,active)
       maybeResume()
-    },80)
+      maybeAutoPopulateToday()
+    },120)
   }
   if(root)new MutationObserver(schedule).observe(root,{childList:true,subtree:true})
 
@@ -189,6 +235,7 @@
     if(active)setLoading(true,active)
     else overlay().hidden=true
     maybeResume()
+    setTimeout(maybeAutoPopulateToday,350)
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',begin,{once:true})
