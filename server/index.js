@@ -14,9 +14,8 @@ import { createRefreshJobs } from './refreshJobs.js'
 import { claimRefreshJob, saveRefreshJob, loadRefreshJob, refreshStoreMode } from './refreshStore.js'
 import { withDeadline } from './providerFetch.js'
 import { getDailyLiveScores } from './liveScores.js'
-import { eliteFeedAuthorized, snapshotIsEliteCompatible, buildEliteFeed } from './eliteExport.js'
 
-const VERSION='1.12.1'
+const VERSION='1.14.0'
 const __dirname=path.dirname(fileURLToPath(import.meta.url)),publicDir=path.resolve(__dirname,'../public'),port=Number(process.env.PORT||3000)
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon','.webmanifest':'application/manifest+json; charset=utf-8'}
 function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data))}
@@ -51,7 +50,7 @@ const refreshJobs=createRefreshJobs(runRefresh,{ttlMs:Number(process.env.REFRESH
 
 const server=http.createServer(async(req,res)=>{try{
  const u=new URL(req.url,'http://local')
- if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,engineIntegrityPolicy:ENGINE_INTEGRITY_POLICY,winSafetyPolicy:WIN_SAFETY_POLICY,teamResultEligibilityPolicy:TEAM_RESULT_ELIGIBILITY_POLICY,ggPolicy:GG_POLICY,refreshMode:'background-job',refreshPersistence:refreshStoreMode(),candidatePolicy:'full-maturity-discovery-priced-enrichment',oddsPolicy:'single-bookmaker-coherent-v1',rankingPolicy:'family-diversity-first-v1',contradictionPolicy:'high-veto-moderate-safer-only',lifecycleClockPolicy:'kickoff-plus-15m-provider-sanity-v1',refreshPerformancePolicy:'parallel-maturity-and-enrichment-v1',liveScores:'api-football-20s-cache',eliteExport:'protected-snapshot-v1',time:new Date().toISOString()})
+ if(u.pathname==='/api/health')return json(res,200,{ok:true,brand:'Stats2Pitch.com',version:VERSION,splitPolicy:SPLIT_ENGINE_POLICY,engineIntegrityPolicy:ENGINE_INTEGRITY_POLICY,winSafetyPolicy:WIN_SAFETY_POLICY,teamResultEligibilityPolicy:TEAM_RESULT_ELIGIBILITY_POLICY,ggPolicy:GG_POLICY,refreshMode:'background-job',refreshPersistence:refreshStoreMode(),candidatePolicy:'full-maturity-discovery-priced-enrichment',oddsPolicy:'single-bookmaker-coherent-v1',rankingPolicy:'family-diversity-first-v1',contradictionPolicy:'high-veto-moderate-safer-only',lifecycleClockPolicy:'kickoff-plus-15m-provider-sanity-v1',refreshPerformancePolicy:'parallel-maturity-and-enrichment-v1',liveScores:'api-football-20s-cache',time:new Date().toISOString()})
  if(u.pathname==='/api/config')return json(res,200,{brand:'Stats2Pitch.com',version:VERSION,supabaseUrl:normalizedSupabaseUrl(),supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true')!=='false'})
  if(u.pathname==='/api/auth/account-status'&&req.method==='POST'){
   if(String(process.env.ALLOW_PUBLIC_SIGNUP||'true')==='false')return json(res,200,{needsAccount:false});const ip=clientIp(req);if(!allowBucket(lookupBuckets,ip,20))return json(res,429,{error:'Too many attempts. Try again later.'})
@@ -66,13 +65,6 @@ const server=http.createServer(async(req,res)=>{try{
   if(!await authed(req,res))return
   const date=normalizeDate(u.searchParams.get('date')||''),force=u.searchParams.get('fresh')==='1'
   try{return json(res,200,await getDailyLiveScores(date,{force}))}catch(e){console.error('Live scores failed:',e.message);return json(res,502,{error:'Live scores are temporarily unavailable.'})}
- }
- if(u.pathname==='/api/export/elite'&&req.method==='GET'){
-  if(!eliteFeedAuthorized(req))return json(res,401,{error:'Elite feed authorization required.'})
-  const date=normalizeDate(u.searchParams.get('date')||''),limit=Math.max(1,Math.min(10,Number(u.searchParams.get('limit')||10))),board=await loadSnapshotByDate(date)
-  if(!board)return json(res,200,{version:1,source:'stats2pitch',date,generated_at:null,count:0,max:10,items:[]})
-  if(!snapshotIsEliteCompatible(board))return json(res,409,{error:'Saved board must be refreshed before Elite export.',date})
-  return json(res,200,buildEliteFeed(board,{date,limit}))
  }
  if(u.pathname==='/api/board'){
   if(!await authed(req,res))return;const date=normalizeDate(u.searchParams.get('date')||''),board=await loadSnapshotByDate(date)

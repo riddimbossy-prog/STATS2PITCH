@@ -1,22 +1,43 @@
-STATS2PITCH v1.4.0 — FULL REPLACEMENT BUILD
+STATS2PITCH v1.14.0 — CONSOLIDATED FRONT-END BUILD
 
-Use this folder as the root of the GitHub repository. Do not upload it inside an older project folder.
+Use this folder as the root of the GitHub repository. Do not upload it inside an
+older project folder. Nothing about the prediction engine, the server, Supabase
+or the providers has changed in this build — only how the front end is packaged.
 
-What changed:
-- New black / white / green Stats2Pitch brand across login, header, app icons and PWA.
-- New stadium-style sign-in screen.
-- Email/password only. No GitHub login.
-- Create Account uses the server-side confirmed-user flow, so users can enter immediately without email verification.
-- New Prediction Board based on the supplied UI reference.
-- Plain-English match reasons and labels.
-- Select filters, Match Any / Match All, remove filter chips, and prioritize one selected filter when sorting.
-- Priority list plus 3+ Filters / 2 Filters / Single Filter sections.
-- API-Football + TheStatsAPI odds-market enrichment preserved.
-- View Details shows available match-market prices without exposing provider/backend names.
-- Mobile, tablet and foldable layouts included.
-- Supabase URL is normalized automatically if Render is given the project hostname without https://.
+WHAT CHANGED
+- public/ went from 60 files to 7. The 17 stylesheets are now one stylesheet and
+  the 21 scripts are now three scripts.
+- Every script segment is wrapped in its own try/catch, so one broken segment can
+  no longer stop the ones after it. That is stricter than the old behaviour.
+- Load order is byte-for-byte the same as v1.13.0. Nothing was rewritten, merged
+  or "cleaned up" inside a segment — the files were concatenated in the exact
+  order index.html used to list them.
+- 20 dead files were deleted (old app.v1.1.1 / v1.3.0 / v1.4.0 bundles, retired
+  boot guards and cache resets, the superseded bootstrap-shell watchdog, four
+  obsolete stylesheets, and sw.js, which nothing registered any more).
+- /api/health reported 1.12.0 while the rest of the build said 1.13.0. Fixed:
+  server, package.json and the UI build stamp all now say 1.14.0.
+- Three regression tests that were guarding retired files were replaced by one
+  test that guards the bundles, checks load order, and fails if index.html ever
+  points at a file that is not in public/.
 
-After pushing to GitHub:
+WHAT public/ CONTAINS NOW
+  index.html                     page shell and the boot-guard splash
+  s2p-cache-reset-v1.14.0.js     head script, one-time storage/cache cleanup
+  s2p-boot-v1.14.0.js            boot layer, runs before the app module
+  app.v1.5.0.js                  the application module (unchanged)
+  s2p-ui-v1.14.0.js              UI layer, runs after the app module
+  s2p-styles-v1.14.0.css         the whole stylesheet
+  manifest.webmanifest, assets/
+
+AFTER PUSHING TO GITHUB
 1. In Render, deploy the latest commit using Clear build cache & deploy.
-2. Confirm /api/health reports version 1.4.0.
-3. Hard-refresh the browser once after deployment.
+2. Confirm /api/health reports version 1.14.0.
+3. Hard-refresh the browser once. The cache-reset script clears old storage and
+   unregisters any leftover service worker automatically on first load.
+4. Check the board loads on phone and desktop before considering it done.
+
+IF SOMETHING LOOKS WRONG
+Open the browser console. A failed segment logs "[s2p] segment failed: <name>"
+with the original filename, so a visual bug points straight at the block of code
+that caused it. Each block is marked in the bundle with a "segment:" banner.
