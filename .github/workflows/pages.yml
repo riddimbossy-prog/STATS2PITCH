@@ -51,6 +51,8 @@ jobs:
           fs.writeFileSync('_site/runtime-config.js',`window.__STATS2PITCH_CONFIG__=${JSON.stringify(cfg)}\n`)
           NODE
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
