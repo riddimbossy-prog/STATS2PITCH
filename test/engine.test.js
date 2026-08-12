@@ -36,12 +36,18 @@ test('AWAY Form Table is calculated independently from AWAY results',()=>{
   assert.equal(p5.position,5)
 })
 
-test('Form Table requires five HOME/AWAY samples across the group before maturity',()=>{
+test('fixture maturity needs only the two teams while ranking still needs the full venue table',()=>{
   assert.equal(leagueMature(history,standings,2,5),true)
-  const short=history.filter(f=>!(String(f?.teams?.home?.id)==='2'&&String(f?.teams?.away?.id)==='102')).slice(1)
-  const table=buildVenueFormTable(short,standings,2,'home')
+  const shortOther=history.filter((f,i)=>!(String(f?.teams?.home?.id)==='3'&&String(f?.teams?.away?.id)==='103'&&i>=0)).slice(1)
+  const table=buildVenueFormTable(shortOther,standings,2,'home')
+  const p2=formTableProfile(shortOther,standings,2,'home')
   assert.equal(table.tableReady,false)
-  assert.equal(leagueMature(short,standings,2,5),false)
+  assert.equal(p2.formTableReady,true)
+  assert.equal(p2.positionSampleReady,false)
+  assert.equal(p2.position,null)
+  assert.equal(leagueMature(shortOther,standings,2,5),true)
+  const shortHome=history.filter((f,i)=>!(String(f?.teams?.home?.id)==='2'&&String(f?.teams?.away?.id)==='102'&&i>=0)).slice(1)
+  assert.equal(leagueMature(shortHome,standings,2,5),false)
 })
 
 const team=(id,name,venue,position,o={})=>({id,name,venue,source:PROFILE_SOURCE,formTableReady:true,formTableSample:5,position,positionSampleReady:true,leagueSize:10,played:5,ppg:2.1,goalsScored:1.6,goalsConceded:1.1,winRate:80,lossRate:0,goalsSample:5,bttsRate:80,failedToScoreRate:0,cleanSheetRate:20,over15:80,under15:20,over25:80,under25:20,over35:40,under35:60,recentGoalsScored:1.6,recentGoalsConceded:1.1,...o})
@@ -64,6 +70,12 @@ test('under-60 Form Table win rate can only downgrade above 2.00 and never if no
   assert.equal(rows.some(x=>x.market==='DNB'&&x.selection==='Alpha DNB'),true)
   rows=analyzeFixture(fixture(4,6,{home:{winRate:40},odds:{home:2.3}}))
   assert.equal(rows.some(x=>['DNB','DC','1X2'].includes(x.market)),false)
+})
+
+test('goals can use exact team split samples before league-wide ranking is complete',()=>{
+  const rows=analyzeFixture(fixture(null,null,{home:{positionSampleReady:false},away:{positionSampleReady:false}}))
+  assert.equal(rows.some(x=>x.market==='O1.5'||x.market==='BTTS'),true)
+  assert.equal(rows.some(x=>['1X2','DNB','DC'].includes(x.market)),false)
 })
 
 test('goals and GG require the Form Table source and use only its five-game metrics',()=>{
