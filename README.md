@@ -1,6 +1,6 @@
 # Stats2Pitch 2.2 — GitHub + Supabase Architecture
 
-Stats2Pitch keeps the strict HOME/AWAY Form Table engine and removes the paid Render web service.
+Stats2Pitch keeps the strict HOME/AWAY Form Table engine and runs without Render.
 
 ## Production stack
 
@@ -35,7 +35,7 @@ The browser never receives the Supabase service-role key or football-provider ke
 
 ## Existing Supabase table
 
-Run `supabase/schema.sql` if the project has not already been initialized. The migration deliberately keeps the existing `prediction_snapshots` table, so the Render removal does not require a new database design.
+Run `supabase/schema.sql` if the project has not already been initialized. The migration keeps the existing `prediction_snapshots` table, so no replacement database is required.
 
 ## GitHub secrets required
 
@@ -50,17 +50,19 @@ Add these in **Repository Settings → Secrets and variables → Actions → Sec
 - `STATS_API_KEY` only if the optional TheStatsAPI odds fallback is used
 - `STATS2PITCH_ELITE_FEED_TOKEN` only if the machine Elite feed is used
 
-Optional tuning values such as `APP_TIMEZONE`, `AUTO_REFRESH_TTL_MINUTES`, `MAX_FIXTURES_PER_REFRESH`, `REFRESH_CONCURRENCY`, `BOARD_DAYS_FORWARD` and `STATS2PITCH_ALLOWED_ORIGIN` belong in GitHub **Actions variables**.
+Optional tuning values such as `APP_TIMEZONE`, `AUTO_REFRESH_TTL_MINUTES`, `MAX_FIXTURES_PER_REFRESH`, `REFRESH_CONCURRENCY` and `BOARD_DAYS_FORWARD` belong in GitHub **Actions variables**.
 
 ## Workflows
 
 - `.github/workflows/pages.yml` deploys the static site to GitHub Pages and injects the public Supabase URL/anon key into `runtime-config.js` during deployment.
 - `.github/workflows/refresh-board.yml` checks the saved snapshot every 30 minutes and runs the engine only when the snapshot is older than the configured TTL. It can also be run manually for any `YYYY-MM-DD` date.
-- `.github/workflows/supabase-functions.yml` deploys `supabase/functions/stats2pitch-api` and syncs the API-Football secret into Supabase.
+- `.github/workflows/supabase-functions.yml` deploys both Stats2Pitch Edge Functions, syncs API secrets and pins browser CORS to `https://www.stats2pitch.com`.
 
-## Domain cutover
+## Domain
 
-`public/CNAME` is set to `stats2pitch.com`. After the GitHub Pages and Supabase workflows are green, point the domain DNS to GitHub Pages. Only after the domain is serving the GitHub Pages build should the old Render service be deleted from the Render dashboard.
+The canonical production domain is `https://www.stats2pitch.com` and `public/CNAME` matches it. GitHub Pages HTTPS covers both `www.stats2pitch.com` and `stats2pitch.com`, with HTTPS enforcement enabled.
+
+The Render service definition has been removed from the repository. After this cleanup is merged and production checks are green, the old Stats2Pitch service can be deleted from the Render dashboard.
 
 ## Local checks
 
@@ -69,4 +71,4 @@ npm ci
 npm run check
 ```
 
-The Node files under `server/` are now engine/worker modules used by GitHub Actions; they are not an always-on web server.
+The Node files under `server/` are engine/worker modules used by GitHub Actions and local checks; they are not the production web host.
