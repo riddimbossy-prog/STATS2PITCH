@@ -23,7 +23,7 @@ jobs:
       APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'UTC' }}
       AUTO_REFRESH_TTL_MINUTES: ${{ vars.AUTO_REFRESH_TTL_MINUTES || '45' }}
       ALLOW_PUBLIC_SIGNUP: ${{ vars.ALLOW_PUBLIC_SIGNUP || 'true' }}
-      STATS2PITCH_ALLOWED_ORIGIN: ${{ vars.STATS2PITCH_ALLOWED_ORIGIN || 'https://stats2pitch.com' }}
+      STATS2PITCH_ALLOWED_ORIGIN: ${{ vars.STATS2PITCH_ALLOWED_ORIGIN || '*' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
