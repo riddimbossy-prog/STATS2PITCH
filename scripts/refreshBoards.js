@@ -9,7 +9,7 @@ const ttlMs=Math.max(15,Number(process.env.AUTO_REFRESH_TTL_MINUTES||45))*60_000
 const timezone=process.env.APP_TIMEZONE||'UTC'
 const explicit=process.argv.find(dateOk)||process.env.REFRESH_DATE||''
 const force=process.argv.includes('--force')||String(process.env.FORCE_REFRESH||'').toLowerCase()==='true'
-const daysForward=Math.max(0,Math.min(3,Number(process.env.BOARD_DAYS_FORWARD||0)))
+const daysForward=Math.max(0,Math.min(3,Number(process.env.BOARD_DAYS_FORWARD||1)))
 
 function dateInZone(offsetDays=0){
   const d=new Date(Date.now()+offsetDays*86_400_000)
