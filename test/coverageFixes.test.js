@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import {normalizeSupabaseUrl} from '../server/store.js'
 import {selectRecentVenueFixtures} from '../server/apiFootball.js'
-import {needsOddsFallback,mergeHistories} from '../server/refresh.js'
+import {needsOddsFallback,mergeHistories,settlePublishedPick,sortKickoff,matchStatusLabel} from '../server/refresh.js'
 
 test('Supabase worker accepts project ref, host, or full URL',()=>{
   assert.equal(normalizeSupabaseUrl('abcdefghijklmnopqrst'),'https://abcdefghijklmnopqrst.supabase.co')
@@ -51,12 +51,35 @@ test('scheduled refresh publishes through Sunday with unlimited fixtures and for
   assert.match(script,/forwardSetting==='week'/)
 })
 
-test('public board keeps all remaining fixtures separate from qualified picks',()=>{
+test('public board keeps the whole day while Upcoming remains scheduled-only',()=>{
   const refresh=fs.readFileSync(new URL('../server/refresh.js',import.meta.url),'utf8')
   const view=fs.readFileSync(new URL('../public/boardView.js',import.meta.url),'utf8')
-  assert.match(refresh,/board\.fixtures=scheduled\.map/)
+  assert.match(refresh,/board\.fixtures=sortKickoff\(raw\.map/)
+  assert.match(refresh,/reconcilePublishedBoard\(board,previous,raw\)/)
   assert.match(refresh,/board\.meta\.publishedFixtures=board\.fixtures\.length/)
-  assert.match(view,/remaining=state\.board\.fixtures\|\|\[\]/)
+  assert.match(view,/SCHEDULED\.has\(shortStatus\(liveState\(f\)\)\)/)
   assert.match(view,/class=\"week-strip\"/)
   assert.match(view,/No pick forced/)
+  assert.match(view,/earliest kickoff first/)
+})
+
+test('kickoff order is ascending and provider statuses are human readable',()=>{
+  const rows=sortKickoff([{fixtureId:2,kickoff:'2026-08-12T18:00:00Z'},{fixtureId:1,kickoff:'2026-08-12T12:00:00Z'}])
+  assert.deepEqual(rows.map(x=>x.fixtureId),[1,2])
+  assert.equal(matchStatusLabel('NS'),'Scheduled')
+  assert.equal(matchStatusLabel('HT'),'Half Time')
+  assert.equal(matchStatusLabel('2H',67),"Live · 2H · 67'")
+  assert.equal(matchStatusLabel('FT'),'Full Time')
+})
+
+test('published picks settle WON LOST PUSH from final provider score',()=>{
+  const raw={fixture:{id:9,date:'2026-08-12T12:00:00Z',status:{short:'FT',long:'Match Finished',elapsed:90}},teams:{home:{id:10,name:'Alpha'},away:{id:20,name:'Beta'}},goals:{home:2,away:1},score:{fulltime:{home:2,away:1}}}
+  assert.equal(settlePublishedPick({market:'1X2',selectedTeamId:10,selection:'Alpha'},raw),'WON')
+  assert.equal(settlePublishedPick({market:'DNB',selectedTeamId:20,selection:'Beta DNB'},raw),'LOST')
+  assert.equal(settlePublishedPick({market:'DC',selectedTeamId:10,selection:'Alpha 1X'},raw),'WON')
+  assert.equal(settlePublishedPick({market:'O2.5',selection:'Over 2.5 goals'},raw),'WON')
+  assert.equal(settlePublishedPick({market:'U3.5',selection:'Under 3.5 goals'},raw),'WON')
+  assert.equal(settlePublishedPick({market:'BTTS',selection:'GG — Both teams to score'},raw),'WON')
+  const draw={...raw,goals:{home:1,away:1},score:{fulltime:{home:1,away:1}}}
+  assert.equal(settlePublishedPick({market:'DNB',selectedTeamId:10,selection:'Alpha DNB'},draw),'PUSH')
 })
