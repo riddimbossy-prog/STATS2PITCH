@@ -42,6 +42,7 @@ test('scheduled refresh defaults to unlimited fixtures, today plus tomorrow, and
   assert.match(workflow,/MAX_FIXTURES_PER_REFRESH: \$\{\{ vars\.MAX_FIXTURES_PER_REFRESH \|\| '0' \}\}/)
   assert.match(workflow,/BOARD_DAYS_FORWARD: \$\{\{ vars\.BOARD_DAYS_FORWARD \|\| '1' \}\}/)
   assert.match(workflow,/API_FOOTBALL_HISTORY_LAST: \$\{\{ vars\.API_FOOTBALL_HISTORY_LAST \|\| '40' \}\}/)
+  assert.match(workflow,/FORCE_REFRESH: \$\{\{ github\.event_name == 'push' \|\| \(github\.event_name == 'workflow_dispatch' && github\.event\.inputs\.force\) \}\}/)
   assert.match(env,/MAX_FIXTURES_PER_REFRESH=0/)
   assert.match(env,/BOARD_DAYS_FORWARD=1/)
   assert.match(env,/API_FOOTBALL_HISTORY_LAST=40/)
