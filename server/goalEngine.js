@@ -3,10 +3,17 @@ import {pickBase} from './pickUtils.js'
 const names={'O1.5':'Over 1.5 goals','U1.5':'Under 1.5 goals','O2.5':'Over 2.5 goals','U2.5':'Under 2.5 goals','O3.5':'Over 3.5 goals','U3.5':'Under 3.5 goals'},keys={'O1.5':'over15','U1.5':'under15','O2.5':'over25','U2.5':'under25','O3.5':'over35','U3.5':'under35'}
 function formTableReady(t){return t?.source===PROFILE_SOURCE&&t?.formTableReady===true&&Number(t?.formTableSample)===5}
 function confirm(h,a,m){const line=Number(m.slice(1)),over=m.startsWith('O'),p=[num(h.goalsScored)!==null&&num(a.goalsScored)!==null?h.goalsScored+a.goalsScored:null,num(h.goalsConceded)!==null&&num(a.goalsConceded)!==null?h.goalsConceded+a.goalsConceded:null].filter(Number.isFinite);if(p.length<2)return false;return over?p.every(v=>v>line):p.every(v=>v<line)}
+function lowWinUnder35(f){
+  const h=f.home,a=f.away,price=odd(f.odds.under35),hw=num(h.winRate),aw=num(a.winRate),hp=num(h.ppg),ap=num(a.ppg)
+  if(price===null||hw===null||aw===null||hp===null||ap===null||hw>=20||aw>=20||hp>=1||ap>=1)return null
+  return pickBase(f,{market:'U3.5',selection:'Under 3.5 goals',odds:price,filterCount:4,familyCount:2,filterFamilies:[FAMILY.FORM,FAMILY.TABLE],familyStrength:4.8,negativeFamilyStrength:0,contradiction:'LOW',score:10,reasons:[`${h.name} have 0 wins from their last 5 HOME matches and average ${hp.toFixed(2)} split PPG`,`${a.name} have 0 wins from their last 5 AWAY matches and average ${ap.toFixed(2)} split PPG`,'Both teams are below the 20% split-win threshold','The strict low-win/low-PPG safety override points to Under 3.5'],warnings:[],safety:'split-low-win-under35'})
+}
 export function goalPicks(f){
   const out=[]
   if(!formTableReady(f.home)||!formTableReady(f.away))return out
+  const lowWin=lowWinUnder35(f);if(lowWin)out.push(lowWin)
   for(const m of Object.keys(keys)){
+    if(lowWin&&m==='U3.5')continue
     const k=keys[m],hr=num(f.home[k]),ar=num(f.away[k]),price=odd(f.odds[k])
     if(hr===null||ar===null||hr<60||ar<60||price===null||f.home.goalsSample<5||f.away.goalsSample<5||!confirm(f.home,f.away,m))continue
     const reasons=[`${names[m]} landed in ${hr}% of ${f.home.name}'s HOME Form Table sample`,`${names[m]} landed in ${ar}% of ${f.away.name}'s AWAY Form Table sample`,'The same HOME/AWAY Form Table attack and defence numbers confirm this goal direction'],strength=+(2.1+(hr>=80?.3:0)+(ar>=80?.3:0)).toFixed(2)

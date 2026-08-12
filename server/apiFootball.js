@@ -4,6 +4,7 @@ const BASE = process.env.API_FOOTBALL_BASE || 'https://v3.football.api-sports.io
 const KEY = process.env.API_FOOTBALL_KEY
 const CACHE_TTL = Number(process.env.CACHE_TTL_SECONDS || 900) * 1000
 const ODDS_MAX_PAGES = Math.max(1, Number(process.env.API_FOOTBALL_ODDS_MAX_PAGES || 10))
+const HISTORY_LAST = Math.max(10, Math.min(100, Number(process.env.API_FOOTBALL_HISTORY_LAST || 40)))
 const REQUEST_TIMEOUT_MS=Math.max(3000,Number(process.env.API_FOOTBALL_TIMEOUT_MS||15000))
 const REQUEST_RETRIES=Math.max(0,Number(process.env.API_FOOTBALL_RETRIES||2))
 const memory = new Map()
@@ -58,6 +59,25 @@ export function flattenStandingGroups(payload){
 }
 export async function getStandings(league, season,opts={}) {const rows = await football('/standings', { league, season },opts);return flattenStandingGroups(rows)}
 export async function getRecent(team,opts={}) {return football('/fixtures', { team, last: 10, status: 'FT', timezone: process.env.APP_TIMEZONE || 'UTC' },opts)}
+
+function fixtureTime(row){const t=Date.parse(row?.fixture?.date||'');return Number.isFinite(t)?t:0}
+export function selectRecentVenueFixtures(rows,team,venue,limit=5,before=null){
+  if(!['home','away'].includes(venue))throw new Error('Venue must be home or away')
+  if(team===undefined||team===null||String(team)==='')return[]
+  const beforeMs=before?Date.parse(before):Infinity,max=Math.max(1,Number(limit||5))
+  return (Array.isArray(rows)?rows:[])
+    .filter(f=>['FT','AET','PEN'].includes(String(f?.fixture?.status?.short||'FT')))
+    .filter(f=>!Number.isFinite(beforeMs)||fixtureTime(f)<beforeMs)
+    .filter(f=>venue==='home'?String(f?.teams?.home?.id)===String(team):String(f?.teams?.away?.id)===String(team))
+    .sort((a,b)=>fixtureTime(b)-fixtureTime(a))
+    .slice(0,max)
+}
+
+export async function getRecentVenueGlobal(team,venue,limit=5,before=null,opts={}){
+  if(team===undefined||team===null||String(team)==='')return[]
+  const rows=await football('/fixtures',{team,last:HISTORY_LAST,status:'FT',timezone:process.env.APP_TIMEZONE||'UTC'},opts)
+  return selectRecentVenueFixtures(rows,team,venue,limit,before)
+}
 
 export async function getRecentLeagueVenue(team, league, season, venue, limit=10,opts={}) {
   if(!['home','away'].includes(venue))throw new Error('Venue must be home or away')

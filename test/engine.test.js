@@ -73,6 +73,16 @@ test('under-60 Form Table win rate can only downgrade above 2.00 and never if no
   assert.equal(rows.some(x=>['DNB','DC','1X2'].includes(x.market)),false)
 })
 
+test('both zero-win, sub-1.00 PPG split teams force the priced Under 3.5 safety route',()=>{
+  const rows=analyzeFixture(fixture(null,null,{home:{positionSampleReady:false,winRate:0,ppg:0.8},away:{positionSampleReady:false,winRate:0,ppg:0.6}}))
+  const pick=rows.find(x=>x.market==='U3.5'&&x.safety==='split-low-win-under35')
+  assert.ok(pick)
+  assert.equal(pick.selection,'Under 3.5 goals')
+  assert.equal(pick.score,10)
+  const blocked=analyzeFixture(fixture(null,null,{home:{positionSampleReady:false,winRate:20,ppg:0.8},away:{positionSampleReady:false,winRate:0,ppg:0.6}}))
+  assert.equal(blocked.some(x=>x.safety==='split-low-win-under35'),false)
+})
+
 test('goals can use exact team split samples before league-wide ranking is complete',()=>{
   const rows=analyzeFixture(fixture(null,null,{home:{positionSampleReady:false},away:{positionSampleReady:false}}))
   assert.equal(rows.some(x=>x.market==='O1.5'||x.market==='BTTS'),true)
