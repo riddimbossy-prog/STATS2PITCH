@@ -4,31 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#061219">
-  <meta name="stats2pitch-build" content="2.2.11">
+  <meta name="stats2pitch-build" content="2.2.12">
   <title>Stats2Pitch</title>
   <link rel="manifest" href="./manifest.webmanifest?v=2.2.0">
-  <link rel="stylesheet" href="./styles.css?v=2.2.0">
+  <link rel="stylesheet" href="./styles.css?v=2.2.12">
   <link rel="stylesheet" href="./auth.css?v=2.2.1">
   <link rel="stylesheet" href="./boardTheme.css?v=2.2.4">
   <link rel="stylesheet" href="./backgroundSwap.css?v=2.2.11">
-  <link rel="stylesheet" href="./noTips.css?v=2.2.0">
+  <link rel="stylesheet" href="./noTips.css?v=2.2.12">
   <script type="importmap">
-    {"imports":{"./core.js":"./core.js?v=2.2.3","./dashboard.js":"./dashboard.js?v=2.2.11","./boardView.js":"./boardView.js?v=2.2.4","./dialogs.js":"./dialogs.js?v=2.2.2"}}
+    {"imports":{"./core.js":"./core.js?v=2.2.3","./dashboard.js":"./dashboard.js?v=2.2.11","./boardView.js":"./boardView.js?v=2.2.12","./dialogs.js":"./dialogs.js?v=2.2.2"}}
   </script>
 </head>
 <body>
   <div id="app">
-    <div class="s2p-loader s2p-loader--page" role="status" aria-live="polite">
-      <div class="s2p-loader-scene" aria-hidden="true">
-        <div class="s2p-loader-trail"></div>
-        <div class="s2p-loader-ball-track">
-          <img class="s2p-loader-ball-real" src="./assets/football-real.svg?v=2.2.0" alt="">
-          <div class="s2p-loader-shadow"></div>
-        </div>
-        <div class="s2p-loader-pitch"><img src="./assets/brand-mark.png?v=2.2.0" alt=""></div>
-      </div>
-      <div class="s2p-loader-text">Loading <b>matches...</b></div>
-      <div class="s2p-loader-sub">FROM STATS TO THE PITCH</div>
+    <div class="s2p-loader s2p-loader--page" role="status" aria-label="Loading Stats2Pitch">
+      <video class="s2p-loader-video" autoplay loop muted playsinline preload="auto">
+        <source src="./assets/fox-kicking-ball.mp4?v=2.2.12" type="video/mp4">
+      </video>
     </div>
   </div>
   <script src="./runtime-config.js?v=2.2.3"></script>
