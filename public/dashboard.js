@@ -1,4 +1,4 @@
-import {state,api,localToday} from './core.js?v=2.2.2'
+import {state,api,localToday} from './core.js?v=2.2.3'
 import {shell,renderBoard,showRefresh,renderLive,stopLive,setTabActive} from './boardView.js?v=2.2.2'
 import {openFilters,openProfile} from './dialogs.js?v=2.2.2'
 export async function loadBoard(){state.board=await api(`/api/board?date=${encodeURIComponent(state.date)}`);showRefresh(state.board?.meta?.refresh);renderBoard()}
