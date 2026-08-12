@@ -38,12 +38,12 @@ export function buildVenueFormTable(fixtures,standings,teamId,venue){
 export function formTableProfile(fixtures,standings,teamId,venue){
   const table=buildVenueFormTable(fixtures,standings,teamId,venue),row=table.rows.find(r=>String(r.id)===String(teamId))
   if(!row)return null
-  const ready=table.tableReady&&row.ready,rate=v=>ready?pct(Math.round((v||0)*FORM_TABLE_SAMPLE),FORM_TABLE_SAMPLE):null
-  return{source:PROFILE_SOURCE,venue,formTableSample:FORM_TABLE_SAMPLE,formTableReady:ready,position:ready?row.position:null,positionSampleReady:ready,leagueSize:table.leagueSize,played:ready?FORM_TABLE_SAMPLE:row.played,ppg:ready?+row.ppg.toFixed(2):null,goalsScored:ready?+row.gfpg.toFixed(2):null,goalsConceded:ready?+row.gapg.toFixed(2):null,winRate:ready?rate(row.winRate):null,lossRate:ready?rate(row.lossRate):null,goalsSample:ready?FORM_TABLE_SAMPLE:row.played,bttsRate:ready?rate(row.bttsRate):null,cleanSheetRate:ready?rate(row.cleanSheetRate):null,failedToScoreRate:ready?rate(row.failedToScoreRate):null,over15:ready?rate(row.over15):null,under15:ready?100-rate(row.over15):null,over25:ready?rate(row.over25):null,under25:ready?100-rate(row.over25):null,over35:ready?rate(row.over35):null,under35:ready?100-rate(row.over35):null,recentGoalsScored:ready?+row.gfpg.toFixed(2):null,recentGoalsConceded:ready?+row.gapg.toFixed(2):null,formAgreement:ready?'FORM_TABLE_ONLY':'INSUFFICIENT'}
+  const sampleReady=row.ready===true,positionReady=sampleReady&&table.tableReady===true,rate=v=>sampleReady?pct(Math.round((v||0)*FORM_TABLE_SAMPLE),FORM_TABLE_SAMPLE):null
+  return{source:PROFILE_SOURCE,venue,formTableSample:FORM_TABLE_SAMPLE,formTableReady:sampleReady,position:positionReady?row.position:null,positionSampleReady:positionReady,leagueSize:table.leagueSize,played:sampleReady?FORM_TABLE_SAMPLE:row.played,ppg:sampleReady?+row.ppg.toFixed(2):null,goalsScored:sampleReady?+row.gfpg.toFixed(2):null,goalsConceded:sampleReady?+row.gapg.toFixed(2):null,winRate:sampleReady?rate(row.winRate):null,lossRate:sampleReady?rate(row.lossRate):null,goalsSample:sampleReady?FORM_TABLE_SAMPLE:row.played,bttsRate:sampleReady?rate(row.bttsRate):null,cleanSheetRate:sampleReady?rate(row.cleanSheetRate):null,failedToScoreRate:sampleReady?rate(row.failedToScoreRate):null,over15:sampleReady?rate(row.over15):null,under15:sampleReady?100-rate(row.over15):null,over25:sampleReady?rate(row.over25):null,under25:sampleReady?100-rate(row.over25):null,over35:sampleReady?rate(row.over35):null,under35:sampleReady?100-rate(row.over35):null,recentGoalsScored:sampleReady?+row.gfpg.toFixed(2):null,recentGoalsConceded:sampleReady?+row.gapg.toFixed(2):null,formAgreement:sampleReady?'FORM_TABLE_ONLY':'INSUFFICIENT'}
 }
 
-// Maturity is now venue-form-table maturity, not normal standings maturity.
-// The normal standings payload is used only to identify competition/group membership.
+// Fixture maturity only requires the two teams being analysed to have five relevant venue matches.
+// A complete league-wide venue table is still required for ranking-dependent team-result markets.
 export function leagueMature(leagueHistory,standings,homeId,awayId){
   const home=formTableProfile(leagueHistory,standings,homeId,'home'),away=formTableProfile(leagueHistory,standings,awayId,'away')
   return home?.formTableReady===true&&away?.formTableReady===true
