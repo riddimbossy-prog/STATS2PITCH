@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: 'Optional YYYY-MM-DD board date. Leave blank for today.'
+        description: 'Optional YYYY-MM-DD board date. Leave blank for the current week.'
         required: false
         type: string
       force:
@@ -38,7 +38,7 @@ jobs:
       AUTO_REFRESH_TTL_MINUTES: ${{ vars.AUTO_REFRESH_TTL_MINUTES || '45' }}
       MAX_FIXTURES_PER_REFRESH: ${{ vars.MAX_FIXTURES_PER_REFRESH || '0' }}
       REFRESH_CONCURRENCY: ${{ vars.REFRESH_CONCURRENCY || '4' }}
-      BOARD_DAYS_FORWARD: ${{ vars.BOARD_DAYS_FORWARD || '1' }}
+      BOARD_DAYS_FORWARD: week
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}

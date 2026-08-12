@@ -1,5 +1,5 @@
 import {app,state,esc,getToken,clearSession,loadConfig,authRequest,api} from './core.js?v=2.2.3'
-import {startDashboard} from './dashboard.js?v=2.2.11'
+import {startDashboard} from './dashboard.js?v=2.2.13'
 
 const eyeIcon=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.4-6 9.8-6 9.8 6 9.8 6-3.4 6-9.8 6-9.8-6-9.8-6Z"/><circle cx="12" cy="12" r="2.8"/></svg>`
 
