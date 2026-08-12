@@ -1,0 +1,58 @@
+/* Stats2Pitch 2.2.5 — corrected background direction.
+   Login uses the Prediction Board's dark background.
+   Prediction Board stays on its original dark theme. */
+
+/* Remove the stadium photo from every auth-stadium surface. */
+.auth-stadium::before,
+.auth-stadium::after{
+  display:none!important;
+  content:none!important;
+}
+
+/* Login: keep the redesigned card/layout, but use the board's dark background. */
+.auth-stadium{
+  background:var(--bg)!important;
+}
+
+/* Board: restore the original solid dark board background and panel treatment. */
+.shell.auth-stadium.dashboard-stadium{
+  background:var(--bg)!important;
+}
+.shell.dashboard-stadium .tabs{
+  background:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  box-shadow:none!important;
+}
+.shell.dashboard-stadium .tab{
+  background:#07151d!important;
+}
+.shell.dashboard-stadium .tab.active{
+  background:var(--lime)!important;
+}
+.shell.dashboard-stadium .card{
+  background:linear-gradient(180deg,#091a24,#07161e)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  box-shadow:none!important;
+}
+.shell.dashboard-stadium .icon-btn{
+  background:#07151d!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.shell.dashboard-stadium .secondary{
+  background:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.shell.dashboard-stadium .empty{
+  background:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.shell.dashboard-stadium .refreshing{
+  background:#09212c!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
