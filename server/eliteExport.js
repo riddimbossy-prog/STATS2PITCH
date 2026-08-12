@@ -63,6 +63,9 @@ export function buildEliteFeed(board,{date,limit=10}={}){
         fixture:fixtureName(row),
         home_team:home||null,
         away_team:away||null,
+        home_logo:text(row?.homeLogo||row?.home_logo||row?.home?.logo)||null,
+        away_logo:text(row?.awayLogo||row?.away_logo||row?.away?.logo)||null,
+        league_logo:text(row?.leagueLogo||row?.league_logo)||null,
         league:text(row?.league||row?.competition)||null,
         country:text(row?.country)||null,
         kickoff:row?.kickoff||row?.date||row?.fixtureDate||null,
@@ -82,7 +85,7 @@ export function buildEliteFeed(board,{date,limit=10}={}){
       }
     })
   return{
-    version:2,
+    version:3,
     source:'stats2pitch',
     date:date||board?.meta?.date||null,
     generated_at:board?.meta?.generatedAt||null,
