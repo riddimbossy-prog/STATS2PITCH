@@ -1,6 +1,13 @@
 name: Refresh Stats2Pitch Board
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
+      - 'scripts/refreshBoards.js'
+      - '.github/workflows/refresh-board.yml'
   schedule:
     - cron: '17,47 * * * *'
   workflow_dispatch:
