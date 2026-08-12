@@ -1,56 +1,58 @@
-/* Stats2Pitch 2.2.10 — new stadium background selected by user. */
-.auth-stadium{
-  position:relative;
-  isolation:isolate;
+/* Stats2Pitch 2.2.11 — stable full-page stadium background for login + board. */
+body.auth-page,
+body.board-page{
+  min-height:100vh;
   background:#020706!important;
+  isolation:isolate;
 }
 
-/* Login keeps the existing stadium layer. */
-.auth-stadium::before{
-  content:""!important;
-  display:block!important;
-  position:fixed!important;
-  inset:0!important;
-  z-index:-1!important;
-  background-image:url("./assets/stadium-user-bg-v3.webp")!important;
-  background-position:center center!important;
-  background-size:cover!important;
-  background-repeat:no-repeat!important;
-  background-attachment:fixed!important;
-  filter:brightness(.70) saturate(.96) contrast(1.05)!important;
-  pointer-events:none!important;
+/* Put the stadium on the viewport itself so it cannot collapse into the header area. */
+body.auth-page::before,
+body.board-page::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:url("./assets/stadium-user-bg-v3.webp") center center / cover no-repeat;
+  filter:brightness(.70) saturate(.96) contrast(1.05);
 }
 
-.auth-stadium::after{
-  content:""!important;
-  display:block!important;
-  position:fixed!important;
-  inset:0!important;
-  z-index:0!important;
-  pointer-events:none!important;
-  background:linear-gradient(180deg,rgba(0,5,7,.08),rgba(0,8,10,.34))!important;
+body.auth-page::after,
+body.board-page::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,5,7,.10),rgba(0,8,10,.36));
 }
 
-/* Prediction Board: use the full pitch image directly so it cannot sit behind a solid parent background. */
+body.auth-page #app,
+body.board-page #app{
+  position:relative;
+  z-index:1;
+  min-height:100vh;
+}
+
+/* The page owns the background now; prevent nested auth/board layers from covering it. */
+.auth-stadium,
 .shell.auth-stadium.dashboard-stadium{
-  min-height:100dvh;
-  background-image:
-    linear-gradient(180deg,rgba(0,6,10,.18),rgba(0,8,10,.40)),
-    url("./assets/stadium-user-bg-v3.webp")!important;
-  background-position:center center,center center!important;
-  background-size:100% 100%,100% 100%!important;
-  background-repeat:no-repeat,no-repeat!important;
-  background-attachment:fixed,fixed!important;
+  background:transparent!important;
 }
-
-/* Disable the inherited auth pseudo-layers on the board; the board background is applied above. */
+.auth-stadium::before,
+.auth-stadium::after,
 .shell.auth-stadium.dashboard-stadium::before,
 .shell.auth-stadium.dashboard-stadium::after{
   display:none!important;
   content:none!important;
 }
 
-/* Keep board content above the pitch and readable. */
+.shell.auth-stadium.dashboard-stadium{
+  min-height:100dvh;
+}
+
+/* Keep board content readable while leaving the stadium visible around it. */
 .shell.dashboard-stadium .topbar,
 .shell.dashboard-stadium .tabs,
 .shell.dashboard-stadium .section-head,
@@ -87,14 +89,8 @@
 }
 
 @media(max-width:680px){
-  .auth-stadium::before{
-    background-size:cover!important;
-    background-position:center center!important;
-    background-attachment:scroll!important;
-  }
-  .shell.auth-stadium.dashboard-stadium{
-    background-position:center center,center center!important;
-    background-size:cover,cover!important;
-    background-attachment:scroll,scroll!important;
+  body.auth-page::before,
+  body.board-page::before{
+    background-position:center center;
   }
 }
