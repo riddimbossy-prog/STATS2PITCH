@@ -1,58 +1,42 @@
-/* Stats2Pitch 2.2.5 — corrected background direction.
-   Login uses the Prediction Board's dark background.
-   Prediction Board stays on its original dark theme. */
+/* Stats2Pitch 2.2.6 — use the same stadium background on both screens.
+   The stadium image itself is defined once in auth.css on .auth-stadium::before.
+   Both the login view and the prediction board carry the auth-stadium class,
+   so this file intentionally does not suppress or replace that backdrop. */
 
-/* Remove the stadium photo from every auth-stadium surface. */
-.auth-stadium::before,
-.auth-stadium::after{
-  display:none!important;
-  content:none!important;
-}
-
-/* Login: keep the redesigned card/layout, but use the board's dark background. */
-.auth-stadium{
-  background:var(--bg)!important;
-}
-
-/* Board: restore the original solid dark board background and panel treatment. */
+/* Keep both full-screen surfaces transparent so the shared stadium layer shows through. */
+.auth-stadium,
 .shell.auth-stadium.dashboard-stadium{
-  background:var(--bg)!important;
-}
-.shell.dashboard-stadium .tabs{
   background:transparent!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  box-shadow:none!important;
+}
+
+/* Preserve the board's readable glass treatment over the stadium image. */
+.shell.dashboard-stadium .tabs{
+  background:rgba(3,16,24,.74)!important;
+  backdrop-filter:blur(9px);
+  -webkit-backdrop-filter:blur(9px);
+  box-shadow:0 18px 45px rgba(0,0,0,.24);
 }
 .shell.dashboard-stadium .tab{
-  background:#07151d!important;
+  background:rgba(4,19,27,.72)!important;
 }
 .shell.dashboard-stadium .tab.active{
   background:var(--lime)!important;
 }
 .shell.dashboard-stadium .card{
-  background:linear-gradient(180deg,#091a24,#07161e)!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  box-shadow:none!important;
+  background:linear-gradient(180deg,rgba(5,24,33,.86),rgba(3,17,24,.88))!important;
+  backdrop-filter:blur(9px);
+  -webkit-backdrop-filter:blur(9px);
+  box-shadow:0 18px 48px rgba(0,0,0,.28);
 }
-.shell.dashboard-stadium .icon-btn{
-  background:#07151d!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-}
+.shell.dashboard-stadium .icon-btn,
 .shell.dashboard-stadium .secondary{
-  background:transparent!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
+  background:rgba(3,17,24,.72)!important;
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
 }
-.shell.dashboard-stadium .empty{
-  background:transparent!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-}
+.shell.dashboard-stadium .empty,
 .shell.dashboard-stadium .refreshing{
-  background:#09212c!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
+  background:rgba(3,17,24,.78)!important;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
 }
