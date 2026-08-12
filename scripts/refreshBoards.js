@@ -9,7 +9,7 @@ const ttlMs=Math.max(15,Number(process.env.AUTO_REFRESH_TTL_MINUTES||45))*60_000
 const timezone=process.env.APP_TIMEZONE||'UTC'
 const explicit=process.argv.find(dateOk)||process.env.REFRESH_DATE||''
 const force=process.argv.includes('--force')||String(process.env.FORCE_REFRESH||'').toLowerCase()==='true'
-const daysForward=Math.max(0,Math.min(3,Number(process.env.BOARD_DAYS_FORWARD||1)))
+const forwardSetting=String(process.env.BOARD_DAYS_FORWARD||'week').trim().toLowerCase()
 
 function dateInZone(offsetDays=0){
   const d=new Date(Date.now()+offsetDays*86_400_000)
@@ -17,6 +17,13 @@ function dateInZone(offsetDays=0){
   const pick=t=>parts.find(x=>x.type===t)?.value||''
   return`${pick('year')}-${pick('month')}-${pick('day')}`
 }
+function daysUntilSunday(){
+  const localDate=dateInZone(0),day=new Date(`${localDate}T12:00:00Z`).getUTCDay()
+  return day===0?0:7-day
+}
+const numericForward=Number(forwardSetting)
+const daysForward=forwardSetting==='week'||!Number.isFinite(numericForward)?daysUntilSunday():Math.max(0,Math.min(6,numericForward))
+
 function generatedAt(board){return board?.meta?.generatedAt||board?.meta?.storedAt||null}
 function fresh(board){const t=Date.parse(generatedAt(board)||'');return Number.isFinite(t)&&Date.now()-t<ttlMs}
 
@@ -31,7 +38,7 @@ for(const date of [...new Set(dates)]){
     }
     console.log(`[Stats2Pitch] ${date}: refreshing with the HOME/AWAY Form Table engine.`)
     const board=await refreshNow(date,progress=>console.log(`[Stats2Pitch] ${date}: ${JSON.stringify(progress)}`))
-    console.log(`[Stats2Pitch] ${date}: complete — ${board?.bestPicks?.length||0} Best Picks, ${board?.meta?.qualified||0} qualified markets.`)
+    console.log(`[Stats2Pitch] ${date}: complete — ${board?.fixtures?.length||0} remaining fixtures published, ${board?.bestPicks?.length||0} Best Picks, ${board?.meta?.qualified||0} qualified markets.`)
   }catch(error){
     failed=true
     console.error(`[Stats2Pitch] ${date}: refresh failed`,error)
