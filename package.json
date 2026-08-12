@@ -1,12 +1,13 @@
 {
   "name": "stats2pitch",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
+    "refresh": "node scripts/refreshBoards.js",
     "test": "node --test",
-    "check": "node --check server/providerFetch.js && node --check server/apiFootball.js && node --check server/statsApi.js && node --check server/oddsV2.js && node --check server/oddsPolicy.js && node --check server/engineConfig.js && node --check server/splitEngine.js && node --check server/pickUtils.js && node --check server/resultEngine.js && node --check server/goalEngine.js && node --check server/engine.js && node --check server/store.js && node --check server/refresh.js && node --check server/index.js && node --check public/core.js && node --check public/dialogs.js && node --check public/boardView.js && node --check public/dashboard.js && node --check public/app.js && npm test"
+    "check": "node --check server/providerFetch.js && node --check server/apiFootball.js && node --check server/statsApi.js && node --check server/oddsV2.js && node --check server/oddsPolicy.js && node --check server/engineConfig.js && node --check server/splitEngine.js && node --check server/pickUtils.js && node --check server/resultEngine.js && node --check server/goalEngine.js && node --check server/engine.js && node --check server/store.js && node --check server/refresh.js && node --check server/index.js && node --check scripts/refreshBoards.js && node --check public/core.js && node --check public/dialogs.js && node --check public/boardView.js && node --check public/dashboard.js && node --check public/app.js && npm test"
   },
   "engines": {
     "node": ">=20.19.0 <23"

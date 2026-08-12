@@ -1,0 +1,65 @@
+name: Refresh Stats2Pitch Board
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Optional YYYY-MM-DD board date. Leave blank for today.'
+        required: false
+        type: string
+      force:
+        description: 'Force provider refresh even if the Supabase snapshot is still fresh.'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stats2pitch-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'UTC' }}
+      AUTO_REFRESH_TTL_MINUTES: ${{ vars.AUTO_REFRESH_TTL_MINUTES || '45' }}
+      MAX_FIXTURES_PER_REFRESH: ${{ vars.MAX_FIXTURES_PER_REFRESH || '80' }}
+      REFRESH_CONCURRENCY: ${{ vars.REFRESH_CONCURRENCY || '4' }}
+      BOARD_DAYS_FORWARD: ${{ vars.BOARD_DAYS_FORWARD || '0' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+      API_FOOTBALL_BASE: ${{ vars.API_FOOTBALL_BASE || 'https://v3.football.api-sports.io' }}
+      API_FOOTBALL_ODDS_MAX_PAGES: ${{ vars.API_FOOTBALL_ODDS_MAX_PAGES || '8' }}
+      API_FOOTBALL_TIMEOUT_MS: ${{ vars.API_FOOTBALL_TIMEOUT_MS || '12000' }}
+      API_FOOTBALL_RETRIES: ${{ vars.API_FOOTBALL_RETRIES || '1' }}
+      STATS_API_KEY: ${{ secrets.STATS_API_KEY }}
+      STATS_API_BASE_URL: ${{ vars.STATS_API_BASE_URL || 'https://api.thestatsapi.com/api' }}
+      STATS_API_REQUESTS_PER_MINUTE: ${{ vars.STATS_API_REQUESTS_PER_MINUTE || '40' }}
+      STATS_API_MIN_INTERVAL_MS: ${{ vars.STATS_API_MIN_INTERVAL_MS || '300' }}
+      STATS_API_TIMEOUT_MS: ${{ vars.STATS_API_TIMEOUT_MS || '15000' }}
+      STATS_API_RETRIES: ${{ vars.STATS_API_RETRIES || '1' }}
+      ODDS_PREFERRED_BOOKMAKER: ${{ vars.ODDS_PREFERRED_BOOKMAKER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - run: npm ci
+      - name: Validate worker secrets
+        run: |
+          test -n "$SUPABASE_URL" || (echo "Missing GitHub secret SUPABASE_URL" && exit 1)
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "Missing GitHub secret SUPABASE_SERVICE_ROLE_KEY" && exit 1)
+          test -n "$API_FOOTBALL_KEY" || (echo "Missing GitHub secret API_FOOTBALL_KEY" && exit 1)
+      - name: Refresh saved prediction board
+        env:
+          REFRESH_DATE: ${{ github.event.inputs.date || '' }}
+          FORCE_REFRESH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force || 'false' }}
+        run: node scripts/refreshBoards.js

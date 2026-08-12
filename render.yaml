@@ -1,3 +1,5 @@
+# LEGACY CUTOVER FALLBACK ONLY. Production target is GitHub Pages + GitHub Actions + Supabase.
+# Delete the Render service from the Render dashboard after the GitHub/Supabase cutover is verified.
 services:
   - type: web
     name: stats2pitch

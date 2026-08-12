@@ -8,7 +8,7 @@ import {getFixturesByDateFresh} from './apiFootball.js'
 import {ENGINE_VERSION,FORM_TABLE_SAMPLE,PROFILE_SOURCE,MIN_LEAGUE_GAMES,TEAM_RESULT_POLICY,GG_POLICY,ODDS_POLICY} from './engine.js'
 import {eliteFeedAuthorized,buildEliteFeed} from './eliteExport.js'
 
-const VERSION='2.1.0',PORT=Number(process.env.PORT||3000),PUBLIC=fileURLToPath(new URL('../public/',import.meta.url)),ttlMs=Math.max(5,Number(process.env.AUTO_REFRESH_TTL_MINUTES||45))*60000
+const VERSION='2.2.0',PORT=Number(process.env.PORT||3000),PUBLIC=fileURLToPath(new URL('../public/',import.meta.url)),ttlMs=Math.max(5,Number(process.env.AUTO_REFRESH_TTL_MINUTES||45))*60000
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg'}
 const dateOk=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))
 const send=(res,status,body,headers={})=>{const data=typeof body==='string'?body:JSON.stringify(body);res.writeHead(status,{'Content-Type':typeof body==='string'?'text/plain; charset=utf-8':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(data)}
