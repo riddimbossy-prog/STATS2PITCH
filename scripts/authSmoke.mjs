@@ -1,9 +1,20 @@
 import crypto from 'node:crypto'
 
-const base=String(process.env.SUPABASE_URL||'').replace(/\/$/,'')
+function normalizeSupabaseUrl(value){
+  const raw=String(value||'').trim().replace(/\/+$/,'')
+  if(!raw)return''
+  const dashboard=raw.match(/\/project\/([a-z0-9]+)/i)?.[1]
+  if(dashboard)return`https://${dashboard}.supabase.co`
+  if(/^[a-z0-9]{15,30}$/i.test(raw))return`https://${raw}.supabase.co`
+  if(/^[a-z0-9-]+\.supabase\.co$/i.test(raw))return`https://${raw}`
+  return raw
+}
+
+const base=normalizeSupabaseUrl(process.env.SUPABASE_URL)
 const anon=process.env.SUPABASE_ANON_KEY||''
 const service=process.env.SUPABASE_SERVICE_ROLE_KEY||''
 if(!base||!anon||!service)throw new Error('Missing Supabase smoke-test configuration')
+try{new URL(base)}catch{throw new Error('SUPABASE_URL is invalid')}
 
 const email=`stats2pitch-smoke-${Date.now()}-${crypto.randomBytes(3).toString('hex')}@example.invalid`
 const password=`S2p!${crypto.randomBytes(18).toString('base64url')}`
