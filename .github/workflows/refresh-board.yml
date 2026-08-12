@@ -69,5 +69,5 @@ jobs:
       - name: Refresh saved prediction board
         env:
           REFRESH_DATE: ${{ github.event.inputs.date || '' }}
-          FORCE_REFRESH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force || 'false' }}
+          FORCE_REFRESH: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.force) }}
         run: node scripts/refreshBoards.js
