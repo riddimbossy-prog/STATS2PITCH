@@ -6,6 +6,7 @@ on:
     paths:
       - 'supabase/functions/**'
       - 'supabase/config.toml'
+      - 'scripts/authSmoke.mjs'
       - '.github/workflows/supabase-functions.yml'
   workflow_dispatch:
 
@@ -18,6 +19,9 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
       STATS2PITCH_ELITE_FEED_TOKEN: ${{ secrets.STATS2PITCH_ELITE_FEED_TOKEN }}
       APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'UTC' }}
@@ -33,6 +37,9 @@ jobs:
         run: |
           test -n "$SUPABASE_ACCESS_TOKEN" || (echo "Missing GitHub secret SUPABASE_ACCESS_TOKEN" && exit 1)
           test -n "$SUPABASE_PROJECT_REF" || (echo "Missing GitHub secret SUPABASE_PROJECT_REF" && exit 1)
+          test -n "$SUPABASE_URL" || (echo "Missing GitHub secret SUPABASE_URL" && exit 1)
+          test -n "$SUPABASE_ANON_KEY" || (echo "Missing GitHub secret SUPABASE_ANON_KEY" && exit 1)
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "Missing GitHub secret SUPABASE_SERVICE_ROLE_KEY" && exit 1)
           test -n "$API_FOOTBALL_KEY" || (echo "Missing GitHub secret API_FOOTBALL_KEY" && exit 1)
       - name: Sync Edge Function secrets
         run: |
@@ -48,3 +55,7 @@ jobs:
           fi
       - name: Deploy Stats2Pitch API
         run: npx --yes supabase@latest functions deploy stats2pitch-api --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+      - name: Deploy Stats2Pitch Auth
+        run: npx --yes supabase@latest functions deploy stats2pitch-auth --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+      - name: Verify login, API identity and token refresh
+        run: node scripts/authSmoke.mjs
