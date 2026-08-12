@@ -1,0 +1,139 @@
+/* Stats2Pitch 2.2.15 — mobile + Galaxy Z Fold centering and responsive hardening. */
+html,body,#app{width:100%;max-width:100%;overflow-x:clip}
+body.board-page,body.auth-page{min-width:0}
+body.board-page::before,body.auth-page::before{
+  left:0!important;right:0!important;top:0!important;bottom:0!important;
+  width:100dvw!important;height:100dvh!important;
+  background-position:50% 50%!important;
+  background-size:cover!important;
+  transform:translateZ(0);
+}
+
+/* Keep the board rail visually centred at every width. */
+.shell.auth-stadium.dashboard-stadium{
+  width:100%;
+  max-width:1440px;
+  margin-inline:auto!important;
+}
+.shell.dashboard-stadium .topbar,
+.shell.dashboard-stadium .tabs,
+.shell.dashboard-stadium .week-strip,
+.shell.dashboard-stadium .section-head,
+.shell.dashboard-stadium #refresh-status,
+.shell.dashboard-stadium .cards{
+  width:min(100%,1100px);
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+.shell.dashboard-stadium .cards{justify-items:stretch}
+.shell.dashboard-stadium .card{width:100%;max-width:100%;min-width:0;margin-inline:auto}
+.shell.dashboard-stadium .competition,
+.shell.dashboard-stadium .teams,
+.shell.dashboard-stadium .team,
+.shell.dashboard-stadium .prediction,
+.shell.dashboard-stadium .kick,
+.shell.dashboard-stadium .details{min-width:0}
+.shell.dashboard-stadium .team,
+.shell.dashboard-stadium .competition strong,
+.shell.dashboard-stadium .prediction strong{overflow-wrap:anywhere;word-break:normal}
+.shell.dashboard-stadium .details{max-width:100%}
+.shell.dashboard-stadium img{max-width:100%}
+
+/* Tablet / unfolded Fold: use a balanced single-card rail rather than a cramped 2-column card. */
+@media (min-width:681px) and (max-width:900px){
+  .shell.auth-stadium.dashboard-stadium{padding:16px 16px 88px}
+  .shell.dashboard-stadium .topbar,
+  .shell.dashboard-stadium .tabs,
+  .shell.dashboard-stadium .week-strip,
+  .shell.dashboard-stadium .section-head,
+  .shell.dashboard-stadium #refresh-status,
+  .shell.dashboard-stadium .cards{width:min(100%,760px)}
+  .shell.dashboard-stadium .card{grid-template-columns:minmax(0,1fr);gap:14px;padding:17px}
+  .shell.dashboard-stadium .competition,
+  .shell.dashboard-stadium .teams,
+  .shell.dashboard-stadium .prediction,
+  .shell.dashboard-stadium .kick,
+  .shell.dashboard-stadium .details{grid-column:1!important}
+  .shell.dashboard-stadium .prediction,.shell.dashboard-stadium .kick{text-align:left}
+  .shell.dashboard-stadium .details{width:100%}
+  .shell.dashboard-stadium .live-row{grid-template-columns:minmax(0,1fr)!important}
+  .shell.dashboard-stadium .score{text-align:left}
+  .shell.dashboard-stadium .tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .shell.dashboard-stadium .tab{padding:12px 6px;font-size:13px;white-space:normal;line-height:1.15}
+  .shell.dashboard-stadium .tab span{margin-left:3px;min-width:21px;height:21px}
+}
+
+/* Phones and folded Fold. */
+@media (max-width:680px){
+  .shell.auth-stadium.dashboard-stadium{padding:12px 10px max(82px,env(safe-area-inset-bottom))}
+  .shell.dashboard-stadium .topbar,
+  .shell.dashboard-stadium .tabs,
+  .shell.dashboard-stadium .week-strip,
+  .shell.dashboard-stadium .section-head,
+  .shell.dashboard-stadium #refresh-status,
+  .shell.dashboard-stadium .cards{width:100%;max-width:560px}
+  .shell.dashboard-stadium .topbar{grid-template-columns:40px minmax(0,1fr) 40px;gap:8px}
+  .shell.dashboard-stadium .icon-btn{width:40px;height:40px;border-radius:12px}
+  .shell.dashboard-stadium .brand{min-width:0}
+  .shell.dashboard-stadium .brand .logo{font-size:clamp(24px,8vw,30px);letter-spacing:-1.4px;white-space:nowrap}
+  .shell.dashboard-stadium .brand small{font-size:11px}
+  .shell.dashboard-stadium .tabs{grid-template-columns:repeat(2,minmax(0,1fr));border-radius:16px;margin-top:16px}
+  .shell.dashboard-stadium .tab{min-width:0;padding:12px 6px;font-size:12px;line-height:1.2;white-space:normal}
+  .shell.dashboard-stadium .tab:nth-child(2){border-right:0}
+  .shell.dashboard-stadium .tab span{min-width:20px;height:20px;margin-left:3px;font-size:10px}
+  .shell.dashboard-stadium .week-strip{padding:2px 0 5px;gap:7px;scroll-padding-inline:0}
+  .shell.dashboard-stadium .week-day{flex:0 0 86px;padding:8px 8px;border-radius:12px}
+  .shell.dashboard-stadium .section-head{align-items:center;margin-top:12px}
+  .shell.dashboard-stadium .section-head h2{font-size:18px}
+  .shell.dashboard-stadium .section-head p{font-size:12px}
+  .shell.dashboard-stadium .tools{flex:0 0 auto}
+  .shell.dashboard-stadium .card{grid-template-columns:minmax(0,1fr)!important;padding:14px 13px;gap:12px;border-radius:16px}
+  .shell.dashboard-stadium .competition,
+  .shell.dashboard-stadium .teams,
+  .shell.dashboard-stadium .prediction,
+  .shell.dashboard-stadium .kick,
+  .shell.dashboard-stadium .details{grid-column:1!important}
+  .shell.dashboard-stadium .competition{gap:9px}
+  .shell.dashboard-stadium .competition strong{font-size:13px}
+  .shell.dashboard-stadium .competition small{font-size:11px}
+  .shell.dashboard-stadium .teams{gap:7px}
+  .shell.dashboard-stadium .team{font-size:14px;gap:8px}
+  .shell.dashboard-stadium .crest{width:26px;height:26px;flex:0 0 26px}
+  .shell.dashboard-stadium .prediction,.shell.dashboard-stadium .kick{text-align:left}
+  .shell.dashboard-stadium .prediction strong{font-size:15px}
+  .shell.dashboard-stadium .odd{font-size:18px;padding:7px 16px;border-radius:12px}
+  .shell.dashboard-stadium .kick{font-size:14px}
+  .shell.dashboard-stadium .details{width:100%;white-space:normal;text-align:center}
+  .shell.dashboard-stadium .match-status,.shell.dashboard-stadium .settlement{max-width:100%;white-space:normal;text-align:left}
+  .shell.dashboard-stadium .inline-score{font-size:17px}
+  .shell.dashboard-stadium .live-row{grid-template-columns:minmax(0,1fr)!important}
+  .shell.dashboard-stadium .score{text-align:left;font-size:22px}
+  .drawer{left:50%;width:calc(100% - 20px);max-width:560px}
+  .modal{width:calc(100% - 20px);padding:18px 14px;border-radius:18px}
+  .filter-actions{flex-wrap:wrap}
+  .filter-actions>*{flex:1 1 140px}
+}
+
+/* Very narrow folded Fold / compact phones. */
+@media (max-width:390px){
+  .shell.auth-stadium.dashboard-stadium{padding-left:8px;padding-right:8px}
+  .shell.dashboard-stadium .topbar{grid-template-columns:38px minmax(0,1fr) 38px}
+  .shell.dashboard-stadium .icon-btn{width:38px;height:38px}
+  .shell.dashboard-stadium .brand .logo{font-size:23px}
+  .shell.dashboard-stadium .brand small{font-size:10px}
+  .shell.dashboard-stadium .tab{font-size:11px;padding:11px 4px}
+  .shell.dashboard-stadium .week-day{flex-basis:78px;padding:7px 6px}
+  .shell.dashboard-stadium .week-day strong{font-size:12px}
+  .shell.dashboard-stadium .week-day small{font-size:10px}
+  .shell.dashboard-stadium .section-head{gap:8px}
+  .shell.dashboard-stadium .section-head h2{font-size:17px}
+  .shell.dashboard-stadium .secondary{padding:9px 10px;font-size:12px}
+  .shell.dashboard-stadium .card{padding:12px 11px}
+  .shell.dashboard-stadium .team{font-size:13px}
+}
+
+/* Landscape Fold/phone: keep centering without making the background jump sideways. */
+@media (max-height:520px) and (orientation:landscape){
+  body.board-page::before,body.auth-page::before{background-position:50% 50%!important}
+  .shell.auth-stadium.dashboard-stadium{padding-top:10px}
+}
