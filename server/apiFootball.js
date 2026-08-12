@@ -63,6 +63,7 @@ export async function getRecent(team,opts={}) {return football('/fixtures', { te
 function fixtureTime(row){const t=Date.parse(row?.fixture?.date||'');return Number.isFinite(t)?t:0}
 export function selectRecentVenueFixtures(rows,team,venue,limit=5,before=null){
   if(!['home','away'].includes(venue))throw new Error('Venue must be home or away')
+  if(team===undefined||team===null||String(team)==='')return[]
   const beforeMs=before?Date.parse(before):Infinity,max=Math.max(1,Number(limit||5))
   return (Array.isArray(rows)?rows:[])
     .filter(f=>['FT','AET','PEN'].includes(String(f?.fixture?.status?.short||'FT')))
@@ -73,6 +74,7 @@ export function selectRecentVenueFixtures(rows,team,venue,limit=5,before=null){
 }
 
 export async function getRecentVenueGlobal(team,venue,limit=5,before=null,opts={}){
+  if(team===undefined||team===null||String(team)==='')return[]
   const rows=await football('/fixtures',{team,last:HISTORY_LAST,status:'FT',timezone:process.env.APP_TIMEZONE||'UTC'},opts)
   return selectRecentVenueFixtures(rows,team,venue,limit,before)
 }
