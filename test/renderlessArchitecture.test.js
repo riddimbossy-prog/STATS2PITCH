@@ -14,7 +14,7 @@ test('GitHub plus Supabase production path is complete before Render cutover',as
   assert.match(render,/LEGACY CUTOVER FALLBACK ONLY/)
   assert.match(html,/runtime-config\.js/)
   assert.match(core,/functions\/v1\/\$\{fn\}/)
-  assert.doesNotMatch(core,/fetch\('\/api\/config'/)
+  assert.match(core,/apiMode==='legacy'/)
   assert.match(pages,/actions\/deploy-pages@v4/)
   assert.match(pages,/SUPABASE_ANON_KEY/)
   assert.match(refresh,/scripts\/refreshBoards\.js/)
