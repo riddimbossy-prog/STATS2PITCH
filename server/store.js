@@ -1,4 +1,12 @@
-const URL=(process.env.SUPABASE_URL||'').replace(/\/$/,'')
+export function normalizeSupabaseUrl(value){
+  const raw=String(value||'').trim().replace(/\/+$/,'')
+  if(!raw)return''
+  if(/^https?:\/\//i.test(raw))return raw
+  if(/^[a-z0-9.-]+\.supabase\.co$/i.test(raw))return`https://${raw}`
+  if(/^[a-z0-9-]+$/i.test(raw))return`https://${raw}.supabase.co`
+  return raw
+}
+const URL=normalizeSupabaseUrl(process.env.SUPABASE_URL)
 const SERVICE=process.env.SUPABASE_SERVICE_ROLE_KEY||''
 const ANON=process.env.SUPABASE_ANON_KEY||''
 const memory=new Map()
