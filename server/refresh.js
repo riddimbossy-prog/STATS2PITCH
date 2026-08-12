@@ -22,15 +22,13 @@ function normalize(raw,standings,leagueHistory,odds){
   const home=makeTeamProfile({standings,leagueHistory,team:homeTeam,venue:'home'}),away=makeTeamProfile({standings,leagueHistory,team:awayTeam,venue:'away'})
   return{fixtureId:f.id,match:`${home.name} vs ${away.name}`,league:league.name||'League',country:league.country||'',leagueLogo:league.logo||null,countryFlag:league.flag||null,kickoff:f.date,kickoffLocal:new Date(f.date).toLocaleString('en-GB',{timeZone:process.env.APP_TIMEZONE||'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),home,away,odds:{...odds.canonical,...extraOdds(odds.marketOdds)},marketOdds:odds.marketOdds}
 }
-async function buildFresh(date,onProgress=()=>{}){
+export async function refreshNow(date,onProgress=()=>{}){
   const raw=await getFixturesByDateFresh(date),scheduled=raw.filter(x=>!liveStatus(x?.fixture?.status?.short)),leagueCache=new Map()
   const keys=[...new Set(scheduled.map(x=>`${x?.league?.id}|${x?.league?.season}`).filter(x=>!x.startsWith('undefined')))]
   onProgress({stage:'form-tables',sourceFixtures:raw.length,scheduledFixtures:scheduled.length,leagueCount:keys.length})
   await mapLimit(keys,6,async k=>{
     const[league,season]=k.split('|')
     try{
-      // Standings are metadata only for group membership. No rank, PPG, W/D/L or goals
-      // from the normal table are used by the engine.
       const [standings,history]=await Promise.all([getStandings(league,season,{bypassCache:true}),getLeagueFinishedFixtures(league,season,{bypassCache:true})])
       leagueCache.set(k,{standings,history})
     }catch{leagueCache.set(k,{standings:[],history:[]})}
@@ -56,6 +54,6 @@ export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}
 export function startRefresh(date){
   const current=jobs.get(date);if(current?.state==='running')return current
   const job={state:'running',date,startedAt:new Date().toISOString(),progress:{stage:'start'}};jobs.set(date,job)
-  buildFresh(date,p=>{job.progress=p}).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={qualified:board?.meta?.qualified||0,bestPicks:board?.bestPicks?.length||0,sourceFixtures:board?.meta?.sourceFixtures||0}}).catch(e=>{job.state='failed';job.completedAt=new Date().toISOString();job.error=e.message})
+  refreshNow(date,p=>{job.progress=p}).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={qualified:board?.meta?.qualified||0,bestPicks:board?.bestPicks?.length||0,sourceFixtures:board?.meta?.sourceFixtures||0}}).catch(e=>{job.state='failed';job.completedAt=new Date().toISOString();job.error=e.message})
   return job
 }
