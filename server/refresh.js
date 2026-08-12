@@ -1,4 +1,4 @@
-import {getFixturesByDateFresh,getStandings,getLeagueFinishedFixtures,getFixtureOdds} from './apiFootball.js'
+import {getFixturesByDateFresh,getStandings,getLeagueFinishedFixtures,getRecentVenueGlobal,getFixtureOdds} from './apiFootball.js'
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {buildCoherentOdds} from './oddsPolicy.js'
 import {leagueMature,makeTeamProfile,buildBoard,ENGINE_VERSION,PROFILE_SOURCE,FORM_TABLE_SAMPLE} from './engine.js'
@@ -20,6 +20,8 @@ function extraOdds(marketOdds){
 function enginePriced(c){return Object.values(c||{}).some(validOdd)}
 export function needsOddsFallback(odds){const c=odds?.canonical||{};return engineOddKeys.some(k=>!validOdd(c[k]))}
 async function mapLimit(items,limit,fn){const out=new Array(items.length);let i=0;async function worker(){while(true){const x=i++;if(x>=items.length)return;out[x]=await fn(items[x],x)}}await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out}
+function historyKey(row){const id=row?.fixture?.id;if(id!==undefined&&id!==null)return`id:${id}`;return[row?.fixture?.date,row?.teams?.home?.id,row?.teams?.away?.id,row?.goals?.home,row?.goals?.away].join('|')}
+export function mergeHistories(...groups){const map=new Map();for(const rows of groups)for(const row of Array.isArray(rows)?rows:[]){const k=historyKey(row);if(!map.has(k))map.set(k,row)}return[...map.values()]}
 function normalize(raw,standings,leagueHistory,odds){
   const f=raw.fixture||{},league=raw.league||{},homeTeam=raw.teams?.home||{},awayTeam=raw.teams?.away||{}
   const home=makeTeamProfile({standings,leagueHistory,team:homeTeam,venue:'home'}),away=makeTeamProfile({standings,leagueHistory,team:awayTeam,venue:'away'})
@@ -36,25 +38,38 @@ export async function refreshNow(date,onProgress=()=>{}){
       leagueCache.set(k,{standings,history})
     }catch{leagueCache.set(k,{standings:[],history:[]})}
   })
-  const matureAll=scheduled.filter(x=>{
-    const k=`${x?.league?.id}|${x?.league?.season}`,data=leagueCache.get(k)||{standings:[],history:[]}
-    return leagueMature(data.history,data.standings,x?.teams?.home?.id,x?.teams?.away?.id)
+
+  let matureFromLeague=0,matureFromTeamFallback=0,insufficientSplit=0,fallbackTeams=0
+  const splitReady=await mapLimit(scheduled,concurrency,async rawFixture=>{
+    const k=`${rawFixture?.league?.id}|${rawFixture?.league?.season}`,data=leagueCache.get(k)||{standings:[],history:[]},homeId=rawFixture?.teams?.home?.id,awayId=rawFixture?.teams?.away?.id
+    if(leagueMature(data.history,data.standings,homeId,awayId)){matureFromLeague++;return{rawFixture,standings:data.standings,history:data.history,splitSource:'league-season'}}
+    const before=rawFixture?.fixture?.date||`${date}T23:59:59Z`
+    const [homeFallback,awayFallback]=await Promise.all([
+      getRecentVenueGlobal(homeId,'home',FORM_TABLE_SAMPLE,before).catch(()=>[]),
+      getRecentVenueGlobal(awayId,'away',FORM_TABLE_SAMPLE,before).catch(()=>[])
+    ])
+    if(homeFallback.length>=FORM_TABLE_SAMPLE)fallbackTeams++
+    if(awayFallback.length>=FORM_TABLE_SAMPLE)fallbackTeams++
+    const history=mergeHistories(data.history,homeFallback,awayFallback)
+    if(leagueMature(history,data.standings,homeId,awayId)){matureFromTeamFallback++;return{rawFixture,standings:data.standings,history,splitSource:'team-history-fallback'}}
+    insufficientSplit++;return null
   })
-  const mature=maxFixtures?matureAll.slice(0,maxFixtures):matureAll
-  onProgress({stage:'mature',matureAvailable:matureAll.length,matureSelected:mature.length,fixtureCap:maxFixtures||'unlimited'})
+  const matureAll=splitReady.filter(Boolean),mature=maxFixtures?matureAll.slice(0,maxFixtures):matureAll
+  onProgress({stage:'mature',matureAvailable:matureAll.length,matureSelected:mature.length,matureFromLeague,matureFromTeamFallback,historyFallbackTeams:fallbackTeams,insufficientSplit,fixtureCap:maxFixtures||'unlimited'})
+
   let done=0,priced=0,fallbacks=0
-  const enriched=await mapLimit(mature,concurrency,async rawFixture=>{
-    const k=`${rawFixture?.league?.id}|${rawFixture?.league?.season}`,data=leagueCache.get(k)||{standings:[],history:[]},fixtureId=rawFixture?.fixture?.id
+  const enriched=await mapLimit(mature,concurrency,async item=>{
+    const {rawFixture,standings,history,splitSource}=item,fixtureId=rawFixture?.fixture?.id
     try{
       const apiOdds=await getFixtureOdds(fixtureId,{bypassCache:true});let odds=buildCoherentOdds({apiPayload:apiOdds,fixture:rawFixture})
       if(statsApiConfigured()&&needsOddsFallback(odds)){
         try{const stats=await getStatsOddsForFixture(rawFixture,{bypassCache:true});odds=buildCoherentOdds({apiPayload:apiOdds,statsPayload:stats?.payload,fixture:rawFixture});fallbacks++}catch{}
       }
       if(!enginePriced(odds.canonical)){done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
-      priced++;done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return normalize(rawFixture,data.standings,data.history,odds)
+      priced++;done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return{...normalize(rawFixture,standings,history,odds),splitSource}
     }catch{done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
   })
-  const fixtures=enriched.filter(Boolean),board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,matureFixtures:mature.length,matureAvailableFixtures:matureAll.length,fixtureCap:maxFixtures,enrichedFixtures:fixtures.length,oddsFallbacks:fallbacks,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE})
+  const fixtures=enriched.filter(Boolean),board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,matureFixtures:mature.length,matureAvailableFixtures:matureAll.length,matureFromLeague,matureFromTeamFallback,historyFallbackTeams:fallbackTeams,insufficientSplit,fixtureCap:maxFixtures,enrichedFixtures:fixtures.length,oddsFallbacks:fallbacks,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE})
   await saveBoard(date,board);return board
 }
 export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}
