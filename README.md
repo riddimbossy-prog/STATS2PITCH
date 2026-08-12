@@ -1,6 +1,17 @@
-# Stats2Pitch 2.1 — HOME/AWAY Form Table Engine
+# Stats2Pitch 2.2 — GitHub + Supabase Architecture
 
-Stats2Pitch uses one canonical football profile source: the recent venue Form Table.
+Stats2Pitch keeps the strict HOME/AWAY Form Table engine and removes the paid Render web service.
+
+## Production stack
+
+- **GitHub Pages** hosts the HTML/CSS/JS/PWA and brand assets from `public/`.
+- **GitHub Actions** runs the prediction engine on a schedule and stores snapshots in Supabase.
+- **Supabase Auth** handles email/password sessions.
+- **Supabase PostgreSQL** stores `prediction_snapshots`.
+- **Supabase Edge Functions** provide authenticated board access, live scores and the Elite machine feed.
+- **Render is not part of the production architecture.**
+
+The browser never receives the Supabase service-role key or football-provider keys.
 
 ## Engine source of truth
 
@@ -9,48 +20,53 @@ Stats2Pitch uses one canonical football profile source: the recent venue Form Ta
 - The Form Table sample is the most recent 5 finished league matches at the relevant venue.
 - PPG is calculated directly from that Form Table: `(wins × 3 + draws) / 5`.
 - Form Table position is ranked by PPG, then goal difference per game, goals scored per game, win rate and points/tiebreakers.
-- The relevant group Form Table must be complete before it can produce engine calculations. Stats2Pitch does not substitute normal-table numbers when the Form Table is incomplete.
-- API-Football normal standings are used only to identify competition/group membership. Normal-table rank, PPG, W/D/L, goals and form are never used as prediction inputs.
-
-That same HOME/AWAY Form Table now supplies all football calculations used by the engine:
-
-- PPG and Top-3 / Bottom-3 position;
-- wins, losses and result safety;
-- goals scored and conceded per game;
-- Over/Under 1.5, 2.5 and 3.5 hit rates;
-- BTTS/GG rate;
-- failed-to-score rate;
-- clean-sheet rate;
-- opponent-strength and opponent-weakness signals;
-- contradiction checks;
-- Win/DNB/DC eligibility;
-- goal-market and GG confirmation.
-
-There is no Last-10 or normal-season fallback in engine calculations.
+- Normal standings are metadata for competition/group membership only.
+- There is no Last-10 or normal-season fallback in engine calculations.
 
 ## Market safety
 
-- Team-result markets are Top-3-only in the relevant HOME/AWAY Form Table. Position 4+ can never be rescued by Win/DNB/DC.
-- HIGH contradiction removes team results. MODERATE can use a safer market only when the original win odd is above 2.00 and a coherent DNB/DC price exists.
-- Straight wins normally require a 60%+ Form Table win rate, with the existing last-place/heavy-concede opponent exceptions evaluated from the same Form Table.
-- Goal markets require both HOME/AWAY Form Table hit rates >=60% plus matching Form Table attack/defence confirmation.
-- GG requires both Form Table BTTS rates >=60%, both teams scoring and conceding at least 1.0 per game, and is vetoed by FTS >=40% or clean sheets >=60%.
-- Every published market requires a real coherent bookmaker price.
+- Team-result markets are Top-3-only in the relevant HOME/AWAY Form Table.
+- HIGH contradiction removes team results.
+- Straight wins normally require a 60%+ Form Table win rate, subject to the existing last-place/heavy-concede exception from the same split table.
+- Goal markets require matching HOME/AWAY Form Table hit rates and attack/defence confirmation.
+- GG requires both Form Table BTTS rates >=60%, both teams scoring and conceding at least 1.0 per game, and is vetoed by strong FTS/clean-sheet opposition.
+- Every published market requires a coherent bookmaker price.
 - Best Picks contains one strongest market per fixture.
 
-## Stack
+## Existing Supabase table
 
-- Node 22, no runtime npm dependencies.
-- API-Football primary football source.
-- TheStatsAPI optional odds fallback.
-- Supabase email/password auth and snapshot storage.
-- Render deployment via `render.yaml`.
+Run `supabase/schema.sql` if the project has not already been initialized. The migration deliberately keeps the existing `prediction_snapshots` table, so the Render removal does not require a new database design.
 
-## Setup
+## GitHub secrets required
 
-1. Run `supabase/schema.sql` once in Supabase SQL Editor.
-2. Set Render environment variables from `.env.example`.
-3. Disable Supabase email confirmation if immediate account access is desired.
-4. Deploy the repository.
+Add these in **Repository Settings → Secrets and variables → Actions → Secrets**:
 
-Health check: `/api/health`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_PROJECT_REF`
+- `SUPABASE_ACCESS_TOKEN`
+- `API_FOOTBALL_KEY`
+- `STATS_API_KEY` only if the optional TheStatsAPI odds fallback is used
+- `STATS2PITCH_ELITE_FEED_TOKEN` only if the machine Elite feed is used
+
+Optional tuning values such as `APP_TIMEZONE`, `AUTO_REFRESH_TTL_MINUTES`, `MAX_FIXTURES_PER_REFRESH`, `REFRESH_CONCURRENCY`, `BOARD_DAYS_FORWARD` and `STATS2PITCH_ALLOWED_ORIGIN` belong in GitHub **Actions variables**.
+
+## Workflows
+
+- `.github/workflows/pages.yml` deploys the static site to GitHub Pages and injects the public Supabase URL/anon key into `runtime-config.js` during deployment.
+- `.github/workflows/refresh-board.yml` checks the saved snapshot every 30 minutes and runs the engine only when the snapshot is older than the configured TTL. It can also be run manually for any `YYYY-MM-DD` date.
+- `.github/workflows/supabase-functions.yml` deploys `supabase/functions/stats2pitch-api` and syncs the API-Football secret into Supabase.
+
+## Domain cutover
+
+`public/CNAME` is set to `stats2pitch.com`. After the GitHub Pages and Supabase workflows are green, point the domain DNS to GitHub Pages. Only after the domain is serving the GitHub Pages build should the old Render service be deleted from the Render dashboard.
+
+## Local checks
+
+```bash
+npm ci
+npm run check
+```
+
+The Node files under `server/` are now engine/worker modules used by GitHub Actions; they are not an always-on web server.
