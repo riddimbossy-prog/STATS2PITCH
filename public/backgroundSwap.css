@@ -1,27 +1,49 @@
-/* Stats2Pitch 2.2.6 — use the same stadium background on both screens.
-   The stadium image itself is defined once in auth.css on .auth-stadium::before.
-   Both the login view and the prediction board carry the auth-stadium class,
-   so this file intentionally does not suppress or replace that backdrop. */
-
-/* Keep both full-screen surfaces transparent so the shared stadium layer shows through. */
+/* Stats2Pitch 2.2.7 — exact user-selected stadium background on login + board. */
 .auth-stadium,
 .shell.auth-stadium.dashboard-stadium{
-  background:transparent!important;
+  position:relative;
+  isolation:isolate;
+  background:#020706!important;
 }
 
-/* Preserve the board's readable glass treatment over the stadium image. */
+.auth-stadium::before,
+.shell.auth-stadium.dashboard-stadium::before{
+  content:""!important;
+  display:block!important;
+  position:fixed!important;
+  inset:0!important;
+  z-index:-3!important;
+  background-image:url("./assets/stadium-user-bg.webp")!important;
+  background-position:center center!important;
+  background-size:100% 100%!important;
+  background-repeat:no-repeat!important;
+  background-attachment:fixed!important;
+  filter:brightness(.72) saturate(.92) contrast(1.06)!important;
+  transform:none!important;
+  opacity:1!important;
+  pointer-events:none!important;
+}
+
+.auth-stadium::after,
+.shell.auth-stadium.dashboard-stadium::after{
+  content:""!important;
+  display:block!important;
+  position:fixed!important;
+  inset:0!important;
+  z-index:-2!important;
+  pointer-events:none!important;
+  background:linear-gradient(180deg,rgba(0,5,7,.10),rgba(0,8,10,.34))!important;
+}
+
+/* Keep board controls readable without hiding the chosen stadium image. */
 .shell.dashboard-stadium .tabs{
   background:rgba(3,16,24,.74)!important;
   backdrop-filter:blur(9px);
   -webkit-backdrop-filter:blur(9px);
   box-shadow:0 18px 45px rgba(0,0,0,.24);
 }
-.shell.dashboard-stadium .tab{
-  background:rgba(4,19,27,.72)!important;
-}
-.shell.dashboard-stadium .tab.active{
-  background:var(--lime)!important;
-}
+.shell.dashboard-stadium .tab{background:rgba(4,19,27,.72)!important}
+.shell.dashboard-stadium .tab.active{background:var(--lime)!important}
 .shell.dashboard-stadium .card{
   background:linear-gradient(180deg,rgba(5,24,33,.86),rgba(3,17,24,.88))!important;
   backdrop-filter:blur(9px);
@@ -39,4 +61,13 @@
   background:rgba(3,17,24,.78)!important;
   backdrop-filter:blur(8px);
   -webkit-backdrop-filter:blur(8px);
+}
+
+@media(max-width:680px){
+  .auth-stadium::before,
+  .shell.auth-stadium.dashboard-stadium::before{
+    background-size:cover!important;
+    background-position:center center!important;
+    background-attachment:scroll!important;
+  }
 }
