@@ -1,4 +1,4 @@
-/* Stats2Pitch 2.2.15 — mobile + Galaxy Z Fold centering and responsive hardening. */
+/* Stats2Pitch 2.2.16 — mobile + Galaxy Z Fold centering, full-stadium board background and overflow hardening. */
 html,body,#app{width:100%;max-width:100%;overflow-x:clip}
 body.board-page,body.auth-page{min-width:0}
 body.board-page::before,body.auth-page::before{
@@ -7,6 +7,23 @@ body.board-page::before,body.auth-page::before{
   background-position:50% 50%!important;
   background-size:cover!important;
   transform:translateZ(0);
+}
+
+/* Board-specific full stadium backdrop. The current v3 artwork has a dark lower composition;
+   use the earlier full-stadium artwork for the prediction board while leaving login untouched. */
+body.board-page::before{
+  background-image:url("./assets/stadium-user-bg-v2.webp")!important;
+  background-position:center center!important;
+  background-size:cover!important;
+  background-repeat:no-repeat!important;
+  opacity:1!important;
+}
+body.board-page::after{
+  background:linear-gradient(180deg,rgba(0,5,7,.16),rgba(0,8,10,.42))!important;
+}
+body.board-page #app,
+body.board-page .shell.auth-stadium.dashboard-stadium{
+  background:transparent!important;
 }
 
 /* Keep the board rail visually centred at every width. */
@@ -48,16 +65,21 @@ body.board-page::before,body.auth-page::before{
   .shell.dashboard-stadium .section-head,
   .shell.dashboard-stadium #refresh-status,
   .shell.dashboard-stadium .cards{width:min(100%,760px)}
-  .shell.dashboard-stadium .card{grid-template-columns:minmax(0,1fr);gap:14px;padding:17px}
+  .shell.dashboard-stadium .card{grid-template-columns:minmax(0,1fr);gap:14px;padding:17px;text-align:center}
   .shell.dashboard-stadium .competition,
   .shell.dashboard-stadium .teams,
   .shell.dashboard-stadium .prediction,
   .shell.dashboard-stadium .kick,
   .shell.dashboard-stadium .details{grid-column:1!important}
-  .shell.dashboard-stadium .prediction,.shell.dashboard-stadium .kick{text-align:left}
+  .shell.dashboard-stadium .competition{justify-content:center;text-align:center}
+  .shell.dashboard-stadium .teams{justify-items:center;align-items:center}
+  .shell.dashboard-stadium .team{justify-content:center;text-align:center;width:100%}
+  .shell.dashboard-stadium .prediction,.shell.dashboard-stadium .kick{text-align:center!important}
   .shell.dashboard-stadium .details{width:100%}
   .shell.dashboard-stadium .live-row{grid-template-columns:minmax(0,1fr)!important}
-  .shell.dashboard-stadium .score{text-align:left}
+  .shell.dashboard-stadium .score{text-align:center!important}
+  .shell.dashboard-stadium .fixture-note{text-align:center!important}
+  .shell.dashboard-stadium .match-status,.shell.dashboard-stadium .settlement{justify-content:center;text-align:center}
   .shell.dashboard-stadium .tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
   .shell.dashboard-stadium .tab{padding:12px 6px;font-size:13px;white-space:normal;line-height:1.15}
   .shell.dashboard-stadium .tab span{margin-left:3px;min-width:21px;height:21px}
@@ -87,27 +109,29 @@ body.board-page::before,body.auth-page::before{
   .shell.dashboard-stadium .section-head h2{font-size:18px}
   .shell.dashboard-stadium .section-head p{font-size:12px}
   .shell.dashboard-stadium .tools{flex:0 0 auto}
-  .shell.dashboard-stadium .card{grid-template-columns:minmax(0,1fr)!important;padding:14px 13px;gap:12px;border-radius:16px}
+  .shell.dashboard-stadium .card{grid-template-columns:minmax(0,1fr)!important;padding:14px 13px;gap:12px;border-radius:16px;text-align:center}
   .shell.dashboard-stadium .competition,
   .shell.dashboard-stadium .teams,
   .shell.dashboard-stadium .prediction,
   .shell.dashboard-stadium .kick,
   .shell.dashboard-stadium .details{grid-column:1!important}
-  .shell.dashboard-stadium .competition{gap:9px}
+  .shell.dashboard-stadium .competition{gap:9px;justify-content:center;text-align:center}
+  .shell.dashboard-stadium .competition>div{text-align:center}
   .shell.dashboard-stadium .competition strong{font-size:13px}
   .shell.dashboard-stadium .competition small{font-size:11px}
-  .shell.dashboard-stadium .teams{gap:7px}
-  .shell.dashboard-stadium .team{font-size:14px;gap:8px}
+  .shell.dashboard-stadium .teams{gap:7px;justify-items:center;align-items:center}
+  .shell.dashboard-stadium .team{font-size:14px;gap:8px;justify-content:center;text-align:center;width:100%}
   .shell.dashboard-stadium .crest{width:26px;height:26px;flex:0 0 26px}
-  .shell.dashboard-stadium .prediction,.shell.dashboard-stadium .kick{text-align:left}
+  .shell.dashboard-stadium .prediction,.shell.dashboard-stadium .kick{text-align:center!important}
   .shell.dashboard-stadium .prediction strong{font-size:15px}
   .shell.dashboard-stadium .odd{font-size:18px;padding:7px 16px;border-radius:12px}
   .shell.dashboard-stadium .kick{font-size:14px}
   .shell.dashboard-stadium .details{width:100%;white-space:normal;text-align:center}
-  .shell.dashboard-stadium .match-status,.shell.dashboard-stadium .settlement{max-width:100%;white-space:normal;text-align:left}
-  .shell.dashboard-stadium .inline-score{font-size:17px}
+  .shell.dashboard-stadium .fixture-note{text-align:center!important}
+  .shell.dashboard-stadium .match-status,.shell.dashboard-stadium .settlement{max-width:100%;white-space:normal;text-align:center;justify-content:center}
+  .shell.dashboard-stadium .inline-score{font-size:17px;text-align:center}
   .shell.dashboard-stadium .live-row{grid-template-columns:minmax(0,1fr)!important}
-  .shell.dashboard-stadium .score{text-align:left;font-size:22px}
+  .shell.dashboard-stadium .score{text-align:center!important;font-size:22px}
   .drawer{left:50%;width:calc(100% - 20px);max-width:560px}
   .modal{width:calc(100% - 20px);padding:18px 14px;border-radius:18px}
   .filter-actions{flex-wrap:wrap}
