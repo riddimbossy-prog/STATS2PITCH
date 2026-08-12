@@ -5,10 +5,12 @@ import {leagueMature,makeTeamProfile,buildBoard,ENGINE_VERSION,PROFILE_SOURCE,FO
 import {saveBoard} from './store.js'
 
 const jobs=new Map()
-const maxFixtures=Math.max(10,Number(process.env.MAX_FIXTURES_PER_REFRESH||80))
+const configuredFixtureCap=Number(process.env.MAX_FIXTURES_PER_REFRESH||0)
+const maxFixtures=Number.isFinite(configuredFixtureCap)&&configuredFixtureCap>0?Math.max(10,configuredFixtureCap):null
 const concurrency=Math.max(1,Math.min(8,Number(process.env.REFRESH_CONCURRENCY||4)))
 const validOdd=v=>Number.isFinite(Number(v))&&Number(v)>1.001&&Number(v)<1000
 const liveStatus=s=>!['NS','TBD'].includes(String(s||''))
+const engineOddKeys=['home','draw','away','over15','under15','over25','under25','over35','under35','bttsYes']
 function name(v){return String(v??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
 function outcome(market,names){for(const n of names){const hit=(market?.outcomes||[]).find(o=>name(o?.name)===name(n));if(hit&&validOdd(hit.odd))return Number(hit.odd)}return null}
 function extraOdds(marketOdds){
@@ -16,6 +18,7 @@ function extraOdds(marketOdds){
   return{dnbHome:outcome(dnb,['Home','1']),dnbAway:outcome(dnb,['Away','2']),dc1x:outcome(dc,['Home or draw','Home/Draw','1X']),dcx2:outcome(dc,['Draw or away','Draw/Away','X2'])}
 }
 function enginePriced(c){return Object.values(c||{}).some(validOdd)}
+export function needsOddsFallback(odds){const c=odds?.canonical||{};return engineOddKeys.some(k=>!validOdd(c[k]))}
 async function mapLimit(items,limit,fn){const out=new Array(items.length);let i=0;async function worker(){while(true){const x=i++;if(x>=items.length)return;out[x]=await fn(items[x],x)}}await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out}
 function normalize(raw,standings,leagueHistory,odds){
   const f=raw.fixture||{},league=raw.league||{},homeTeam=raw.teams?.home||{},awayTeam=raw.teams?.away||{}
@@ -33,21 +36,25 @@ export async function refreshNow(date,onProgress=()=>{}){
       leagueCache.set(k,{standings,history})
     }catch{leagueCache.set(k,{standings:[],history:[]})}
   })
-  const mature=scheduled.filter(x=>{
+  const matureAll=scheduled.filter(x=>{
     const k=`${x?.league?.id}|${x?.league?.season}`,data=leagueCache.get(k)||{standings:[],history:[]}
     return leagueMature(data.history,data.standings,x?.teams?.home?.id,x?.teams?.away?.id)
-  }).slice(0,maxFixtures)
-  let done=0,priced=0
+  })
+  const mature=maxFixtures?matureAll.slice(0,maxFixtures):matureAll
+  onProgress({stage:'mature',matureAvailable:matureAll.length,matureSelected:mature.length,fixtureCap:maxFixtures||'unlimited'})
+  let done=0,priced=0,fallbacks=0
   const enriched=await mapLimit(mature,concurrency,async rawFixture=>{
     const k=`${rawFixture?.league?.id}|${rawFixture?.league?.season}`,data=leagueCache.get(k)||{standings:[],history:[]},fixtureId=rawFixture?.fixture?.id
     try{
       const apiOdds=await getFixtureOdds(fixtureId,{bypassCache:true});let odds=buildCoherentOdds({apiPayload:apiOdds,fixture:rawFixture})
-      if(!enginePriced(odds.canonical)&&statsApiConfigured()){try{const stats=await getStatsOddsForFixture(rawFixture,{bypassCache:true});odds=buildCoherentOdds({apiPayload:apiOdds,statsPayload:stats?.payload,fixture:rawFixture})}catch{}}
-      if(!enginePriced(odds.canonical)){done++;onProgress({stage:'enrich',done,total:mature.length,priced});return null}
-      priced++;done++;onProgress({stage:'enrich',done,total:mature.length,priced});return normalize(rawFixture,data.standings,data.history,odds)
-    }catch{done++;onProgress({stage:'enrich',done,total:mature.length,priced});return null}
+      if(statsApiConfigured()&&needsOddsFallback(odds)){
+        try{const stats=await getStatsOddsForFixture(rawFixture,{bypassCache:true});odds=buildCoherentOdds({apiPayload:apiOdds,statsPayload:stats?.payload,fixture:rawFixture});fallbacks++}catch{}
+      }
+      if(!enginePriced(odds.canonical)){done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
+      priced++;done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return normalize(rawFixture,data.standings,data.history,odds)
+    }catch{done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
   })
-  const fixtures=enriched.filter(Boolean),board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,matureFixtures:mature.length,enrichedFixtures:fixtures.length,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE})
+  const fixtures=enriched.filter(Boolean),board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,matureFixtures:mature.length,matureAvailableFixtures:matureAll.length,fixtureCap:maxFixtures,enrichedFixtures:fixtures.length,oddsFallbacks:fallbacks,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE})
   await saveBoard(date,board);return board
 }
 export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}
