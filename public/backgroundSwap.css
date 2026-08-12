@@ -1,4 +1,4 @@
-/* Stats2Pitch 2.2.7 — exact user-selected stadium background on login + board. */
+/* Stats2Pitch 2.2.8 — exact user-selected stadium background on login + board. */
 .auth-stadium,
 .shell.auth-stadium.dashboard-stadium{
   position:relative;
@@ -13,12 +13,12 @@
   position:fixed!important;
   inset:0!important;
   z-index:-3!important;
-  background-image:url("./assets/stadium-user-bg.webp")!important;
+  background-image:url("./assets/stadium-user-bg-v2.webp")!important;
   background-position:center center!important;
-  background-size:100% 100%!important;
+  background-size:cover!important;
   background-repeat:no-repeat!important;
   background-attachment:fixed!important;
-  filter:brightness(.72) saturate(.92) contrast(1.06)!important;
+  filter:brightness(.70) saturate(.96) contrast(1.05)!important;
   transform:none!important;
   opacity:1!important;
   pointer-events:none!important;
@@ -32,7 +32,7 @@
   inset:0!important;
   z-index:-2!important;
   pointer-events:none!important;
-  background:linear-gradient(180deg,rgba(0,5,7,.10),rgba(0,8,10,.34))!important;
+  background:linear-gradient(180deg,rgba(0,5,7,.08),rgba(0,8,10,.34))!important;
 }
 
 /* Keep board controls readable without hiding the chosen stadium image. */
