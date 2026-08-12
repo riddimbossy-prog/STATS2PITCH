@@ -1,0 +1,4 @@
+project_id = "stats2pitch"
+
+[functions.stats2pitch-api]
+verify_jwt = false
