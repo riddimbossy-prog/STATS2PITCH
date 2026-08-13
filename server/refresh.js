@@ -101,16 +101,12 @@ function mergeRows(current,previous,rawById){
 }
 function reconcilePublishedBoard(board,previous,raw){
   const rawById=new Map((raw||[]).map(x=>[String(x?.fixture?.id??''),x]))
-  const sameEngine=String(previous?.meta?.engineVersion||'')===String(ENGINE_VERSION)
-  const previousPriority=sameEngine?previous?.priority:[]
-  const previousBest=sameEngine?previous?.bestPicks:[]
-  board.priority=mergeRows(board.priority,previousPriority,rawById)
-  board.bestPicks=mergeRows(board.bestPicks,previousBest,rawById)
+  board.priority=mergeRows(board.priority,previous?.priority,rawById)
+  board.bestPicks=mergeRows(board.bestPicks,previous?.bestPicks,rawById)
   board.groups={single:board.priority.filter(x=>Number(x.filterCount||0)===1),two:board.priority.filter(x=>Number(x.filterCount||0)===2),threePlus:board.priority.filter(x=>Number(x.filterCount||0)>=3)}
   board.availableMarkets=[...new Set(board.priority.map(x=>x.market).filter(Boolean))].sort()
   board.meta.qualified=board.priority.length
   board.meta.bestPicks=board.bestPicks.length
-  board.meta.previousSnapshotAccepted=sameEngine
   return board
 }
 export async function refreshNow(date,onProgress=()=>{}){

@@ -1,69 +1,74 @@
-# Stats2Pitch.com v1.14.0
+# Stats2Pitch 2.2 — GitHub + Supabase Architecture
 
-**From stats to the pitch.**
+Stats2Pitch keeps the strict HOME/AWAY Form Table engine and runs without Render.
 
-Stats2Pitch is a login-gated football prediction dashboard. The application uses API-Football for fixtures/form/standings and can enrich each fixture with broader odds markets from TheStatsAPI. Supabase handles accounts and the persisted prediction-board snapshot; Render hosts the Node application.
+## Production stack
 
-## Interface
+- **GitHub Pages** hosts the HTML/CSS/JS/PWA and brand assets from `public/`.
+- **GitHub Actions** runs the prediction engine on a schedule and stores snapshots in Supabase.
+- **Supabase Auth** handles email/password sessions.
+- **Supabase PostgreSQL** stores `prediction_snapshots`.
+- **Supabase Edge Functions** provide authenticated board access, live scores and the Elite machine feed.
+- **Render is not part of the production architecture.**
 
-The site uses the black, white and green Stats2Pitch identity throughout. The login screen is football-first, account creation goes directly into the app without an email-verification step, and GitHub sign-in is not included.
+The browser never receives the Supabase service-role key or football-provider keys.
 
-The Prediction Board has Market, Minimum Filters, Fixture Date, Choose Filters and Sort By controls. Chosen filters appear as removable chips. Inside Choose Filters you can use **Match any**, **Match all**, and **Put one selected filter first** to sort around a specific filter. User-facing reasons are written in normal football language rather than backend/statistical shorthand.
+## Engine source of truth
 
-Each fixture can open **View details** to show its reasons and the available market prices that were collected for that match. Provider/admin information is deliberately not shown in the normal UI.
+- HOME team calculations come only from the HOME Form Table.
+- AWAY team calculations come only from the AWAY Form Table.
+- The Form Table sample is the most recent 5 finished league matches at the relevant venue.
+- PPG is calculated directly from that Form Table: `(wins × 3 + draws) / 5`.
+- Form Table position is ranked by PPG, then goal difference per game, goals scored per game, win rate and points/tiebreakers.
+- Normal standings are metadata for competition/group membership only.
+- There is no Last-10 or normal-season fallback in engine calculations.
 
-## Run
+## Market safety
 
-```bash
-npm ci
-npm start
-```
+- Team-result markets are Top-3-only in the relevant HOME/AWAY Form Table.
+- HIGH contradiction removes team results.
+- Straight wins normally require a 60%+ Form Table win rate, subject to the existing last-place/heavy-concede exception from the same split table.
+- Goal markets require matching HOME/AWAY Form Table hit rates and attack/defence confirmation.
+- GG requires both Form Table BTTS rates >=60%, both teams scoring and conceding at least 1.0 per game, and is vetoed by strong FTS/clean-sheet opposition.
+- Every published market requires a coherent bookmaker price.
+- Best Picks contains one strongest market per fixture.
 
-Health check: `GET /api/health`
+## Existing Supabase table
 
-Engine check:
+Run `supabase/schema.sql` if the project has not already been initialized. The migration keeps the existing `prediction_snapshots` table, so no replacement database is required.
 
-```bash
-npm run check
-```
+## GitHub secrets required
 
-## Required Render secrets
+Add these in **Repository Settings → Secrets and variables → Actions → Secrets**:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_PROJECT_REF`
+- `SUPABASE_ACCESS_TOKEN`
 - `API_FOOTBALL_KEY`
+- `STATS_API_KEY` only if the optional TheStatsAPI odds fallback is used
+- `STATS2PITCH_ELITE_FEED_TOKEN` only if the machine Elite feed is used
 
-For extra odds/markets:
+Optional tuning values such as `APP_TIMEZONE`, `AUTO_REFRESH_TTL_MINUTES`, `MAX_FIXTURES_PER_REFRESH`, `REFRESH_CONCURRENCY` and `BOARD_DAYS_FORWARD` belong in GitHub **Actions variables**.
 
-- `STATS_API_KEY`
-- `STATS_API_BASE_URL=https://api.thestatsapi.com/api`
+## Workflows
 
-The Supabase URL may be entered either as the full `https://...supabase.co` URL or as the Supabase hostname; the server normalizes it.
+- `.github/workflows/pages.yml` deploys the static site to GitHub Pages and injects the public Supabase URL/anon key into `runtime-config.js` during deployment.
+- `.github/workflows/refresh-board.yml` checks the saved snapshot every 30 minutes and runs the engine only when the snapshot is older than the configured TTL. It can also be run manually for any `YYYY-MM-DD` date.
+- `.github/workflows/supabase-functions.yml` deploys both Stats2Pitch Edge Functions, syncs API secrets and pins browser CORS to `https://www.stats2pitch.com`.
 
-See `SETUP_GITHUB_RENDER_SUPABASE.md` for deployment steps.
+## Domain
 
-## Front-end file layout (v1.14.0)
+The canonical production domain is `https://www.stats2pitch.com` and `public/CNAME` matches it. GitHub Pages HTTPS covers both `www.stats2pitch.com` and `stats2pitch.com`, with HTTPS enforcement enabled.
 
-The front end is four files plus the app module. They load in this order and the
-order matters:
+The Render service definition has been removed from the repository. After this cleanup is merged and production checks are green, the old Stats2Pitch service can be deleted from the Render dashboard.
 
-| File | When it runs | Contains |
-| --- | --- | --- |
-| `s2p-cache-reset-v1.14.0.js` | head, blocking | one-time storage/cache cleanup, keyed on the build constant |
-| `s2p-styles-v1.14.0.css` | head | all 17 former stylesheets, cascade order preserved |
-| `s2p-boot-v1.14.0.js` | body, blocking | network guard, deterministic board bootstrap, boot guard, date router |
-| `app.v1.5.0.js` | deferred module | the application |
-| `s2p-ui-v1.14.0.js` | deferred, after the module | loading surface, UI layers, status clock, board runtime, responsive board, live scores |
+## Local checks
 
-Inside each bundle, blocks are separated by `segment:` banners naming the file
-they came from, and each block is wrapped in its own try/catch. A failure logs
-`[s2p] segment failed: <name>` and the remaining segments still run.
+```bash
+npm ci
+npm run check
+```
 
-**Making changes:** edit the relevant segment in place inside the bundle. Do not
-add a new versioned file to `public/` — `npm run check` will fail if an unbundled
-script or stylesheet appears there, which is deliberate: that pattern is what
-grew the folder to 60 files. When you change a bundle, bump the version in the
-filename, in `index.html`, in `package.json`, in `server/index.js` (`VERSION`),
-and in `server/bootBundle.test.js` (`BUILD`) so the cache reset runs once for the
-new build.
+The Node files under `server/` are engine/worker modules used by GitHub Actions and local checks; they are not the production web host.

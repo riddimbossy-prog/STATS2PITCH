@@ -1,0 +1,96 @@
+/* Stats2Pitch 2.2.11 — stable full-page stadium background for login + board. */
+body.auth-page,
+body.board-page{
+  min-height:100vh;
+  background:#020706!important;
+  isolation:isolate;
+}
+
+/* Put the stadium on the viewport itself so it cannot collapse into the header area. */
+body.auth-page::before,
+body.board-page::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:url("./assets/stadium-user-bg-v3.webp") center center / cover no-repeat;
+  filter:brightness(.70) saturate(.96) contrast(1.05);
+}
+
+body.auth-page::after,
+body.board-page::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,5,7,.10),rgba(0,8,10,.36));
+}
+
+body.auth-page #app,
+body.board-page #app{
+  position:relative;
+  z-index:1;
+  min-height:100vh;
+}
+
+/* The page owns the background now; prevent nested auth/board layers from covering it. */
+.auth-stadium,
+.shell.auth-stadium.dashboard-stadium{
+  background:transparent!important;
+}
+.auth-stadium::before,
+.auth-stadium::after,
+.shell.auth-stadium.dashboard-stadium::before,
+.shell.auth-stadium.dashboard-stadium::after{
+  display:none!important;
+  content:none!important;
+}
+
+.shell.auth-stadium.dashboard-stadium{
+  min-height:100dvh;
+}
+
+/* Keep board content readable while leaving the stadium visible around it. */
+.shell.dashboard-stadium .topbar,
+.shell.dashboard-stadium .tabs,
+.shell.dashboard-stadium .section-head,
+.shell.dashboard-stadium #refresh-status,
+.shell.dashboard-stadium .cards{
+  position:relative;
+  z-index:1;
+}
+.shell.dashboard-stadium .tabs{
+  background:rgba(3,16,24,.76)!important;
+  backdrop-filter:blur(9px);
+  -webkit-backdrop-filter:blur(9px);
+  box-shadow:0 18px 45px rgba(0,0,0,.24);
+}
+.shell.dashboard-stadium .tab{background:rgba(4,19,27,.74)!important}
+.shell.dashboard-stadium .tab.active{background:var(--lime)!important}
+.shell.dashboard-stadium .card{
+  background:linear-gradient(180deg,rgba(5,24,33,.88),rgba(3,17,24,.90))!important;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  box-shadow:0 18px 48px rgba(0,0,0,.28);
+}
+.shell.dashboard-stadium .icon-btn,
+.shell.dashboard-stadium .secondary{
+  background:rgba(3,17,24,.76)!important;
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+}
+.shell.dashboard-stadium .empty,
+.shell.dashboard-stadium .refreshing{
+  background:rgba(3,17,24,.80)!important;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+
+@media(max-width:680px){
+  body.auth-page::before,
+  body.board-page::before{
+    background-position:center center;
+  }
+}

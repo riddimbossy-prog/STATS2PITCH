@@ -1,0 +1,24 @@
+/* The no-tips board is intentionally just the supplied fox video.
+   Keep the full native frame visible: no crop, zoom, filters, transforms or CSS animation. */
+.s2p-no-tips{
+  display:block;
+  width:100%;
+  margin:0;
+  padding:0;
+  overflow:visible;
+  border:0;
+  border-radius:0;
+  background:#000;
+  box-shadow:none;
+}
+.s2p-no-tips-video{
+  display:block;
+  width:100%;
+  height:auto;
+  max-width:100%;
+  object-fit:contain;
+  object-position:center;
+  border:0;
+  border-radius:0;
+  background:#000;
+}

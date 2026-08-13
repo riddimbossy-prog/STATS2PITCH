@@ -1,0 +1,61 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      ALLOW_PUBLIC_SIGNUP: ${{ vars.ALLOW_PUBLIC_SIGNUP }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate public Supabase configuration
+        run: |
+          test -n "$SUPABASE_URL" || (echo "Missing GitHub secret SUPABASE_URL" && exit 1)
+          test -n "$SUPABASE_ANON_KEY" || (echo "Missing GitHub secret SUPABASE_ANON_KEY" && exit 1)
+      - name: Build static site
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp -R public/. _site/
+          touch _site/.nojekyll
+          node <<'NODE'
+          const fs=require('fs')
+          const cfg={
+            supabaseUrl:process.env.SUPABASE_URL,
+            supabaseAnonKey:process.env.SUPABASE_ANON_KEY,
+            allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true').toLowerCase()!=='false',
+            functionName:'stats2pitch-api',
+            version:'2.2.0'
+          }
+          fs.writeFileSync('_site/runtime-config.js',`window.__STATS2PITCH_CONFIG__=${JSON.stringify(cfg)}\n`)
+          NODE
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
