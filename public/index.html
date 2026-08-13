@@ -1,32 +1,20 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#061219">
-  <meta name="stats2pitch-build" content="2.2.16">
-  <title>Stats2Pitch</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=2.2.0">
-  <link rel="stylesheet" href="./styles.css?v=2.2.12">
-  <link rel="stylesheet" href="./auth.css?v=2.2.1">
-  <link rel="stylesheet" href="./boardTheme.css?v=2.2.4">
-  <link rel="stylesheet" href="./backgroundSwap.css?v=2.2.11">
-  <link rel="stylesheet" href="./noTips.css?v=2.2.12">
-  <link rel="stylesheet" href="./weekBoard.css?v=2.2.14">
-  <link rel="stylesheet" href="./responsive.css?v=2.2.16">
-  <script type="importmap">
-    {"imports":{"./core.js":"./core.js?v=2.2.3","./dashboard.js":"./dashboard.js?v=2.2.14","./boardView.js":"./boardView.js?v=2.2.14","./dialogs.js":"./dialogs.js?v=2.2.2"}}
-  </script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Stats2Pitch</title>
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div id="app">
-    <div class="s2p-loader s2p-loader--page" role="status" aria-label="Loading Stats2Pitch">
-      <video class="s2p-loader-video" autoplay loop muted playsinline preload="auto">
-        <source src="./assets/fox-kicking-ball.mp4?v=2.2.12" type="video/mp4">
-      </video>
-    </div>
-  </div>
-  <script src="./runtime-config.js?v=2.2.3"></script>
-  <script type="module" src="./app.js?v=2.2.14"></script>
+<div class="app">
+<header><div><div class="brand">STATS<span>2</span>PITCH</div><small>Fresh Consensus Engine</small></div><button id="refresh">Refresh</button></header>
+<section class="rule">Odds 1.20–1.55 · Home ≥80% · Away ≥80% · Last 5 home/away split</section>
+<nav id="dates"></nav>
+<div class="toolbar"><select id="market"><option value="all">All markets</option></select><span id="status"></span></div>
+<main id="cards"></main>
+</div>
+<div id="modal" class="modal hidden"></div>
+<script type="module" src="/app.js"></script>
 </body>
 </html>
