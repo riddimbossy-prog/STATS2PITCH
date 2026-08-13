@@ -26,7 +26,6 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      ALLOW_PUBLIC_SIGNUP: ${{ vars.ALLOW_PUBLIC_SIGNUP }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate public Supabase configuration
@@ -41,12 +40,18 @@ jobs:
           touch _site/.nojekyll
           node <<'NODE'
           const fs=require('fs')
+          function normalize(value){
+            const raw=String(value||'').trim().replace(/\/+$/,'')
+            if(/^https?:\/\//i.test(raw))return raw
+            if(/^[a-z0-9-]+\.supabase\.co$/i.test(raw))return`https://${raw}`
+            if(/^[a-z0-9-]+$/i.test(raw))return`https://${raw}.supabase.co`
+            return raw
+          }
           const cfg={
-            supabaseUrl:process.env.SUPABASE_URL,
+            supabaseUrl:normalize(process.env.SUPABASE_URL),
             supabaseAnonKey:process.env.SUPABASE_ANON_KEY,
-            allowPublicSignup:String(process.env.ALLOW_PUBLIC_SIGNUP||'true').toLowerCase()!=='false',
             functionName:'stats2pitch-api',
-            version:'2.2.0'
+            version:'3.0.0'
           }
           fs.writeFileSync('_site/runtime-config.js',`window.__STATS2PITCH_CONFIG__=${JSON.stringify(cfg)}\n`)
           NODE
