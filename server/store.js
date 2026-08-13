@@ -1,3 +1,5 @@
+import {ENGINE_VERSION} from './engineConfig.js'
+
 export function normalizeSupabaseUrl(value){
   const raw=String(value||'').trim().replace(/\/+$/,'')
   if(!raw)return''
@@ -21,9 +23,15 @@ async function request(path,{method='GET',body,token=SERVICE,headers={}}={}){
 }
 export async function verifyUser(accessToken){if(!URL||!ANON||!accessToken)throw new Error('Authentication unavailable');const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6000);try{const res=await fetch(`${URL}/auth/v1/user`,{signal:controller.signal,headers:{apikey:ANON,Authorization:`Bearer ${accessToken}`}});const data=await res.json().catch(()=>null);if(!res.ok||!data?.id)throw new Error('Authentication required');return data}finally{clearTimeout(timer)}}
 export async function loadBoard(date){
-  if(!configured())return memory.get(date)||null
+  if(!configured()){
+    const cached=memory.get(date)||null
+    return cached?.meta?.engineVersion===ENGINE_VERSION?cached:null
+  }
   const rows=await request(`/rest/v1/prediction_snapshots?select=payload,generated_at&snapshot_date=eq.${encodeURIComponent(date)}&limit=1`)
-  const row=Array.isArray(rows)?rows[0]:null;if(!row)return null;return{...row.payload,meta:{...(row.payload?.meta||{}),storedAt:row.generated_at}}
+  const row=Array.isArray(rows)?rows[0]:null
+  if(!row)return null
+  if(row?.payload?.meta?.engineVersion!==ENGINE_VERSION)return null
+  return{...row.payload,meta:{...(row.payload?.meta||{}),storedAt:row.generated_at}}
 }
 export async function saveBoard(date,board){
   memory.set(date,board);if(!configured())return board
