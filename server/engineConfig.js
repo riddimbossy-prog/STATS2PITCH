@@ -1,4 +1,4 @@
-export const ENGINE_VERSION='simple-odds-consensus-v1'
+export const ENGINE_VERSION='all-markets-consensus-v2'
 export const FORM_TABLE_SAMPLE=5
 export const MIN_LEAGUE_GAMES=FORM_TABLE_SAMPLE
 export const MIN_SPLIT_TABLE_SAMPLE=FORM_TABLE_SAMPLE
@@ -7,8 +7,8 @@ export const SPLIT_LONG_SAMPLE=FORM_TABLE_SAMPLE
 export const MIN_ODD=1.20
 export const MAX_ODD=1.55
 export const MIN_CONSENSUS=80
-export const TEAM_RESULT_POLICY='disabled'
-export const GG_POLICY='strict-two-team-consensus'
+export const TEAM_RESULT_POLICY='all-markets-strict-consensus'
+export const GG_POLICY='all-markets-strict-consensus'
 export const ODDS_POLICY='strict-1.20-to-1.55'
 export const PROFILE_SOURCE='venue-form-table-last5'
 export const FAMILY={MARKET:'Market/Odds',CONSENSUS:'Two-Team Consensus'}
