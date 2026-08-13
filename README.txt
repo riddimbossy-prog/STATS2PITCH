@@ -1,33 +1,22 @@
-STATS2PITCH — MARKET LABEL UI FIX
+STATS2PITCH LIVE BOARD MARKET LABEL FIX
 
-Problem:
-The engine stores marketName correctly, but the main board only displayed selection.
-So a First-half goals pick appeared as:
-  Over 0.5
-instead of:
-  1H · Over 0.5
+Replace:
+  public/boardView.js
 
-This patch updates public/boardView.js to display market context.
+This is the actual patched file from the GitHub fix branch.
+It makes the main board show market context such as:
+- 1H · Over 0.5
+- 1H Result · Home
+- Home Team · Over 0.5
+- Away Team · Over 0.5
+- BTTS · Yes
+- Double Chance · Home or draw
+- DNB · Home
+- 1X2 · Home
 
-Examples after patch:
-- First-half goals -> 1H · Over 0.5
-- First-half winner -> 1H Result · Home
-- Home team goals -> Home Team · Over 0.5
-- Away team goals -> Away Team · Over 0.5
-- BTTS -> BTTS · Yes
-- Double chance -> Double Chance · Home or draw
-- DNB -> DNB · Home
-- 1X2 -> 1X2 · Home
-- Normal full-time totals remain Over/Under X.X
-
-INSTALL:
-1. Extract this ZIP into your STATS2PITCH repo root.
-2. Open PowerShell/Terminal in the repo.
-3. Run:
-   node patch-board-labels.mjs
-4. Run:
-   npm run check
-5. Commit and Push with GitHub Desktop.
-6. Refresh the site.
-
-Only the board label display changes. Engine odds and 80/80 logic are untouched.
+GitHub Desktop:
+1. Extract ZIP.
+2. Copy public/boardView.js into your repo.
+3. Replace the existing file.
+4. Commit and Push origin.
+5. Refresh/redeploy the site.
