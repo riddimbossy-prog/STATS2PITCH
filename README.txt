@@ -1,32 +1,33 @@
-STATS2PITCH — CROSS-SOURCE ODDS VERIFIER v2
+STATS2PITCH — MARKET LABEL UI FIX
 
-Replace:
-  server/oddsPolicy.js
-  server/refresh.js
+Problem:
+The engine stores marketName correctly, but the main board only displayed selection.
+So a First-half goals pick appeared as:
+  Over 0.5
+instead of:
+  1H · Over 0.5
 
-What changes:
-- TheStatsAPI is now queried for every mature fixture when configured, not only as a last-resort fallback.
-- API-Football and TheStatsAPI are normalized to the same market/selection.
-- If both sources have the same selection, the price is accepted only when relative disagreement is <= 15% by default.
-- Verified outcomes use the midpoint of both source prices.
-- Large source disagreements are dropped instead of reaching the engine.
-- If only one source has a market, it is still allowed by default (to preserve coverage) but marked single-source.
-- Set ODDS_REQUIRE_CROSS_SOURCE=true if you want to reject every single-source outcome.
-- Change ODDS_VERIFY_MAX_RELATIVE_DIFF=0.15 to tune the tolerance.
-- Keeps your existing 1.20–1.55 engine odds window and 80/80 split consensus rules.
-- Keeps stale old-engine snapshot protection.
-- Improves row identity when reconciling settled picks.
+This patch updates public/boardView.js to display market context.
 
-Recommended environment:
-  ODDS_VERIFY_MAX_RELATIVE_DIFF=0.15
-  ODDS_REQUIRE_CROSS_SOURCE=false
+Examples after patch:
+- First-half goals -> 1H · Over 0.5
+- First-half winner -> 1H Result · Home
+- Home team goals -> Home Team · Over 0.5
+- Away team goals -> Away Team · Over 0.5
+- BTTS -> BTTS · Yes
+- Double chance -> Double Chance · Home or draw
+- DNB -> DNB · Home
+- 1X2 -> 1X2 · Home
+- Normal full-time totals remain Over/Under X.X
 
-For maximum strictness:
-  ODDS_REQUIRE_CROSS_SOURCE=true
+INSTALL:
+1. Extract this ZIP into your STATS2PITCH repo root.
+2. Open PowerShell/Terminal in the repo.
+3. Run:
+   node patch-board-labels.mjs
+4. Run:
+   npm run check
+5. Commit and Push with GitHub Desktop.
+6. Refresh the site.
 
-GitHub Desktop:
-1. Extract ZIP.
-2. Copy the server folder into the repo root.
-3. Replace server/oddsPolicy.js and server/refresh.js.
-4. Commit and Push origin.
-5. Run board refresh.
+Only the board label display changes. Engine odds and 80/80 logic are untouched.
