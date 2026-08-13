@@ -7,6 +7,7 @@ const inOddsWindow=v=>finite(v)&&Number(v)>=MIN_ODD&&Number(v)<=MAX_ODD
 const norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
 const rate=(hits,total)=>total?Math.round(hits*100/total):null
 const teamIsHome=(f,id)=>String(f?.teams?.home?.id)===String(id)
+
 function fullScore(f,id){
   const h=Number(f?.goals?.home),a=Number(f?.goals?.away)
   if(!finite(h)||!finite(a))return null
@@ -20,6 +21,13 @@ function halfScore(f,id){
 function parsedOU(name){
   const m=String(name||'').match(/\b(Over|Under)\s*([0-9]+(?:\.[0-9]+)?)/i)
   return m?{side:m[1].toLowerCase(),line:Number(m[2])}:null
+}
+function saneLine(key,line){
+  if(!finite(line))return false
+  if(key==='total-goals')return line>=0.5&&line<=6.5
+  if(key==='first-half-goals')return line>=0.5&&line<=3.5
+  if(['home-team-goals','away-team-goals','team-goals'].includes(key))return line>=0.5&&line<=4.5
+  return true
 }
 function resultRate(profile,wanted,half=false){
   const rows=profile?.venueFixtures||[],id=profile?.id
@@ -91,10 +99,10 @@ function consensusFor(f,market,outcome){
     if(n==='no')return[bttsRate(home,false),bttsRate(away,false)]
   }
   if(key==='total-goals'){
-    const p=parsedOU(name);if(p)return[totalRate(home,p.side,p.line),totalRate(away,p.side,p.line)]
+    const p=parsedOU(name);if(p&&saneLine(key,p.line))return[totalRate(home,p.side,p.line),totalRate(away,p.side,p.line)]
   }
   if(key==='first-half-goals'){
-    const p=parsedOU(name);if(p)return[totalRate(home,p.side,p.line,true),totalRate(away,p.side,p.line,true)]
+    const p=parsedOU(name);if(p&&saneLine(key,p.line))return[totalRate(home,p.side,p.line,true),totalRate(away,p.side,p.line,true)]
   }
   if(key==='first-half-winner'){
     if(n==='home'||n==='1')return[resultRate(home,'win',true),resultRate(away,'loss',true)]
@@ -102,19 +110,16 @@ function consensusFor(f,market,outcome){
     if(n==='draw'||n==='x')return[resultRate(home,'draw',true),resultRate(away,'draw',true)]
   }
   if(key==='home-team-goals'){
-    const p=parsedOU(name);if(p)return[ownGoalRate(home,p.side,p.line),oppGoalRate(away,p.side,p.line)]
+    const p=parsedOU(name);if(p&&saneLine(key,p.line))return[ownGoalRate(home,p.side,p.line),oppGoalRate(away,p.side,p.line)]
   }
   if(key==='away-team-goals'){
-    const p=parsedOU(name);if(p)return[oppGoalRate(home,p.side,p.line),ownGoalRate(away,p.side,p.line)]
+    const p=parsedOU(name);if(p&&saneLine(key,p.line))return[oppGoalRate(home,p.side,p.line),ownGoalRate(away,p.side,p.line)]
   }
-  // Generic team-goals is used only when the outcome itself names Home/Away.
   if(key==='team-goals'){
     const p=parsedOU(name)
-    if(p&&/\bhome\b/i.test(name))return[ownGoalRate(home,p.side,p.line),oppGoalRate(away,p.side,p.line)]
-    if(p&&/\baway\b/i.test(name))return[oppGoalRate(home,p.side,p.line),ownGoalRate(away,p.side,p.line)]
+    if(p&&saneLine(key,p.line)&&/\bhome\b/i.test(name))return[ownGoalRate(home,p.side,p.line),oppGoalRate(away,p.side,p.line)]
+    if(p&&saneLine(key,p.line)&&/\baway\b/i.test(name))return[oppGoalRate(home,p.side,p.line),ownGoalRate(away,p.side,p.line)]
   }
-  // Handicaps and unknown provider-specific markets are intentionally skipped
-  // unless their historical event can be interpreted exactly. No guessed picks.
   return null
 }
 function candidate(f,market,outcome){
@@ -132,7 +137,7 @@ function candidate(f,market,outcome){
     fixtureId:f.fixtureId,match:f.match,league:f.league,country:f.country,leagueLogo:f.leagueLogo||null,countryFlag:f.countryFlag||null,
     kickoff:f.kickoff,kickoffLocal:f.kickoffLocal,home:f?.home?.name||'',away:f?.away?.name||'',homeLogo:f?.home?.logo||null,awayLogo:f?.away?.logo||null,
     market:market.marketKey,marketName,selection,odds:+odds.toFixed(2),homeConsensus:homeRate,awayConsensus:awayRate,consensus,
-    filterCount:2,engineRating:`${consensus}%`,familyCount:2,contradiction:'LOW',reasons:[reason],warnings:[],reason
+    filterCount:2,engineRating:`${consensus}%`,reasons:[reason],warnings:[],reason
   }
 }
 export function analyzeFixture(f){
