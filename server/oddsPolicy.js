@@ -4,6 +4,8 @@ const text=v=>String(v??'').trim()
 const norm=s=>text(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim().replace(/\s+/g,' ')
 const validOdd=v=>{const n=Number(v);return Number.isFinite(n)&&n>1.001&&n<1000?n:null}
 const defaultBookOrder=['pinnacle','betfair exchange','bet365','kambi']
+const MAX_RELATIVE_DIFF=Math.max(0,Number(process.env.ODDS_VERIFY_MAX_RELATIVE_DIFF||0.15))
+const REQUIRE_CROSS_SOURCE=String(process.env.ODDS_REQUIRE_CROSS_SOURCE||'false').toLowerCase()==='true'
 
 function bookRank(name){
   const n=norm(name)
@@ -38,9 +40,12 @@ function completeness(key,outcomes){
   }
   return m.size>=2?50+m.size:0
 }
-
-export function buildCoherentOdds({apiPayload=[],statsPayload=null,fixture=null}={}){
-  const rows=[...parseStatsRows(statsPayload,fixture),...parseApiFootballRows(apiPayload,fixture)]
+function relativeDiff(a,b){
+  const x=validOdd(a),y=validOdd(b)
+  if(!x||!y)return null
+  return Math.abs(x-y)/Math.min(x,y)
+}
+function groupRows(rows){
   const grouped=new Map()
   let order=0
   for(const row of rows){
@@ -50,21 +55,85 @@ export function buildCoherentOdds({apiPayload=[],statsPayload=null,fixture=null}
     if(!grouped.has(k))grouped.set(k,{marketKey:row.marketKey,market:row.market,bookmaker:row.bookmaker||'Book',source,sourceRank,order:order++,outcomes:[]})
     grouped.get(k).outcomes.push(...(row.outcomes||[]))
   }
-  const byMarket=new Map()
-  for(const g of grouped.values()){
+  return [...grouped.values()]
+}
+function chooseCandidate(candidates){
+  const rows=[...candidates].sort((a,b)=>bookRank(a.bookmaker)-bookRank(b.bookmaker)||b.quality-a.quality||a.sourceRank-b.sourceRank||a.order-b.order)
+  return rows[0]||null
+}
+function sourceMarketMap(groups,source){
+  const out=new Map()
+  for(const g of groups.filter(x=>x.source===source)){
     const map=outcomeMap(g.outcomes)
     const outcomes=[...map.values()].map(o=>({...o,bookmaker:g.bookmaker,source:g.source}))
     const quality=completeness(g.marketKey,outcomes)
     if(!quality)continue
-    const candidate={...g,outcomes,quality}
-    if(!byMarket.has(g.marketKey))byMarket.set(g.marketKey,[])
-    byMarket.get(g.marketKey).push(candidate)
+    const c={...g,outcomes,quality}
+    if(!out.has(g.marketKey))out.set(g.marketKey,[])
+    out.get(g.marketKey).push(c)
   }
+  return out
+}
+function verifyMarket(apiCandidate,statsCandidate){
+  if(!apiCandidate&&!statsCandidate)return null
+  if(!apiCandidate||!statsCandidate){
+    const c=apiCandidate||statsCandidate
+    if(REQUIRE_CROSS_SOURCE)return null
+    return {
+      marketKey:c.marketKey,market:c.market,bookmaker:c.bookmaker,source:c.source,
+      verification:'single-source',outcomes:c.outcomes.map(o=>({...o,verified:false,verification:'single-source'}))
+    }
+  }
+  const a=outcomeMap(apiCandidate.outcomes),s=outcomeMap(statsCandidate.outcomes),out=[]
+  const names=new Set([...a.keys(),...s.keys()])
+  for(const name of names){
+    const av=a.get(name),sv=s.get(name)
+    if(av&&sv){
+      const diff=relativeDiff(av.odd,sv.odd)
+      if(diff!==null&&diff<=MAX_RELATIVE_DIFF){
+        const chosen=bookRank(apiCandidate.bookmaker)<=bookRank(statsCandidate.bookmaker)?av:sv
+        out.push({
+          name:chosen.name,
+          odd:+((Number(av.odd)+Number(sv.odd))/2).toFixed(3),
+          bookmaker:`${apiCandidate.bookmaker} + ${statsCandidate.bookmaker}`,
+          source:'cross-source',
+          verified:true,
+          verification:'cross-source',
+          apiOdd:Number(av.odd),
+          statsOdd:Number(sv.odd),
+          relativeDiff:+diff.toFixed(4)
+        })
+      }
+      continue
+    }
+    if(!REQUIRE_CROSS_SOURCE){
+      const single=av||sv
+      out.push({...single,verified:false,verification:'single-source'})
+    }
+  }
+  if(!out.length)return null
+  return {
+    marketKey:apiCandidate.marketKey,
+    market:apiCandidate.market||statsCandidate.market,
+    bookmaker:`${apiCandidate.bookmaker} / ${statsCandidate.bookmaker}`,
+    source:'verified-cross-source-v2',
+    verification:'mixed',
+    outcomes:out
+  }
+}
+
+export function buildCoherentOdds({apiPayload=[],statsPayload=null,fixture=null}={}){
+  const rows=[...parseStatsRows(statsPayload,fixture),...parseApiFootballRows(apiPayload,fixture)]
+  const groups=groupRows(rows)
+  const apiBy=sourceMarketMap(groups,'api-football')
+  const statsBy=sourceMarketMap(groups,'thestatsapi')
+  const keys=new Set([...apiBy.keys(),...statsBy.keys()])
   const marketOdds=[]
-  for(const candidates of byMarket.values()){
-    candidates.sort((a,b)=>bookRank(a.bookmaker)-bookRank(b.bookmaker)||b.quality-a.quality||a.sourceRank-b.sourceRank||a.order-b.order)
-    const c=candidates[0]
-    marketOdds.push({marketKey:c.marketKey,market:c.market,bookmaker:c.bookmaker,source:c.source,outcomes:c.outcomes})
+  for(const key of keys){
+    const api=chooseCandidate(apiBy.get(key)||[])
+    const stats=chooseCandidate(statsBy.get(key)||[])
+    const verified=verifyMarket(api,stats)
+    if(verified)marketOdds.push(verified)
   }
   marketOdds.sort((a,b)=>a.market.localeCompare(b.market))
   const find=(key,names)=>{
@@ -79,5 +148,5 @@ export function buildCoherentOdds({apiPayload=[],statsPayload=null,fixture=null}
     over35:find('total-goals',['Over 3.5']),under35:find('total-goals',['Under 3.5']),
     bttsYes:find('both-teams-score',['Yes']),bttsNo:find('both-teams-score',['No'])
   }
-  return{marketOdds,canonical,policy:'single-bookmaker-coherent-v1'}
+  return{marketOdds,canonical,policy:'verified-cross-source-v2',maxRelativeDiff:MAX_RELATIVE_DIFF,requireCrossSource:REQUIRE_CROSS_SOURCE}
 }

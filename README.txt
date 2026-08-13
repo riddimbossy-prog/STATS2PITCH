@@ -1,18 +1,32 @@
-STATS2PITCH — PICK DETAILS IDENTITY FIX
+STATS2PITCH — CROSS-SOURCE ODDS VERIFIER v2
 
 Replace:
-  public/dialogs.js
+  server/oddsPolicy.js
+  server/refresh.js
 
-Why this fixes the discrepancy:
-- The card displays the fixture's published bestPicks row.
-- The old modal searched priority first, so it could open a different qualifying selection
-  for the same fixture and market.
-- The modal now resolves bestPicks first, so the displayed card and details popup stay identical.
-- Saved picks now also use fixture + market + selection + odds as the identity.
+What changes:
+- TheStatsAPI is now queried for every mature fixture when configured, not only as a last-resort fallback.
+- API-Football and TheStatsAPI are normalized to the same market/selection.
+- If both sources have the same selection, the price is accepted only when relative disagreement is <= 15% by default.
+- Verified outcomes use the midpoint of both source prices.
+- Large source disagreements are dropped instead of reaching the engine.
+- If only one source has a market, it is still allowed by default (to preserve coverage) but marked single-source.
+- Set ODDS_REQUIRE_CROSS_SOURCE=true if you want to reject every single-source outcome.
+- Change ODDS_VERIFY_MAX_RELATIVE_DIFF=0.15 to tune the tolerance.
+- Keeps your existing 1.20–1.55 engine odds window and 80/80 split consensus rules.
+- Keeps stale old-engine snapshot protection.
+- Improves row identity when reconciling settled picks.
 
-Install with GitHub Desktop:
-1. Extract this ZIP.
-2. Copy the public folder into your STATS2PITCH repo.
-3. Replace public/dialogs.js.
+Recommended environment:
+  ODDS_VERIFY_MAX_RELATIVE_DIFF=0.15
+  ODDS_REQUIRE_CROSS_SOURCE=false
+
+For maximum strictness:
+  ODDS_REQUIRE_CROSS_SOURCE=true
+
+GitHub Desktop:
+1. Extract ZIP.
+2. Copy the server folder into the repo root.
+3. Replace server/oddsPolicy.js and server/refresh.js.
 4. Commit and Push origin.
-5. Refresh the site / board.
+5. Run board refresh.

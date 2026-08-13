@@ -21,12 +21,8 @@ function extraOdds(marketOdds){
   const dnb=(marketOdds||[]).find(m=>m.marketKey==='draw-no-bet'),dc=(marketOdds||[]).find(m=>m.marketKey==='double-chance')
   return{dnbHome:outcome(dnb,['Home','1']),dnbAway:outcome(dnb,['Away','2']),dc1x:outcome(dc,['Home or draw','Home/Draw','1X']),dcx2:outcome(dc,['Draw or away','Draw/Away','X2'])}
 }
-function hasEngineWindowOutcome(odds){
-  return (odds?.marketOdds||[]).some(m=>(m?.outcomes||[]).some(o=>inEngineWindow(o?.odd)))
-}
-export function needsOddsFallback(odds){
-  return !hasEngineWindowOutcome(odds)
-}
+function hasEngineWindowOutcome(odds){return (odds?.marketOdds||[]).some(m=>(m?.outcomes||[]).some(o=>inEngineWindow(o?.odd)))}
+export function needsOddsFallback(odds){return !hasEngineWindowOutcome(odds)}
 async function mapLimit(items,limit,fn){const out=new Array(items.length);let i=0;async function worker(){while(true){const x=i++;if(x>=items.length)return;out[x]=await fn(items[x],x)}}await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out}
 function historyKey(row){const id=row?.fixture?.id;if(id!==undefined&&id!==null)return`id:${id}`;return[row?.fixture?.date,row?.teams?.home?.id,row?.teams?.away?.id,row?.goals?.home,row?.goals?.away].join('|')}
 export function mergeHistories(...groups){const map=new Map();for(const rows of groups)for(const row of Array.isArray(rows)?rows:[]){const k=historyKey(row);if(!map.has(k))map.set(k,row)}return[...map.values()]}
@@ -90,7 +86,7 @@ function publicFixture(raw,availability='scheduled'){
 function normalize(raw,standings,leagueHistory,odds){
   const f=raw.fixture||{},league=raw.league||{},homeTeam=raw.teams?.home||{},awayTeam=raw.teams?.away||{}
   const home=makeTeamProfile({standings,leagueHistory,team:homeTeam,venue:'home'}),away=makeTeamProfile({standings,leagueHistory,team:awayTeam,venue:'away'})
-  return{fixtureId:f.id,match:`${home.name} vs ${away.name}`,league:league.name||'League',country:league.country||'',leagueLogo:league.logo||null,countryFlag:league.flag||null,kickoff:f.date,kickoffLocal:new Date(f.date).toLocaleString('en-GB',{timeZone:process.env.APP_TIMEZONE||'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),home,away,odds:{...odds.canonical,...extraOdds(odds.marketOdds)},marketOdds:odds.marketOdds}
+  return{fixtureId:f.id,match:`${home.name} vs ${away.name}`,league:league.name||'League',country:league.country||'',leagueLogo:league.logo||null,countryFlag:league.flag||null,kickoff:f.date,kickoffLocal:new Date(f.date).toLocaleString('en-GB',{timeZone:process.env.APP_TIMEZONE||'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),home,away,odds:{...odds.canonical,...extraOdds(odds.marketOdds)},marketOdds:odds.marketOdds,oddsPolicy:odds.policy}
 }
 function reconcilePick(row,rawById){
   const raw=rawById.get(String(row?.fixtureId??''));if(!raw)return row
@@ -99,8 +95,8 @@ function reconcilePick(row,rawById){
 }
 function mergeRows(current,previous,rawById){
   const map=new Map()
-  for(const row of current||[]){const x=reconcilePick(row,rawById);map.set(`${x.fixtureId}|${x.market}`,x)}
-  for(const row of previous||[]){const raw=rawById.get(String(row?.fixtureId??''));if(!raw||SCHEDULED.has(statusShort(raw)))continue;const x=reconcilePick(row,rawById),key=`${x.fixtureId}|${x.market}`;if(!map.has(key))map.set(key,x)}
+  for(const row of current||[]){const x=reconcilePick(row,rawById);map.set(`${x.fixtureId}|${x.market}|${x.selection}|${x.odds}`,x)}
+  for(const row of previous||[]){const raw=rawById.get(String(row?.fixtureId??''));if(!raw||SCHEDULED.has(statusShort(raw)))continue;const x=reconcilePick(row,rawById),key=`${x.fixtureId}|${x.market}|${x.selection}|${x.odds}`;if(!map.has(key))map.set(key,x)}
   return sortKickoff([...map.values()])
 }
 function reconcilePublishedBoard(board,previous,raw){
@@ -144,19 +140,26 @@ export async function refreshNow(date,onProgress=()=>{}){
   const matureAll=splitReady.filter(Boolean),mature=maxFixtures?matureAll.slice(0,maxFixtures):matureAll
   onProgress({stage:'mature',matureAvailable:matureAll.length,matureSelected:mature.length,matureFromLeague,matureFromTeamFallback,historyFallbackTeams:fallbackTeams,insufficientSplit,fixtureCap:maxFixtures||'unlimited'})
 
-  let done=0,priced=0,fallbacks=0
+  let done=0,priced=0,verifiedCalls=0,statsFailures=0
   const enriched=await mapLimit(mature,concurrency,async item=>{
     const {rawFixture,standings,history,splitSource}=item,fixtureId=rawFixture?.fixture?.id,id=String(fixtureId??'')
     try{
-      const apiOdds=await getFixtureOdds(fixtureId,{bypassCache:true});let odds=buildCoherentOdds({apiPayload:apiOdds,fixture:rawFixture})
-      if(statsApiConfigured()&&needsOddsFallback(odds)){
-        try{const stats=await getStatsOddsForFixture(rawFixture,{bypassCache:true});odds=buildCoherentOdds({apiPayload:apiOdds,statsPayload:stats?.payload,fixture:rawFixture});fallbacks++}catch{}
+      const apiOdds=await getFixtureOdds(fixtureId,{bypassCache:true})
+      let statsPayload=null
+      if(statsApiConfigured()){
+        try{
+          const stats=await getStatsOddsForFixture(rawFixture,{bypassCache:true})
+          statsPayload=stats?.payload||null
+          if(statsPayload)verifiedCalls++
+        }catch{statsFailures++}
       }
-      if(!hasEngineWindowOutcome(odds)){availability.set(id,'waiting-odds');done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
-      availability.set(id,'priced');priced++;done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return{...normalize(rawFixture,standings,history,odds),splitSource}
-    }catch{availability.set(id,'analysis-unavailable');done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
+      const odds=buildCoherentOdds({apiPayload:apiOdds,statsPayload,fixture:rawFixture})
+      if(!hasEngineWindowOutcome(odds)){availability.set(id,'waiting-verified-odds');done++;onProgress({stage:'enrich',done,total:mature.length,priced,verifiedCalls,statsFailures});return null}
+      availability.set(id,'priced');priced++;done++;onProgress({stage:'enrich',done,total:mature.length,priced,verifiedCalls,statsFailures})
+      return{...normalize(rawFixture,standings,history,odds),splitSource}
+    }catch{availability.set(id,'analysis-unavailable');done++;onProgress({stage:'enrich',done,total:mature.length,priced,verifiedCalls,statsFailures});return null}
   })
-  const fixtures=enriched.filter(Boolean),board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,matureFixtures:mature.length,matureAvailableFixtures:matureAll.length,matureFromLeague,matureFromTeamFallback,historyFallbackTeams:fallbackTeams,insufficientSplit,fixtureCap:maxFixtures,enrichedFixtures:fixtures.length,oddsFallbacks:fallbacks,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE})
+  const fixtures=enriched.filter(Boolean),board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,matureFixtures:mature.length,matureAvailableFixtures:matureAll.length,matureFromLeague,matureFromTeamFallback,historyFallbackTeams:fallbackTeams,insufficientSplit,fixtureCap:maxFixtures,enrichedFixtures:fixtures.length,verifiedOddsCalls:verifiedCalls,statsOddsFailures:statsFailures,engineVersion:ENGINE_VERSION,profileSource:PROFILE_SOURCE,formTableSample:FORM_TABLE_SAMPLE,oddsPolicy:'verified-cross-source-v2'})
   const qualifiedIds=new Set((board.bestPicks||[]).map(x=>String(x?.fixtureId??'')))
   for(const id of qualifiedIds)availability.set(id,'qualified')
   board.fixtures=sortKickoff(raw.map(rawFixture=>publicFixture(rawFixture,availability.get(String(rawFixture?.fixture?.id??''))||'scheduled')))
