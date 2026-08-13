@@ -1,7 +1,7 @@
 import {getFixturesByDateFresh,getStandings,getLeagueFinishedFixtures,getRecentVenueGlobal,getFixtureOdds} from './apiFootball.js'
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {buildCoherentOdds} from './oddsPolicy.js'
-import {leagueMature,makeTeamProfile,buildBoard,ENGINE_VERSION,PROFILE_SOURCE,FORM_TABLE_SAMPLE} from './engine.js'
+import {leagueMature,makeTeamProfile,buildBoard,ENGINE_VERSION,PROFILE_SOURCE,FORM_TABLE_SAMPLE,MIN_ODD,MAX_ODD} from './engine.js'
 import {loadBoard,saveBoard} from './store.js'
 
 const jobs=new Map()
@@ -9,10 +9,10 @@ const configuredFixtureCap=Number(process.env.MAX_FIXTURES_PER_REFRESH||0)
 const maxFixtures=Number.isFinite(configuredFixtureCap)&&configuredFixtureCap>0?Math.max(10,configuredFixtureCap):null
 const concurrency=Math.max(1,Math.min(8,Number(process.env.REFRESH_CONCURRENCY||4)))
 const validOdd=v=>Number.isFinite(Number(v))&&Number(v)>1.001&&Number(v)<1000
+const inEngineWindow=v=>Number.isFinite(Number(v))&&Number(v)>=MIN_ODD&&Number(v)<=MAX_ODD
 const SCHEDULED=new Set(['NS','TBD'])
 const FINISHED=new Set(['FT','AET','PEN'])
 const liveStatus=s=>!SCHEDULED.has(String(s||'').toUpperCase())
-const engineOddKeys=['home','draw','away','over15','under15','over25','under25','over35','under35','bttsYes']
 const kickMs=x=>{const n=Date.parse(x?.kickoff||'');return Number.isFinite(n)?n:Number.MAX_SAFE_INTEGER}
 export const sortKickoff=(rows=[])=>[...(rows||[])].sort((a,b)=>kickMs(a)-kickMs(b)||String(a?.fixtureId??'').localeCompare(String(b?.fixtureId??'')))
 function name(v){return String(v??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
@@ -21,8 +21,12 @@ function extraOdds(marketOdds){
   const dnb=(marketOdds||[]).find(m=>m.marketKey==='draw-no-bet'),dc=(marketOdds||[]).find(m=>m.marketKey==='double-chance')
   return{dnbHome:outcome(dnb,['Home','1']),dnbAway:outcome(dnb,['Away','2']),dc1x:outcome(dc,['Home or draw','Home/Draw','1X']),dcx2:outcome(dc,['Draw or away','Draw/Away','X2'])}
 }
-function enginePriced(c){return Object.values(c||{}).some(validOdd)}
-export function needsOddsFallback(odds){const c=odds?.canonical||{};return engineOddKeys.some(k=>!validOdd(c[k]))}
+function hasEngineWindowOutcome(odds){
+  return (odds?.marketOdds||[]).some(m=>(m?.outcomes||[]).some(o=>inEngineWindow(o?.odd)))
+}
+export function needsOddsFallback(odds){
+  return !hasEngineWindowOutcome(odds)
+}
 async function mapLimit(items,limit,fn){const out=new Array(items.length);let i=0;async function worker(){while(true){const x=i++;if(x>=items.length)return;out[x]=await fn(items[x],x)}}await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out}
 function historyKey(row){const id=row?.fixture?.id;if(id!==undefined&&id!==null)return`id:${id}`;return[row?.fixture?.date,row?.teams?.home?.id,row?.teams?.away?.id,row?.goals?.home,row?.goals?.away].join('|')}
 export function mergeHistories(...groups){const map=new Map();for(const rows of groups)for(const row of Array.isArray(rows)?rows:[]){const k=historyKey(row);if(!map.has(k))map.set(k,row)}return[...map.values()]}
@@ -148,7 +152,7 @@ export async function refreshNow(date,onProgress=()=>{}){
       if(statsApiConfigured()&&needsOddsFallback(odds)){
         try{const stats=await getStatsOddsForFixture(rawFixture,{bypassCache:true});odds=buildCoherentOdds({apiPayload:apiOdds,statsPayload:stats?.payload,fixture:rawFixture});fallbacks++}catch{}
       }
-      if(!enginePriced(odds.canonical)){availability.set(id,'waiting-odds');done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
+      if(!hasEngineWindowOutcome(odds)){availability.set(id,'waiting-odds');done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
       availability.set(id,'priced');priced++;done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return{...normalize(rawFixture,standings,history,odds),splitSource}
     }catch{availability.set(id,'analysis-unavailable');done++;onProgress({stage:'enrich',done,total:mature.length,priced,fallbacks});return null}
   })
@@ -156,7 +160,8 @@ export async function refreshNow(date,onProgress=()=>{}){
   const qualifiedIds=new Set((board.bestPicks||[]).map(x=>String(x?.fixtureId??'')))
   for(const id of qualifiedIds)availability.set(id,'qualified')
   board.fixtures=sortKickoff(raw.map(rawFixture=>publicFixture(rawFixture,availability.get(String(rawFixture?.fixture?.id??''))||'scheduled')))
-  reconcilePublishedBoard(board,previous,raw)
+  const compatiblePrevious=previous?.meta?.engineVersion===ENGINE_VERSION?previous:null
+  reconcilePublishedBoard(board,compatiblePrevious,raw)
   board.meta.publishedFixtures=board.fixtures.length
   board.meta.upcomingFixtures=board.fixtures.filter(x=>SCHEDULED.has(String(x.status||'').toUpperCase())).length
   board.meta.unqualifiedFixtures=board.fixtures.filter(x=>x.availability!=='qualified'&&SCHEDULED.has(String(x.status||'').toUpperCase())).length
