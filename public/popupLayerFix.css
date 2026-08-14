@@ -1,0 +1,13 @@
+.modal{
+  z-index:2147483000!important;
+  isolation:isolate;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  pointer-events:auto;
+}
+.modal.hidden{display:none!important}
+.modal .dialog{
+  position:relative;
+  z-index:1;
+  margin:auto;
+}
