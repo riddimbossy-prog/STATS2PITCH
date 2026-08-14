@@ -5,16 +5,32 @@ const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
 const anon=String(cfg.supabaseAnonKey||'')
 const fn=String(cfg.functionName||'stats2pitch-api')
 const fallback='/assets/football-real.svg'
-function endpoint(path){if(!base)throw new Error('Supabase runtime configuration is missing');return`${base}/functions/v1/${fn}${path}`}
-async function api(path,options={}){const headers={apikey:anon,Authorization:`Bearer ${anon}`,...(options.headers||{})};const res=await fetch(endpoint(path),{...options,headers,cache:'no-store'});const body=await res.json().catch(()=>null);if(!res.ok)throw new Error(body?.error||`API ${res.status}`);return body}
+function endpoint(path){if(!base)throw new Error('Picks are temporarily unavailable');return`${base}/functions/v1/${fn}${path}`}
+async function api(path,options={}){const headers={apikey:anon,Authorization:`Bearer ${anon}`,...(options.headers||{})};const res=await fetch(endpoint(path),{...options,headers,cache:'no-store'});const body=await res.json().catch(()=>null);if(!res.ok)throw new Error('Unable to load picks right now');return body}
 function logo(v){const s=String(v||'').trim();return /^https?:\/\//i.test(s)||s.startsWith('/')?esc(s):fallback}
-function team(name,img,side){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${logo(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span></div>`}
+function team(name,img,side){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${logo(img)}" alt="${esc(name)} crest" loading="lazy" onerror="this.src='${fallback}'"></span><span class="team-name">${esc(name)}</span></div>`}
 function matchup(r){return`<div class="teams crest-matchup">${team(r.home,r.homeLogo,'home')}<span class="versus">VS</span>${team(r.away,r.awayLogo,'away')}</div>`}
 function dates(){const a=[];for(let i=0;i<7;i++){const d=new Date(Date.now()+i*86400000);a.push(d.toISOString().slice(0,10))}return a}
 function renderDates(){const ds=dates();$('#dates').innerHTML=ds.map(d=>`<button class="date ${d===state.date?'active':''}" data-d="${d}">${d===ds[0]?'Today':new Date(d+'T12:00:00Z').toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'})}</button>`).join('');document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{state.date=b.dataset.d;load()})}
-function render(){renderDates();const b=state.board||{},rows=(b.bestPicks||[]).filter(x=>state.market==='all'||x.market===state.market);const markets=['all',...(b.availableMarkets||[])];$('#market').innerHTML=markets.map(m=>`<option ${m===state.market?'selected':''} value="${esc(m)}">${m==='all'?'All markets':esc(m)}</option>`).join('');const refresh=b?.meta?.refresh?.state;$('#status').textContent=refresh==='stale'?'Saved board waiting for next worker refresh':`${rows.length} best pick${rows.length===1?'':'s'}`;$('#cards').innerHTML=rows.length?rows.map((r,i)=>`<article class="card"><div class="league">${esc(r.league)} · ${esc(r.country)}</div>${matchup(r)}<div class="pick"><strong>${esc(r.displaySelection||r.selection)}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="support"><span>Home ${r.homeConsensus}%</span><span>Away ${r.awayConsensus}%</span></div>${r.oddsVerified?'<div class="verified">✓ Cross-source odds verified</div>':''}<div class="time">${new Date(r.kickoff).toLocaleString()}</div><button class="details" data-i="${i}">View details</button></article>`).join(''):'<div class="empty">No fresh v3 market has passed both the odds gate and strict 80/80 consensus for this date yet.</div>';document.querySelectorAll('[data-i]').forEach(btn=>btn.onclick=()=>open(rows[Number(btn.dataset.i)]))}
-function open(r){$('#modal').classList.remove('hidden');$('#modal').innerHTML=`<div class="dialog"><div class="dialog-matchup">${team(r.home,r.homeLogo,'home')}<span class="versus">VS</span>${team(r.away,r.awayLogo,'away')}</div><div class="pick"><strong>${esc(r.displaySelection||r.selection)}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="metrics"><div class="metric"><small>Consensus</small><b>${r.consensus}%</b></div><div class="metric"><small>Home</small><b>${r.homeConsensus}%</b></div><div class="metric"><small>Away</small><b>${r.awayConsensus}%</b></div></div><p>${esc(r.reason)}</p>${r.apiOdd&&r.statsOdd?`<p>API-Football ${r.apiOdd} · TheStatsAPI ${r.statsOdd}</p>`:''}<button class="close">Close</button></div>`;$('.close').onclick=()=>$('#modal').classList.add('hidden')}
-async function load(){ $('#status').textContent='Loading…';try{state.board=await api(`/board?date=${encodeURIComponent(state.date)}`);render()}catch(e){console.error(e);$('#status').textContent='Board API unavailable';$('#cards').innerHTML=`<div class="empty">${esc(e.message)}. Check the Pages and Supabase Functions workflow runs.</div>`}}
+function render(){
+  renderDates()
+  const b=state.board||{},rows=(b.bestPicks||[]).filter(x=>state.market==='all'||x.market===state.market)
+  const markets=['all',...(b.availableMarkets||[])]
+  $('#market').innerHTML=markets.map(m=>`<option ${m===state.market?'selected':''} value="${esc(m)}">${m==='all'?'All markets':esc(m)}</option>`).join('')
+  $('#status').textContent=`${rows.length} pick${rows.length===1?'':'s'}`
+  $('#cards').innerHTML=rows.length?rows.map((r,i)=>`<article class="card"><div class="league">${esc(r.league)} · ${esc(r.country)}</div>${matchup(r)}<div class="pick"><strong>${esc(r.displaySelection||r.selection)}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="support"><span>Home ${r.homeConsensus}%</span><span>Away ${r.awayConsensus}%</span></div>${r.oddsVerified?'<div class="verified">✓ Verified</div>':''}<div class="time">${new Date(r.kickoff).toLocaleString()}</div><button class="details" data-i="${i}">View details</button></article>`).join(''):'<div class="empty">No picks available for this date yet.</div>'
+  document.querySelectorAll('[data-i]').forEach(btn=>btn.onclick=()=>open(rows[Number(btn.dataset.i)]))
+}
+function open(r){
+  $('#modal').classList.remove('hidden')
+  $('#modal').innerHTML=`<div class="dialog"><div class="dialog-matchup">${team(r.home,r.homeLogo,'home')}<span class="versus">VS</span>${team(r.away,r.awayLogo,'away')}</div><div class="pick"><strong>${esc(r.displaySelection||r.selection)}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="metrics"><div class="metric"><small>Confidence</small><b>${r.consensus}%</b></div><div class="metric"><small>Home</small><b>${r.homeConsensus}%</b></div><div class="metric"><small>Away</small><b>${r.awayConsensus}%</b></div></div><p>${esc(r.reason||'Strong match profile for this selection.')}</p><button class="close">Close</button></div>`
+  $('.close').onclick=()=>$('#modal').classList.add('hidden')
+}
+async function load(){
+  $('#status').textContent='Loading…'
+  try{state.board=await api(`/board?date=${encodeURIComponent(state.date)}`);render()}
+  catch(e){console.error(e);$('#status').textContent='Unavailable';$('#cards').innerHTML='<div class="empty">Unable to load picks right now. Please try again.</div>'}
+}
 $('#market').onchange=e=>{state.market=e.target.value;render()}
 $('#refresh').onclick=load
 renderDates()
