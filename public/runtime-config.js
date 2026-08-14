@@ -3,5 +3,5 @@ window.__STATS2PITCH_CONFIG__={
   supabaseAnonKey:'',
   allowPublicSignup:true,
   functionName:'stats2pitch-api',
-  version:'2.2.0'
+  version:'4.0.0'
 }

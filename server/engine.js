@@ -1,4 +1,5 @@
 import {ENGINE_VERSION,MIN_ODD,MAX_ODD,MIN_CONSENSUS,FORM_SAMPLE,FINISHED} from './config.js'
+import {learningAllows} from './learning.js'
 
 const finite=v=>Number.isFinite(Number(v))
 const pct=(h,t)=>t?Math.round(h*100/t):null
@@ -80,6 +81,30 @@ function display(m,o){
   if(m.marketKey==='match-winner')return`1X2 · ${s}`
   return s
 }
+function bankerSafety(f,m,o,hr,ar,price){
+  const checks=[]
+  const add=(ok,label)=>checks.push({ok,label})
+  add(f.home.fixtures.length>=FORM_SAMPLE&&f.away.fixtures.length>=FORM_SAMPLE,'Full recent home/away sample')
+  add(Number(hr)===100&&Number(ar)===100,'Both teams agree 100%')
+  add(Number(hr)===100&&Number(ar)===100,'No opposing venue trend')
+  add(inWindow(price),'Odds inside the approved range')
+  let approved=checks.every(x=>x.ok)
+  const n=norm(o.name),k=m.marketKey
+  if(k==='match-winner'){
+    const homePick=n==='home'||n==='1',awayPick=n==='away'||n==='2'
+    const split=homePick?f.homeSplit:awayPick?f.awaySplit:null
+    const splitReady=split?.sampleReady===true&&Number.isFinite(Number(split.position))&&Number.isFinite(Number(split.size))
+    add(splitReady,'Venue split table position is available')
+    if(!splitReady)approved=false
+    if(splitReady){
+      const bottom3=Number(split.position)>Number(split.size)-3
+      add(!bottom3,'Selected team is not bottom three in the venue split table')
+      if(bottom3)approved=false
+    }
+  }
+  return{approved:approved&&checks.every(x=>x.ok),checks}
+}
+
 export function analyzeFixture(f){
   if(f.home.fixtures.length<FORM_SAMPLE||f.away.fixtures.length<FORM_SAMPLE)return[]
   const out=[]
@@ -88,20 +113,29 @@ export function analyzeFixture(f){
     const pair=support(f,m,o);if(!pair)continue
     const [hr,ar]=pair;if(!finite(hr)||!finite(ar)||hr<MIN_CONSENSUS||ar<MIN_CONSENSUS)continue
     const consensus=Math.min(hr,ar)
+    const banker=bankerSafety(f,m,o,hr,ar,price)
     out.push({
       fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
       home:f.home.name,away:f.away.name,homeLogo:f.home.logo,awayLogo:f.away.logo,
       market:m.marketKey,marketName:m.market,selection:o.name,displaySelection:display(m,o),
       odds:+price.toFixed(2),homeConsensus:hr,awayConsensus:ar,consensus,
+      homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,
+      bankerCandidate:Number(hr)===100&&Number(ar)===100,bankerApproved:banker.approved,bankerChecks:banker.checks,
       oddsVerified:o.verified===true,apiOdd:o.apiOdd??null,statsOdd:o.statsOdd??null,
       reason:`${m.market}: ${o.name} @ ${price.toFixed(2)}. Home split ${hr}%; away split ${ar}%.`
     })
   }
   return out.sort((a,b)=>b.consensus-a.consensus||Number(b.oddsVerified)-Number(a.oddsVerified)||a.odds-b.odds)
 }
-export function buildBoard(fixtures,meta={}){
-  const all=(fixtures||[]).flatMap(analyzeFixture),best=[]
-  const seen=new Set()
+export function buildBoard(fixtures,meta={},learningProfiles=[]){
+  const raw=(fixtures||[]).flatMap(analyzeFixture)
+  const all=[]
+  for(const p of raw){
+    const learned=learningAllows(p,learningProfiles)
+    if(!learned.allowed)continue
+    all.push({...p,learningProfile:learned.profile?{sample:learned.profile.sample,winRate:learned.profile.winRate,gate:learned.profile.gate}:null})
+  }
+  const best=[],seen=new Set()
   for(const p of all){if(seen.has(String(p.fixtureId)))continue;seen.add(String(p.fixtureId));best.push(p)}
-  return{meta:{...meta,engineVersion:ENGINE_VERSION,minOdd:MIN_ODD,maxOdd:MAX_ODD,minConsensus:MIN_CONSENSUS,formSample:FORM_SAMPLE,qualified:all.length,bestPicks:best.length},priority:all,bestPicks:best,availableMarkets:[...new Set(all.map(x=>x.market))].sort()}
+  return{meta:{...meta,engineVersion:ENGINE_VERSION,minOdd:MIN_ODD,maxOdd:MAX_ODD,minConsensus:MIN_CONSENSUS,formSample:FORM_SAMPLE,qualified:all.length,bestPicks:best.length,learningProfiles:learningProfiles.filter(x=>x.ready).length},priority:all,bestPicks:best,availableMarkets:[...new Set(all.map(x=>x.market))].sort()}
 }

@@ -2,12 +2,14 @@ import {fixturesByDate,teamHistory,leagueHistory,oddsByDate} from './apiFootball
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard} from './engine.js'
-import {saveBoard} from './store.js'
+import {saveBoard,listBoards} from './store.js'
+import {buildLearningProfiles} from './learning.js'
 import {ENGINE_VERSION,SCHEDULED,FORM_SAMPLE} from './config.js'
 
 const jobs=new Map()
 const leagueCache=new Map()
 const teamCache=new Map()
+const splitCache=new Map()
 
 async function mapLimit(items,limit,fn){
   const out=new Array(items.length);let i=0
@@ -56,7 +58,54 @@ function mergeUnique(...groups){
   return[...map.values()]
 }
 
+function lastNVenue(rows,teamId,venue,n=FORM_SAMPLE){
+  return (rows||[]).filter(f=>{
+    const done=['FT','AET','PEN'].includes(String(f?.fixture?.status?.short||'').toUpperCase())
+    if(!done)return false
+    return venue==='home'?String(f?.teams?.home?.id)===String(teamId):String(f?.teams?.away?.id)===String(teamId)
+  }).sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0)).slice(0,n)
+}
+function ppgFor(rows,teamId,venue){
+  let pts=0,played=0
+  for(const f of rows){
+    const h=Number(f?.goals?.home),a=Number(f?.goals?.away)
+    if(!Number.isFinite(h)||!Number.isFinite(a))continue
+    const own=venue==='home'?h:a,opp=venue==='home'?a:h
+    played++;pts+=own>opp?3:own===opp?1:0
+  }
+  return played?pts/played:0
+}
+function splitTable(history,venue){
+  const ids=new Map()
+  for(const f of history||[]){
+    const t=venue==='home'?f?.teams?.home:f?.teams?.away
+    if(t?.id)ids.set(String(t.id),{id:t.id,name:t.name||''})
+  }
+  const rows=[]
+  for(const t of ids.values()){
+    const sample=lastNVenue(history,t.id,venue)
+    if(sample.length<FORM_SAMPLE)continue
+    rows.push({...t,ppg:ppgFor(sample,t.id,venue),played:sample.length})
+  }
+  rows.sort((a,b)=>b.ppg-a.ppg||String(a.name).localeCompare(String(b.name)))
+  return new Map(rows.map((r,i)=>[String(r.id),{position:i+1,size:rows.length,ppg:+r.ppg.toFixed(2),played:r.played,sampleReady:true,venue}]))
+}
+function cachedSplitTable(leagueId,season,venue,history){
+  const key=`${leagueId}|${season}|${venue}`
+  if(!splitCache.has(key))splitCache.set(key,splitTable(history,venue))
+  return splitCache.get(key)
+}
+async function learningProfiles(){
+  try{
+    const end=new Date(),start=new Date(end.getTime()-60*86400000)
+    const rows=await listBoards(start.toISOString().slice(0,10),end.toISOString().slice(0,10))
+    return buildLearningProfiles(rows.map(x=>x.payload).filter(Boolean),20)
+  }catch{return[]}
+}
+
+
 export async function refreshNow(date,onProgress=()=>{}){
+  const learned=await learningProfiles()
   onProgress({stage:'fixtures-and-odds',done:0,total:2})
   const raw=await fixturesByDate(date)
   onProgress({stage:'fixtures-and-odds',done:1,total:2,fixtures:raw.length})
@@ -91,6 +140,8 @@ export async function refreshNow(date,onProgress=()=>{}){
       let history=mergeUnique(current,previous)
       let homeFixtures=venueSample(history,homeId,'home')
       let awayFixtures=venueSample(history,awayId,'away')
+      const homeSplit=cachedSplitTable(leagueId,season,'home',history).get(String(homeId))||null
+      const awaySplit=cachedSplitTable(leagueId,season,'away',history).get(String(awayId))||null
 
       if(homeFixtures.length<FORM_SAMPLE){
         history=mergeUnique(history,await getTeamHistory(homeId))
@@ -102,7 +153,6 @@ export async function refreshNow(date,onProgress=()=>{}){
         fallbackTeams++
         awayFixtures=venueSample(history,awayId,'away')
       }
-
       if(homeFixtures.length<FORM_SAMPLE||awayFixtures.length<FORM_SAMPLE){
         done++
         onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams})
@@ -120,7 +170,7 @@ export async function refreshNow(date,onProgress=()=>{}){
         fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,
         home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},
         away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},
-        marketOdds
+        homeSplit,awaySplit,marketOdds
       }
     }catch(error){
       console.warn(`Fixture ${f?.fixture?.id||'unknown'} skipped: ${error?.message||error}`)
@@ -135,11 +185,11 @@ export async function refreshNow(date,onProgress=()=>{}){
     date,generatedAt:new Date().toISOString(),engineVersion:ENGINE_VERSION,
     sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,
     statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams
-  })
+  },learned)
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p]))
   board.fixtures=raw.map(f=>publicFixture(f,picks.has(String(f?.fixture?.id))?'qualified':'no-qualified-pick'))
-  await saveBoard(date,board)
-  return board
+  const saved=await saveBoard(date,board)
+  return saved
 }
 
 export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}

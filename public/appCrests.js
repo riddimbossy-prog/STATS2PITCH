@@ -1,110 +1,54 @@
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const view=document.body.dataset.view||'all'
-const state={date:new Date().toISOString().slice(0,10),board:null,market:'all',country:'all',league:'all',kickoff:'upcoming'}
-const cfg=window.__STATS2PITCH_CONFIG__||{}
-const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
-const anon=String(cfg.supabaseAnonKey||'')
-const fn=String(cfg.functionName||'stats2pitch-api')
-const fallback='/assets/football-real.svg'
+const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,resultData:null,performance:null,market:'all',country:'all',league:'all',status:view==='results'?'settled':'upcoming',performanceGroup:'market',timer:null}
+const cfg=window.__STATS2PITCH_CONFIG__||{},base=String(cfg.supabaseUrl||'').replace(/\/+$/,''),anon=String(cfg.supabaseAnonKey||''),fn=String(cfg.functionName||'stats2pitch-api'),fallback='/assets/football-real.svg'
 
 function endpoint(path){if(!base)throw new Error('Service unavailable');return`${base}/functions/v1/${fn}${path}`}
-async function api(path,options={}){const headers={apikey:anon,Authorization:`Bearer ${anon}`,...(options.headers||{})};const res=await fetch(endpoint(path),{...options,headers,cache:'no-store'});const body=await res.json().catch(()=>null);if(!res.ok)throw new Error('Unable to load picks');return body}
+async function api(path,options={}){const headers={apikey:anon,Authorization:`Bearer ${anon}`,...(options.headers||{})};const res=await fetch(endpoint(path),{...options,headers,cache:'no-store'});const body=await res.json().catch(()=>null);if(!res.ok)throw new Error('Unable to load this right now');return body}
 function logo(v){const s=String(v||'').trim();return /^https?:\/\//i.test(s)||s.startsWith('/')?esc(s):fallback}
-function team(name,img,side){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${logo(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span></div>`}
-function matchup(r){return`<div class="teams crest-matchup">${team(r.home,r.homeLogo,'home')}<span class="versus">VS</span>${team(r.away,r.awayLogo,'away')}</div>`}
-function kickoffMs(r){const n=Date.parse(r?.kickoff||'');return Number.isFinite(n)?n:Number.MAX_SAFE_INTEGER}
-function formatDateTime(v){return new Date(v).toLocaleString([], {weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
-function leagueLine(r){return`<div class="league" data-country="${esc(r.country)}">${esc(r.league)}</div>`}
-function dates(){const a=[];for(let i=0;i<7;i++){const d=new Date(Date.now()+i*86400000);a.push(d.toISOString().slice(0,10))}return a}
-function renderDates(){const ds=dates();$('#dates').innerHTML=ds.map(d=>`<button class="date ${d===state.date?'active':''}" data-d="${d}">${d===ds[0]?'Today':new Date(d+'T12:00:00Z').toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'})}</button>`).join('');$$('[data-d]').forEach(b=>b.onclick=()=>{state.date=b.dataset.d;load()})}
-
+function team(name,img,side,score){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${logo(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span>${score!==undefined&&score!==null?`<b class="team-score">${esc(score)}</b>`:''}</div>`}
+function matchup(r,score){return`<div class="teams crest-matchup">${team(r.home,r.homeLogo,'home',score?.home)}<span class="versus">${score?'–':'VS'}</span>${team(r.away,r.awayLogo,'away',score?.away)}</div>`}
+function leagueLine(r){return`<div class="league"><span class="league-flag" role="img" aria-label="${esc(r.country||'International')} flag">${flag(r.country)}</span><span>${esc(r.league)}</span></div>`}
+function kickoffMs(r){const n=Date.parse(r?.kickoff||'');return Number.isFinite(n)?n:Number.MAX_SAFE_INTEGER}
+function formatDateTime(v){const d=new Date(v);return Number.isNaN(d.getTime())?'TBC':d.toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+function publishedTime(v){const d=new Date(v);return Number.isNaN(d.getTime())?'Published before kickoff':`Published ${d.toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`}
+function dates(){const a=[];for(let i=-6;i<=6;i++){const d=new Date(Date.now()+i*86400000);a.push(d.toISOString().slice(0,10))}return a}
+function renderDates(){const host=$('#dates');if(!host)return;const ds=dates(),today=new Date().toISOString().slice(0,10);host.innerHTML=ds.map(d=>`<button class="date ${d===state.date?'active':''}" data-d="${d}">${d===today?'Today':new Date(d+'T12:00:00Z').toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'})}</button>`).join('');$$('[data-d]').forEach(b=>b.onclick=()=>{state.date=b.dataset.d;history.replaceState(null,'',`?date=${encodeURIComponent(state.date)}`);load()});requestAnimationFrame(()=>host.querySelector('.date.active')?.scrollIntoView({inline:'center',block:'nearest'}))}
 function marketLabel(r){return String(r.displaySelection||r.selection||'This tip').replace(/^1H\s*·\s*/i,'First half · ').replace(/^1H Result\s*·\s*/i,'First half result · ').replace(/^DNB\s*·\s*/i,'Draw no bet · ').replace(/^BTTS\s*·\s*/i,'Both teams to score · ').replace(/^Double Chance\s*·\s*/i,'Double chance · ').replace(/^1X2\s*·\s*/i,'Match result · ')}
-function normalizedSelection(r){return String(r.selection||'').toLowerCase().trim()}
-function openingLine(r){
-  const sel=normalizedSelection(r),market=String(r.market||'')
-  if(market==='match-winner'){
-    if(sel==='home'||sel==='1')return`${r.home} has the stronger recent home-versus-away profile for this matchup.`
-    if(sel==='away'||sel==='2')return`${r.away} has the stronger recent away-versus-home profile for this matchup.`
-    return`Recent results from both teams make the draw the clearest match-result direction.`
-  }
-  if(market==='double-chance'){
-    if(sel.includes('home')||sel==='1x')return`${r.home} has been difficult to beat at home, while ${r.away} has not shown enough away to justify a straight opposition win.`
-    if(sel.includes('away')||sel==='x2')return`${r.away} has been difficult to beat away, while ${r.home} has not shown enough at home to justify a straight home win.`
-    return`Both teams' recent results make avoiding the draw the stronger direction.`
-  }
-  if(market==='draw-no-bet')return`One team has the stronger recent venue form, but this option keeps the draw protected.`
-  if(market==='both-teams-score')return sel==='yes'?`Both teams have regularly scored in their recent home and away matches.`:`At least one of these teams has often failed to score in its recent venue matches.`
-  if(market==='total-goals')return sel.includes('over')?`Both teams' recent matches point toward enough goals to clear this line.`:`Both teams' recent matches have stayed controlled enough to support this lower-goals line.`
-  if(market==='first-half-goals')return sel.includes('over')?`The recent first halves from both sides have produced goals early enough to support this pick.`:`The recent first halves from both sides have usually stayed below this line.`
-  if(market==='home-team-goals')return`${r.home}'s recent home scoring and ${r.away}'s recent away defending both point in the same direction.`
-  if(market==='away-team-goals')return`${r.away}'s recent away scoring and ${r.home}'s recent home defending both point in the same direction.`
-  return`Recent home and away results from both teams point in the same direction for this market.`
-}
-function supportLine(r){
-  const h=Number(r.homeConsensus)||0,a=Number(r.awayConsensus)||0
-  if(h===100&&a===100)return`Every recent home match from ${r.home} and every recent away match from ${r.away} supports this same direction.`
-  return`${r.home}'s recent home matches support it ${h}% of the time, and ${r.away}'s recent away matches support it ${a}% of the time.`
-}
-function closingLine(r){return`That agreement makes ${marketLabel(r)} the preferred tip here at available odds of ${Number(r.odds).toFixed(2)}.`}
-function explanationHtml(r){const items=[openingLine(r),supportLine(r),closingLine(r)];return`<div class="why-tip"><h3>Why this tip was chosen</h3><ul>${items.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`}
-
-function bankerOnly(rows){return view==='bankers'?rows.filter(r=>Number(r.homeConsensus)===100&&Number(r.awayConsensus)===100):rows}
+function resultFor(r){return state.resultData?.picks?.find(x=>String(x.fixtureId)===String(r.fixtureId))?.result||state.board?.results?.[String(r.fixtureId)]||null}
+function stateFor(r){const x=resultFor(r);if(x?.matchState)return x.matchState;if(x?.outcome&&x.outcome!=='pending')return'settled';return kickoffMs(r)>Date.now()?'upcoming':'pending'}
+function scoreFor(r){const x=resultFor(r);const h=x?.home?.score??x?.homeScore,a=x?.away?.score??x?.awayScore;return h!==null&&h!==undefined&&a!==null&&a!==undefined?{home:h,away:a}:null}
+function statusBadge(r){const x=resultFor(r),s=stateFor(r);if(s==='live')return`<span class="match-badge live">LIVE${x?.minute?` · ${esc(x.minute)}′`:''}</span>`;if(s==='settled'){const o=x?.outcome||'pending';return`<span class="match-badge ${esc(o)}">${o==='won'?'WON':o==='lost'?'LOST':o==='void'?'VOID':'SETTLED'}</span>`}return`<span class="match-badge upcoming">UPCOMING</span>`}
+function bankerApproved(r){return r?.bankerApproved===true&&Number(r.homeConsensus)===100&&Number(r.awayConsensus)===100}
+function bankerOnly(rows){return view==='bankers'?rows.filter(bankerApproved):rows}
 function sortedUnique(values){return[...new Set(values.filter(Boolean).map(String))].sort((a,b)=>a.localeCompare(b))}
-function setOptions(select,values,current,allLabel,formatter=v=>v){
-  if(!select)return'all'
-  const valid=current==='all'||values.includes(current)?current:'all'
-  select.innerHTML=`<option value="all">${esc(allLabel)}</option>`+values.map(v=>`<option value="${esc(v)}" ${v===valid?'selected':''}>${formatter(v)}</option>`).join('')
-  return valid
-}
+function setOptions(el,values,current,label,fmt=v=>v){if(!el)return'all';const valid=current==='all'||values.includes(current)?current:'all';el.innerHTML=`<option value="all">${esc(label)}</option>`+values.map(v=>`<option value="${esc(v)}" ${v===valid?'selected':''}>${fmt(v)}</option>`).join('');return valid}
 function refreshFilterOptions(baseRows){
-  const countries=sortedUnique(baseRows.map(r=>r.country))
-  state.country=setOptions($('#countryFilter'),countries,state.country,'All countries',c=>`${flag(c)} ${esc(c)}`)
-  const countryRows=state.country==='all'?baseRows:baseRows.filter(r=>String(r.country)===state.country)
-  const leagues=sortedUnique(countryRows.map(r=>r.league))
-  state.league=setOptions($('#leagueFilter'),leagues,state.league,'All leagues',l=>esc(l))
-  const leagueRows=state.league==='all'?countryRows:countryRows.filter(r=>String(r.league)===state.league)
-  const markets=sortedUnique(leagueRows.map(r=>r.market))
-  state.market=setOptions($('#market'),markets,state.market,'All markets',m=>esc(m.replaceAll('-',' ')))
-  if($('#kickoffFilter'))$('#kickoffFilter').value=state.kickoff
+  const countries=sortedUnique(baseRows.map(r=>r.country));state.country=setOptions($('#countryFilter'),countries,state.country,'All countries',c=>`${flag(c)} ${esc(c)}`)
+  const countryRows=state.country==='all'?baseRows:baseRows.filter(r=>String(r.country)===state.country),leagues=sortedUnique(countryRows.map(r=>r.league));state.league=setOptions($('#leagueFilter'),leagues,state.league,'All leagues',esc)
+  const leagueRows=state.league==='all'?countryRows:countryRows.filter(r=>String(r.league)===state.league),markets=sortedUnique(leagueRows.map(r=>r.market));state.market=setOptions($('#market'),markets,state.market,'All markets',m=>esc(m.replaceAll('-',' ')))
+  if($('#statusFilter'))$('#statusFilter').value=state.status
 }
-function filteredRows(baseRows){
-  const now=Date.now()
-  return baseRows.filter(r=>{
-    if(state.kickoff==='upcoming'&&kickoffMs(r)<=now)return false
-    if(state.country!=='all'&&String(r.country)!==state.country)return false
-    if(state.league!=='all'&&String(r.league)!==state.league)return false
-    if(state.market!=='all'&&String(r.market)!==state.market)return false
-    return true
-  }).sort((a,b)=>kickoffMs(a)-kickoffMs(b)||String(a.league).localeCompare(String(b.league)))
-}
-function bankerBadge(r){return view==='bankers'?'<span class="banker-badge">100% AGREEMENT</span>':''}
-function render(){
-  renderDates()
-  const all=bankerOnly(state.board?.bestPicks||[])
-  refreshFilterOptions(all)
-  const rows=filteredRows(all)
-  const noun=view==='bankers'?'banker':'pick'
-  $('#status').textContent=`${rows.length} ${noun}${rows.length===1?'':'s'}`
-  $('#cards').innerHTML=rows.length?rows.map((r,i)=>`<article class="card">${leagueLine(r)}${bankerBadge(r)}${matchup(r)}<div class="pick"><strong>${esc(marketLabel(r))}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="time"><b>Kickoff</b> · ${formatDateTime(r.kickoff)}</div><button class="details" data-i="${i}">Why this tip?</button></article>`).join(''):`<div class="empty">${view==='bankers'?'No 100% agreement bankers available for these filters yet.':'No picks available for these filters yet.'}</div>`
-  $$('[data-i]').forEach(btn=>btn.onclick=()=>open(rows[Number(btn.dataset.i)]))
-}
-function open(r){
-  $('#modal').classList.remove('hidden')
-  $('#modal').innerHTML=`<div class="dialog">${leagueLine(r)}${bankerBadge(r)}<div class="dialog-matchup">${team(r.home,r.homeLogo,'home')}<span class="versus">VS</span>${team(r.away,r.awayLogo,'away')}</div><div class="pick"><strong>${esc(marketLabel(r))}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="time"><b>Kickoff</b> · ${formatDateTime(r.kickoff)}</div>${explanationHtml(r)}<button class="close">Close</button></div>`
-  $('.close').onclick=()=>$('#modal').classList.add('hidden')
-}
-function bindFilters(){
-  const pairs=[['kickoffFilter','kickoff'],['countryFilter','country'],['leagueFilter','league'],['market','market']]
-  for(const[id,key]of pairs){const el=$('#'+id);if(el)el.onchange=e=>{state[key]=e.target.value;if(key==='country')state.league='all';render()}}
-  const clear=$('#clearFilters');if(clear)clear.onclick=()=>{state.kickoff='upcoming';state.country='all';state.league='all';state.market='all';render()}
-}
-async function load(){
-  $('#status').textContent='Loading…'
-  try{state.board=await api(`/board?date=${encodeURIComponent(state.date)}`);render()}
-  catch{$('#status').textContent='Unable to load picks';$('#cards').innerHTML='<div class="empty">Please try again shortly.</div>'}
-}
-$('#refresh').onclick=load
-bindFilters()
-renderDates()
-load()
+function filteredRows(baseRows){return baseRows.filter(r=>{const s=stateFor(r);if(state.status!=='all'&&s!==state.status)return false;if(state.country!=='all'&&String(r.country)!==state.country)return false;if(state.league!=='all'&&String(r.league)!==state.league)return false;if(state.market!=='all'&&String(r.market)!==state.market)return false;return true}).sort((a,b)=>kickoffMs(a)-kickoffMs(b)||String(a.league).localeCompare(String(b.league)))}
+function renderCountryChips(rows){const host=$('#countryChips');if(!host)return;const countries=sortedUnique(rows.map(r=>r.country));host.innerHTML=`<button class="country-chip ${state.country==='all'?'active':''}" data-country="all" title="All countries">🌍</button>`+countries.map(c=>`<button class="country-chip ${state.country===c?'active':''}" data-country="${esc(c)}" title="${esc(c)}" aria-label="${esc(c)}">${flag(c)}</button>`).join('');$$('[data-country]').forEach(b=>b.onclick=()=>{state.country=b.dataset.country;state.league='all';renderBoard()})}
+function renderTodayStats(rows){const host=$('#todayStats');if(!host)return;const counts={upcoming:0,live:0,settled:0,bankers:0,total:rows.length};for(const r of rows){const s=stateFor(r);if(counts[s]!==undefined)counts[s]++;if(bankerApproved(r))counts.bankers++}host.innerHTML=`<button data-stat="all"><small>Total Picks</small><b>${counts.total}</b></button><button data-stat="upcoming"><small>Upcoming</small><b>${counts.upcoming}</b></button><button data-stat="live"><small>Live</small><b>${counts.live}</b></button><button data-stat="settled"><small>Settled</small><b>${counts.settled}</b></button><a href="/bankers.html"><small>Bankers</small><b>${counts.bankers}</b></a>`;$$('[data-stat]').forEach(b=>b.onclick=()=>{state.status=b.dataset.stat;renderBoard()})}
+function openingLine(r){const sel=String(r.selection||'').toLowerCase(),market=String(r.market||'');if(market==='match-winner'){if(sel==='home'||sel==='1')return`${r.home} has repeatedly won at home while ${r.away}'s recent away results point the opposite way.`;if(sel==='away'||sel==='2')return`${r.away} has repeatedly won away while ${r.home}'s recent home results point the opposite way.`;return`Both teams' recent venue results make a draw the strongest match-result direction.`}if(market==='double-chance')return`The recent venue form suggests the selected side is unlikely to lose, so the safer double-chance route was chosen.`;if(market==='draw-no-bet')return`One side has the stronger venue trend, but the draw is protected.`;if(market==='both-teams-score')return sel==='yes'?`Both teams' recent venue matches regularly produced goals for both sides.`:`At least one side regularly failed to score in the recent venue sample.`;if(market.includes('goals'))return sel.includes('over')?`The recent home and away samples consistently produced enough goals to clear this line.`:`The recent home and away samples consistently stayed below this line.`;return`Both teams' recent venue results point strongly in the same direction for this market.`}
+function evidenceLine(r){const h=Math.round((Number(r.homeConsensus)||0)/20),a=Math.round((Number(r.awayConsensus)||0)/20);return`${r.home} supports this in ${h}/5 recent home matches, while ${r.away} supports it in ${a}/5 recent away matches.`}
+function splitLine(r){const hs=r.homeSplit,as=r.awaySplit,parts=[];if(hs?.sampleReady)parts.push(`${r.home} is ${hs.position}${ordinal(hs.position)} in its recent home split`);if(as?.sampleReady)parts.push(`${r.away} is ${as.position}${ordinal(as.position)} in its recent away split`);return parts.length?`${parts.join(', while ')}.`:''}
+function ordinal(n){n=Number(n);const v=n%100;return v>=11&&v<=13?'th':n%10===1?'st':n%10===2?'nd':n%10===3?'rd':'th'}
+function closingLine(r){return`The two venue trends agree strongly enough for Stats2Pitch to prefer ${marketLabel(r)} at ${Number(r.odds).toFixed(2)}.`}
+function explanationHtml(r){const lines=[openingLine(r),evidenceLine(r),splitLine(r),closingLine(r)].filter(Boolean);const safety=bankerApproved(r)&&Array.isArray(r.bankerChecks)?`<div class="banker-safety"><b>Banker check passed</b>${r.bankerChecks.filter(x=>x.ok).map(x=>`<span>✓ ${esc(x.label)}</span>`).join('')}</div>`:'';return`<div class="why-tip"><h3>Why this tip was chosen</h3><ul>${lines.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>${safety}</div>`}
+function proofLine(r){return`<div class="proof-line">✓ Original published tip preserved · ${esc(publishedTime(r.publishedAt))}</div>`}
+function card(r,i){const score=scoreFor(r),x=resultFor(r);return`<article class="card ${stateFor(r)}">${leagueLine(r)}${statusBadge(r)}${bankerApproved(r)?'<span class="banker-badge">BANKER</span>':''}${matchup(r,score)}${score&&stateFor(r)==='live'?`<div class="live-score-note">${esc(x?.minute||'')}′</div>`:''}<div class="pick"><strong>${esc(marketLabel(r))}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="time"><b>Kickoff</b> · ${formatDateTime(r.kickoff)}</div><button class="details" data-i="${i}">Why this tip?</button></article>`}
+function renderBoard(){renderDates();const base=bankerOnly(state.board?.bestPicks||[]);refreshFilterOptions(base);renderCountryChips(base);renderTodayStats(state.board?.bestPicks||[]);const rows=filteredRows(base),noun=view==='bankers'?'banker':'pick';$('#status').textContent=`${rows.length} ${noun}${rows.length===1?'':'s'}`;$('#cards').innerHTML=rows.length?rows.map(card).join(''):`<div class="empty">${view==='bankers'?'No verified 100% agreement bankers match these filters yet.':'No picks match these filters yet.'}</div>`;$$('[data-i]').forEach(btn=>btn.onclick=()=>open(rows[Number(btn.dataset.i)]))}
+function open(r){const x=resultFor(r),score=scoreFor(r);$('#modal').classList.remove('hidden');$('#modal').innerHTML=`<div class="dialog">${leagueLine(r)}${statusBadge(r)}${matchup(r,score)}<div class="pick"><strong>${esc(marketLabel(r))}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="time"><b>Kickoff</b> · ${formatDateTime(r.kickoff)}</div>${x?.matchState==='settled'?`<div class="settled-summary ${esc(x.outcome||'')}">${esc((x.outcome||'settled').toUpperCase())}${score?` · ${score.home}–${score.away}`:''}</div>`:''}${explanationHtml(r)}${proofLine(r)}<button class="close">Close</button></div>`;$('.close').onclick=()=>$('#modal').classList.add('hidden')}
+function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
+async function loadBoardData(){const [board,res]=await Promise.all([api(`/board?date=${encodeURIComponent(state.date)}`),api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)]);state.board=board;state.resultData=res;renderBoard();startPolling()}
+function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`);renderBoard()}catch{}},30000)}
+function performanceRows(){const dimension=state.performanceGroup;return(state.performance?.groups||[]).filter(x=>x.dimension===dimension)}
+function renderPerformance(){const p=state.performance||{summary:{},groups:[]},s=p.summary||{},host=$('#performanceSummary');if(host)host.innerHTML=`<div><small>Picks</small><b>${s.picks||0}</b></div><div class="win"><small>Won</small><b>${s.won||0}</b></div><div class="loss"><small>Lost</small><b>${s.lost||0}</b></div><div><small>Void</small><b>${s.void||0}</b></div><div class="rate"><small>Success</small><b>${Number(s.winRate||0).toFixed(1)}%</b></div>`;const rows=performanceRows(),table=$('#performanceTable');if(table)table.innerHTML=rows.length?`<div class="perf-head"><span>${esc(state.performanceGroup)}</span><span>Picks</span><span>Won</span><span>Lost</span><span>Success</span></div>`+rows.map(r=>`<div class="perf-row"><strong>${state.performanceGroup==='country'?`${flag(r.value)} `:''}${esc(r.value.replaceAll('-',' '))}</strong><span>${r.picks}</span><span>${r.won}</span><span>${r.lost}</span><b>${Number(r.winRate).toFixed(1)}%</b></div>`):'<div class="empty">No settled performance data yet.</div>';const g=$('#performanceGroup');if(g)g.value=state.performanceGroup}
+async function loadResultsView(){skeleton();const [perf]=await Promise.all([api('/performance?days=30')]);state.performance=perf;renderPerformance();await loadBoardData()}
+function bind(){for(const[id,key]of[['statusFilter','status'],['countryFilter','country'],['leagueFilter','league'],['market','market']]){const el=$('#'+id);if(el)el.onchange=e=>{state[key]=e.target.value;if(key==='country')state.league='all';renderBoard()}};$('#clearFilters')?.addEventListener('click',()=>{state.status=view==='results'?'settled':'upcoming';state.country=state.league=state.market='all';renderBoard()});$('#performanceGroup')?.addEventListener('change',e=>{state.performanceGroup=e.target.value;renderPerformance()});$('#refresh')?.addEventListener('click',load)}
+async function load(){skeleton();try{if(view==='results')await loadResultsView();else await loadBoardData()}catch{$('#status').textContent='Unable to load picks';$('#cards').innerHTML='<div class="empty">Please try again shortly.</div>'}}
+bind();renderDates();load();window.addEventListener('beforeunload',()=>clearInterval(state.timer))

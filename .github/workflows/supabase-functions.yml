@@ -28,6 +28,8 @@ jobs:
       AUTO_REFRESH_TTL_MINUTES: ${{ vars.AUTO_REFRESH_TTL_MINUTES || '45' }}
       ALLOW_PUBLIC_SIGNUP: ${{ vars.ALLOW_PUBLIC_SIGNUP || 'true' }}
       STATS2PITCH_ALLOWED_ORIGIN: https://www.stats2pitch.com
+      STATS2PITCH_ADMIN_EMAILS: ${{ secrets.STATS2PITCH_ADMIN_EMAILS }}
+      STATS2PITCH_GITHUB_TOKEN: ${{ secrets.STATS2PITCH_GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,6 +54,12 @@ jobs:
             --project-ref "$SUPABASE_PROJECT_REF"
           if [ -n "$STATS2PITCH_ELITE_FEED_TOKEN" ]; then
             npx --yes supabase@latest secrets set STATS2PITCH_ELITE_FEED_TOKEN="$STATS2PITCH_ELITE_FEED_TOKEN" --project-ref "$SUPABASE_PROJECT_REF"
+          fi
+          if [ -n "$STATS2PITCH_ADMIN_EMAILS" ]; then
+            npx --yes supabase@latest secrets set STATS2PITCH_ADMIN_EMAILS="$STATS2PITCH_ADMIN_EMAILS" --project-ref "$SUPABASE_PROJECT_REF"
+          fi
+          if [ -n "$STATS2PITCH_GITHUB_TOKEN" ]; then
+            npx --yes supabase@latest secrets set STATS2PITCH_GITHUB_TOKEN="$STATS2PITCH_GITHUB_TOKEN" --project-ref "$SUPABASE_PROJECT_REF"
           fi
       - name: Deploy Stats2Pitch API
         run: npx --yes supabase@latest functions deploy stats2pitch-api --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
