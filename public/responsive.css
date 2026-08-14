@@ -1,4 +1,4 @@
-/* Stats2Pitch 2.2.16 — mobile + Galaxy Z Fold centering, full-stadium board background and overflow hardening. */
+
 html,body,#app{width:100%;max-width:100%;overflow-x:clip}
 body.board-page,body.auth-page{min-width:0}
 body.board-page::before,body.auth-page::before{
@@ -9,8 +9,7 @@ body.board-page::before,body.auth-page::before{
   transform:translateZ(0);
 }
 
-/* Board-specific full stadium backdrop. The current v3 artwork has a dark lower composition;
-   use the earlier full-stadium artwork for the prediction board while leaving login untouched. */
+
 body.board-page::before{
   background-image:url("./assets/stadium-user-bg-v2.webp")!important;
   background-position:center center!important;
@@ -26,7 +25,7 @@ body.board-page .shell.auth-stadium.dashboard-stadium{
   background:transparent!important;
 }
 
-/* Keep the board rail visually centred at every width. */
+
 .shell.auth-stadium.dashboard-stadium{
   width:100%;
   max-width:1440px;
@@ -56,7 +55,7 @@ body.board-page .shell.auth-stadium.dashboard-stadium{
 .shell.dashboard-stadium .details{max-width:100%}
 .shell.dashboard-stadium img{max-width:100%}
 
-/* Tablet / unfolded Fold: use a balanced single-card rail rather than a cramped 2-column card. */
+
 @media (min-width:681px) and (max-width:900px){
   .shell.auth-stadium.dashboard-stadium{padding:16px 16px 88px}
   .shell.dashboard-stadium .topbar,
@@ -85,7 +84,7 @@ body.board-page .shell.auth-stadium.dashboard-stadium{
   .shell.dashboard-stadium .tab span{margin-left:3px;min-width:21px;height:21px}
 }
 
-/* Phones and folded Fold. */
+
 @media (max-width:680px){
   .shell.auth-stadium.dashboard-stadium{padding:12px 10px max(82px,env(safe-area-inset-bottom))}
   .shell.dashboard-stadium .topbar,
@@ -138,7 +137,7 @@ body.board-page .shell.auth-stadium.dashboard-stadium{
   .filter-actions>*{flex:1 1 140px}
 }
 
-/* Very narrow folded Fold / compact phones. */
+
 @media (max-width:390px){
   .shell.auth-stadium.dashboard-stadium{padding-left:8px;padding-right:8px}
   .shell.dashboard-stadium .topbar{grid-template-columns:38px minmax(0,1fr) 38px}
@@ -156,7 +155,7 @@ body.board-page .shell.auth-stadium.dashboard-stadium{
   .shell.dashboard-stadium .team{font-size:13px}
 }
 
-/* Landscape Fold/phone: keep centering without making the background jump sideways. */
+
 @media (max-height:520px) and (orientation:landscape){
   body.board-page::before,body.auth-page::before{background-position:50% 50%!important}
   .shell.auth-stadium.dashboard-stadium{padding-top:10px}
