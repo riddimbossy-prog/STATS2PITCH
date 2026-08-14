@@ -137,6 +137,11 @@ export async function refreshNow(date,onProgress=()=>{}){
 
       const current=Number.isFinite(season)?await getLeagueHistory(leagueId,season):[]
       const previous=Number.isFinite(season)&&season>0?await getLeagueHistory(leagueId,season-1):[]
+      const currentHomeFixtures=venueSample(current,homeId,'home')
+      const currentAwayFixtures=venueSample(current,awayId,'away')
+      const earlySeasonHome=currentHomeFixtures.length<FORM_SAMPLE
+      const earlySeasonAway=currentAwayFixtures.length<FORM_SAMPLE
+      const earlySeason=earlySeasonHome||earlySeasonAway
       let history=mergeUnique(current,previous)
       let homeFixtures=venueSample(history,homeId,'home')
       let awayFixtures=venueSample(history,awayId,'away')
@@ -170,6 +175,8 @@ export async function refreshNow(date,onProgress=()=>{}){
         fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,
         home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},
         away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},
+        earlySeason,earlySeasonHome,earlySeasonAway,
+        currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},
         homeSplit,awaySplit,marketOdds
       }
     }catch(error){

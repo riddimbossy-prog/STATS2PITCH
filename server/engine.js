@@ -133,6 +133,7 @@ export function analyzeFixture(f){
       home:f.home.name,away:f.away.name,homeLogo:f.home.logo,awayLogo:f.away.logo,
       market:m.marketKey,marketName:m.market,selection:o.name,displaySelection:display(m,o),
       odds:+price.toFixed(2),homeConsensus:hr,awayConsensus:ar,consensus,
+      earlySeason:f.earlySeason===true,earlySeasonHome:f.earlySeasonHome===true,earlySeasonAway:f.earlySeasonAway===true,currentVenueSamples:f.currentVenueSamples||null,
       homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,homeTier:tier.homeTier,awayTier:tier.awayTier,
       bankerCandidate:Number(hr)===100&&Number(ar)===100,bankerApproved:banker.approved,bankerChecks:banker.checks,
       oddsVerified:o.verified===true,apiOdd:o.apiOdd??null,statsOdd:o.statsOdd??null,
