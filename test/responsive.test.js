@@ -5,7 +5,7 @@ const css=fs.readFileSync(new URL('../public/product.css',import.meta.url),'utf8
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8')
 
 test('v4 stylesheet is loaded last and mobile bottom nav exists',()=>{
-  assert.match(html,/tabVisibility\.css\?v=4\.0\.0[\s\S]*product\.css\?v=4\.0\.0/)
+  assert.match(html,/tabVisibility\.css\?v=4\.0\.\d+[\s\S]*product\.css\?v=4\.0\.\d+/)
   assert.match(html,/class="mobile-nav"/)
 })
 test('folded and unfolded layouts have explicit breakpoints',()=>{

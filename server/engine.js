@@ -84,25 +84,25 @@ function display(m,o){
 function bankerSafety(f,m,o,hr,ar,price){
   const checks=[]
   const add=(ok,label)=>checks.push({ok,label})
-  add(f.home.fixtures.length>=FORM_SAMPLE&&f.away.fixtures.length>=FORM_SAMPLE,'Full recent home/away sample')
-  add(Number(hr)===100&&Number(ar)===100,'Both teams agree 100%')
-  add(Number(hr)===100&&Number(ar)===100,'No opposing venue trend')
-  add(inWindow(price),'Odds inside the approved range')
-  let approved=checks.every(x=>x.ok)
+  const fullSample=f.home.fixtures.length>=FORM_SAMPLE&&f.away.fixtures.length>=FORM_SAMPLE
+  const fullAgreement=Number(hr)===100&&Number(ar)===100
+  const validOdds=inWindow(price)
+  add(fullSample,'Full recent home/away sample')
+  add(fullAgreement,'Both teams agree 100%')
+  add(validOdds,'Odds inside the approved range')
+  let approved=fullSample&&fullAgreement&&validOdds
   const n=norm(o.name),k=m.marketKey
   if(k==='match-winner'){
     const homePick=n==='home'||n==='1',awayPick=n==='away'||n==='2'
     const split=homePick?f.homeSplit:awayPick?f.awaySplit:null
     const splitReady=split?.sampleReady===true&&Number.isFinite(Number(split.position))&&Number.isFinite(Number(split.size))
-    add(splitReady,'Venue split table position is available')
-    if(!splitReady)approved=false
     if(splitReady){
       const bottom3=Number(split.position)>Number(split.size)-3
       add(!bottom3,'Selected team is not bottom three in the venue split table')
       if(bottom3)approved=false
     }
   }
-  return{approved:approved&&checks.every(x=>x.ok),checks}
+  return{approved,checks}
 }
 
 export function analyzeFixture(f){
