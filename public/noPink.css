@@ -1,0 +1,46 @@
+/* Final palette lock: no hot pink / magenta anywhere in the public UI */
+:root{
+  --accent:#b6ffe1;
+  --accent-strong:#93ffd0;
+  --accent-deep:#2bd7a0;
+}
+
+/* Picks + odds */
+.pick strong,
+.card .pick strong,
+.dialog .pick strong{
+  color:#fff!important;
+  text-shadow:none!important;
+}
+.odd,
+.card .odd,
+.dialog .odd{
+  color:var(--accent)!important;
+  text-shadow:0 0 18px rgba(147,255,208,.30),0 3px 14px rgba(0,0,0,.18)!important;
+}
+
+/* Tabs / banker highlights */
+.page-tab,
+.page-tab:visited{color:#fff!important}
+.page-tab.active,
+.page-tab.active:visited{
+  color:#eafff8!important;
+  background:linear-gradient(180deg,rgba(182,255,225,.22),rgba(43,215,160,.16))!important;
+  border-color:rgba(182,255,225,.55)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 10px 28px rgba(20,120,95,.18)!important;
+}
+.page-intro strong,
+.banker-badge{
+  color:var(--accent)!important;
+}
+.banker-badge{
+  border-color:rgba(147,255,208,.44)!important;
+  background:rgba(147,255,208,.11)!important;
+}
+
+/* Links/buttons should not inherit an old magenta accent */
+a:not(.page-tab){color:inherit}
+.details,.clear-filters,#refresh{color:#fff!important}
+
+/* Safety catch for old theme classes if any remain in cached markup */
+.hot-pink,.hotpink,.pink,.magenta,.accent-pink{color:var(--accent)!important}
