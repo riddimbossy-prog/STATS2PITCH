@@ -81,6 +81,19 @@ function display(m,o){
   if(m.marketKey==='match-winner')return`1X2 · ${s}`
   return s
 }
+export function tierFromSplit(split){
+  const position=Number(split?.position),size=Number(split?.size)
+  if(split?.sampleReady!==true||!Number.isFinite(position)||!Number.isFinite(size)||position<1||size<2||position>size)return null
+  const band=Math.max(1,Math.min(4,Math.ceil((position*4)/size)))
+  return ['A','B','C','D'][band-1]
+}
+export function tierGate(f){
+  const homeTier=tierFromSplit(f?.homeSplit),awayTier=tierFromSplit(f?.awaySplit)
+  if(!homeTier||!awayTier)return{allowed:false,homeTier,awayTier,reason:'tier-unverified'}
+  if(homeTier===awayTier)return{allowed:false,homeTier,awayTier,reason:'same-tier'}
+  return{allowed:true,homeTier,awayTier,reason:'different-tier'}
+}
+
 function bankerSafety(f,m,o,hr,ar,price){
   const checks=[]
   const add=(ok,label)=>checks.push({ok,label})
@@ -107,6 +120,7 @@ function bankerSafety(f,m,o,hr,ar,price){
 
 export function analyzeFixture(f){
   if(f.home.fixtures.length<FORM_SAMPLE||f.away.fixtures.length<FORM_SAMPLE)return[]
+  const tier=tierGate(f);if(!tier.allowed)return[]
   const out=[]
   for(const m of f.marketOdds||[])for(const o of m.outcomes||[]){
     const price=Number(o.odd);if(!inWindow(price))continue
@@ -119,7 +133,7 @@ export function analyzeFixture(f){
       home:f.home.name,away:f.away.name,homeLogo:f.home.logo,awayLogo:f.away.logo,
       market:m.marketKey,marketName:m.market,selection:o.name,displaySelection:display(m,o),
       odds:+price.toFixed(2),homeConsensus:hr,awayConsensus:ar,consensus,
-      homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,
+      homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,homeTier:tier.homeTier,awayTier:tier.awayTier,
       bankerCandidate:Number(hr)===100&&Number(ar)===100,bankerApproved:banker.approved,bankerChecks:banker.checks,
       oddsVerified:o.verified===true,apiOdd:o.apiOdd??null,statsOdd:o.statsOdd??null,
       reason:`${m.market}: ${o.name} @ ${price.toFixed(2)}. Home split ${hr}%; away split ${ar}%.`

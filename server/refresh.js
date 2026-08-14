@@ -1,7 +1,7 @@
 import {fixturesByDate,teamHistory,leagueHistory,oddsByDate} from './apiFootball.js'
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {verifiedMarkets} from './odds.js'
-import {venueSample,buildBoard} from './engine.js'
+import {venueSample,buildBoard,tierGate} from './engine.js'
 import {saveBoard,listBoards} from './store.js'
 import {buildLearningProfiles} from './learning.js'
 import {ENGINE_VERSION,SCHEDULED,FORM_SAMPLE} from './config.js'
@@ -181,13 +181,16 @@ export async function refreshNow(date,onProgress=()=>{}){
   })
 
   const fixtures=analyzed.filter(Boolean)
-  const board=buildBoard(fixtures,{
+  const tierEligible=fixtures.filter(f=>tierGate(f).allowed)
+  const board=buildBoard(tierEligible,{
     date,generatedAt:new Date().toISOString(),engineVersion:ENGINE_VERSION,
     sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,
+    tierEligibleFixtures:tierEligible.length,sameTierOrUnverifiedSkipped:fixtures.length-tierEligible.length,
     statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams
   },learned)
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p]))
-  board.fixtures=raw.map(f=>publicFixture(f,picks.has(String(f?.fixture?.id))?'qualified':'no-qualified-pick'))
+  const eligibleIds=new Set(tierEligible.map(f=>String(f.fixtureId)))
+  board.fixtures=raw.filter(f=>eligibleIds.has(String(f?.fixture?.id))).map(f=>publicFixture(f,picks.has(String(f?.fixture?.id))?'qualified':'no-qualified-pick'))
   const saved=await saveBoard(date,board)
   return saved
 }

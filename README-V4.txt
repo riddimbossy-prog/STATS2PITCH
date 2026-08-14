@@ -35,3 +35,9 @@ OPTIONAL ADMIN SECRETS
 - STATS2PITCH_GITHUB_TOKEN: fine-grained GitHub token with Actions write access if you want the admin "Run board refresh" button.
 
 AUTOMATIC REFRESH STILL WORKS WITHOUT THE OPTIONAL GITHUB TOKEN.
+
+V4.0.2 STRICT TIER RULE
+- Home home-split tier is compared with away away-split tier.
+- Tiers are quartiles: A top 25%, B next 25%, C next 25%, D bottom 25%.
+- Same-tier fixtures are rejected before any market is evaluated and never enter the public board.
+- If either tier cannot be verified, the fixture is also skipped.
