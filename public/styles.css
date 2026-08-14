@@ -274,3 +274,35 @@ nav::-webkit-scrollbar{display:none}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   header,.rule,nav,.toolbar,.card,.pick,.dialog,button,select{background:#0a1d2f}
 }
+
+
+.brand-block{display:flex;flex-direction:column;gap:6px}
+.brand-img{display:block;width:min(100%,420px);height:auto;filter:drop-shadow(0 4px 18px rgba(0,0,0,.22))}
+.why-tip{margin-top:16px;padding:14px 16px;border:1px solid rgba(255,255,255,.10);border-radius:16px;background:linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.03)),rgba(255,255,255,.03)}
+.why-tip h3{margin:0 0 10px;font-size:15px}
+.why-tip ul{margin:0;padding-left:18px;display:grid;gap:10px}
+.why-tip li{color:inherit;line-height:1.5}
+.dialog .league{margin-bottom:10px}
+.dialog .time{margin-top:12px}
+@media(max-width:700px){.brand-img{width:min(72vw,340px)}}
+@media(max-width:520px){header{align-items:flex-start}.brand-block{max-width:68%}.brand-img{width:100%;max-width:250px}}
+
+/* Navigation, filters and bankers */
+.page-tabs{display:flex;gap:8px;margin:14px 0 10px;padding:6px;border:1px solid rgba(255,255,255,.12);border-radius:16px;background:rgba(255,255,255,.045);backdrop-filter:blur(22px) saturate(165%);-webkit-backdrop-filter:blur(22px) saturate(165%)}
+.page-tab{flex:1;text-align:center;text-decoration:none;color:#fff;padding:10px 14px;border-radius:12px;font-weight:850;letter-spacing:.01em}
+.page-tab.active{background:rgba(255,20,147,.20);border:1px solid rgba(255,20,147,.48);box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 10px 28px rgba(255,20,147,.12);color:#ff1493}
+.page-intro{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;padding:12px 14px;border:1px solid rgba(255,255,255,.13);border-radius:16px;background:rgba(255,255,255,.05);backdrop-filter:blur(24px) saturate(170%);-webkit-backdrop-filter:blur(24px) saturate(170%)}
+.page-intro strong{color:#ff1493;font-size:16px}.page-intro span{font-size:13px;color:var(--text-muted);text-align:right}
+.filters{display:grid;grid-template-columns:minmax(130px,.8fr) minmax(150px,1fr) minmax(150px,1fr) minmax(150px,1fr) auto auto;gap:8px;align-items:center}
+.filters select,.filters button{min-width:0;width:100%}.filters #status{white-space:nowrap;text-align:right}
+.clear-filters{padding-inline:13px}
+.league{display:flex;align-items:center;gap:7px}.league-flag{font-size:18px;line-height:1;filter:drop-shadow(0 2px 5px rgba(0,0,0,.2))}
+.banker-badge{display:inline-flex;align-items:center;width:max-content;margin-top:9px;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:950;letter-spacing:.08em;color:#ff1493;border:1px solid rgba(255,20,147,.45);background:rgba(255,20,147,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.time b{color:#fff}.details{font-weight:850}
+@media(max-width:900px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters #status{grid-column:1/-1;text-align:left}.page-intro{align-items:flex-start;flex-direction:column}.page-intro span{text-align:left}}
+@media(max-width:520px){.page-tabs{margin-top:10px}.page-tab{padding:9px 8px}.filters{grid-template-columns:1fr}.filters #status{grid-column:auto}.league-flag{font-size:17px}}
+
+/* Preserve Stats2Pitch hot-pink tip emphasis */
+.pick strong,.odd{color:#ff1493!important;text-shadow:0 0 18px rgba(255,20,147,.24),0 3px 14px rgba(0,0,0,.18)}
+.brand-img{height:96px!important;width:auto!important;max-width:min(62vw,340px)!important;object-fit:contain;object-position:left center}
+@media(max-width:520px){.brand-img{height:76px!important;max-width:58vw!important}.brand-block{max-width:none!important}}
