@@ -1,0 +1,143 @@
+:root{
+  --hot-pink:#ff1493;
+  --hot-pink-bright:#ff4fb2;
+  --glass-border-100:rgba(255,255,255,.38);
+}
+
+header,
+nav,
+.toolbar,
+.card,
+.pick,
+.dialog,
+.metric,
+button,
+select,
+.crest-wrap{
+  border-color:var(--glass-border-100)!important;
+  backdrop-filter:blur(42px) saturate(220%) contrast(108%)!important;
+  -webkit-backdrop-filter:blur(42px) saturate(220%) contrast(108%)!important;
+  box-shadow:
+    0 30px 85px rgba(0,58,46,.25),
+    inset 0 1px 0 rgba(255,255,255,.38),
+    inset 0 -1px 0 rgba(255,255,255,.07)!important;
+}
+
+header{
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.28),rgba(255,255,255,.06) 48%,rgba(255,255,255,.02)),
+    rgba(2,52,44,.22)!important;
+}
+
+nav,
+.toolbar{
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.20),rgba(255,255,255,.035)),
+    rgba(2,51,43,.18)!important;
+}
+
+button,
+select{
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.24),rgba(255,255,255,.055)),
+    rgba(2,51,43,.20)!important;
+  backdrop-filter:blur(30px) saturate(205%)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(205%)!important;
+}
+
+.card{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.27),rgba(255,255,255,.05) 38%,rgba(255,255,255,.018) 72%),
+    rgba(1,48,41,.20)!important;
+  border:1px solid rgba(255,255,255,.42)!important;
+  box-shadow:
+    0 34px 95px rgba(0,58,46,.28),
+    inset 0 1px 0 rgba(255,255,255,.42),
+    inset 0 0 48px rgba(255,255,255,.045)!important;
+  backdrop-filter:blur(48px) saturate(225%) contrast(110%)!important;
+  -webkit-backdrop-filter:blur(48px) saturate(225%) contrast(110%)!important;
+}
+
+.card::before{
+  background:linear-gradient(120deg,rgba(255,255,255,.34),transparent 27%,transparent 68%,rgba(255,255,255,.08))!important;
+  opacity:.78!important;
+}
+
+.card::after{
+  content:"";
+  position:absolute;
+  inset:1px;
+  border-radius:19px;
+  pointer-events:none;
+  z-index:0;
+  background:radial-gradient(circle at 18% 0%,rgba(255,255,255,.20),transparent 36%);
+}
+
+.card:hover{
+  transform:translateY(-4px)!important;
+  border-color:rgba(255,255,255,.58)!important;
+  box-shadow:
+    0 40px 110px rgba(0,58,46,.34),
+    inset 0 1px 0 rgba(255,255,255,.48),
+    inset 0 0 52px rgba(255,255,255,.055)!important;
+}
+
+.pick{
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.045)),
+    rgba(1,43,37,.22)!important;
+  border:1px solid rgba(255,255,255,.34)!important;
+  backdrop-filter:blur(34px) saturate(215%)!important;
+  -webkit-backdrop-filter:blur(34px) saturate(215%)!important;
+}
+
+.pick strong,
+.odd{
+  color:var(--hot-pink)!important;
+  font-weight:900!important;
+  text-shadow:
+    0 0 8px rgba(255,20,147,.38),
+    0 0 22px rgba(255,20,147,.24),
+    0 2px 8px rgba(0,0,0,.16)!important;
+}
+
+.odd{font-size:22px!important}
+
+.dialog{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.30),rgba(255,255,255,.055) 42%,rgba(255,255,255,.02)),
+    rgba(1,43,37,.26)!important;
+  border:1px solid rgba(255,255,255,.46)!important;
+  box-shadow:
+    0 40px 120px rgba(0,44,36,.44),
+    inset 0 1px 0 rgba(255,255,255,.44),
+    inset 0 0 52px rgba(255,255,255,.05)!important;
+  backdrop-filter:blur(54px) saturate(230%) contrast(112%)!important;
+  -webkit-backdrop-filter:blur(54px) saturate(230%) contrast(112%)!important;
+}
+
+.metric{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.21),rgba(255,255,255,.045)),
+    rgba(1,42,36,.16)!important;
+}
+
+.crest-wrap{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.34),rgba(255,255,255,.08)),
+    rgba(255,255,255,.055)!important;
+  border-color:rgba(255,255,255,.45)!important;
+}
+
+.modal{
+  backdrop-filter:blur(24px) saturate(185%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(185%)!important;
+}
+
+@media(max-width:520px){
+  header,nav,.toolbar,.card,.pick,.dialog,.metric,button,select,.crest-wrap{
+    backdrop-filter:blur(30px) saturate(200%)!important;
+    -webkit-backdrop-filter:blur(30px) saturate(200%)!important;
+  }
+  .card{backdrop-filter:blur(36px) saturate(210%)!important;-webkit-backdrop-filter:blur(36px) saturate(210%)!important}
+}
