@@ -1,11 +1,11 @@
 import {FINISHED} from './config.js'
 
-const finite=v=>Number.isFinite(Number(v))
+const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
 const pct=(hits,total)=>total?Math.round((hits*1000)/total)/10:null
 const finished=f=>FINISHED.has(String(f?.fixture?.status?.short||'').toUpperCase())
 const score=f=>{
-  const h=Number(f?.goals?.home),a=Number(f?.goals?.away)
-  return finite(h)&&finite(a)?{home:h,away:a,total:h+a}:null
+  const h=f?.goals?.home,a=f?.goals?.away
+  return finite(h)&&finite(a)?{home:Number(h),away:Number(a),total:Number(h)+Number(a)}:null
 }
 const byDateDesc=(a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0)
 const hasTeam=(f,id)=>String(f?.teams?.home?.id)===String(id)||String(f?.teams?.away?.id)===String(id)
@@ -49,9 +49,9 @@ function recentOvers(rows,n=6){
   return{overs:sample.filter(f=>(score(f)?.total??-1)>2.5).length,played:sample.length}
 }
 function optionalCombinedXg(xg){
-  const homeXg=Number(xg?.home?.xg??xg?.homeXg),homeXga=Number(xg?.home?.xga??xg?.homeXga)
-  const awayXg=Number(xg?.away?.xg??xg?.awayXg),awayXga=Number(xg?.away?.xga??xg?.awayXga)
-  if(![homeXg,homeXga,awayXg,awayXga].every(Number.isFinite))return null
+  const raw=[xg?.home?.xg??xg?.homeXg,xg?.home?.xga??xg?.homeXga,xg?.away?.xg??xg?.awayXg,xg?.away?.xga??xg?.awayXga]
+  if(!raw.every(finite))return null
+  const [homeXg,homeXga,awayXg,awayXga]=raw.map(Number)
   return Math.round((((homeXg+homeXga)+(awayXg+awayXga))/2)*100)/100
 }
 
@@ -62,7 +62,7 @@ export function buildOver25Profile(history,homeId,awayId,{xg=null}={}){
   const homeSeasonO25=overRate(homeSeason),awaySeasonO25=overRate(awaySeason)
   const homeHomeO25=overRate(homeVenue),awayAwayO25=overRate(awayVenue)
   const homeGoalsAvg=averageTotalGoals(homeSeason),awayGoalsAvg=averageTotalGoals(awaySeason)
-  const combinedAverageGoals=finite(homeGoalsAvg)&&finite(awayGoalsAvg)?Math.round(((homeGoalsAvg+awayGoalsAvg)/2)*100)/100:null
+  const combinedAverageGoals=finite(homeGoalsAvg)&&finite(awayGoalsAvg)?Math.round(((Number(homeGoalsAvg)+Number(awayGoalsAvg))/2)*100)/100:null
   const leagueO25=overRate(leagueRows)
   const homeRecent=recentOvers(homeSeason,OVER25_THRESHOLDS.recentGames),awayRecent=recentOvers(awaySeason,OVER25_THRESHOLDS.recentGames)
   const combinedXg=optionalCombinedXg(xg)
@@ -108,8 +108,6 @@ export function buildOver25Profile(history,homeId,awayId,{xg=null}={}){
 
 export function isOver25Selection(market,outcome){
   if(String(market?.marketKey||'')!=='total-goals')return false
-  const match=String(outcome?.name||'').match(/\bOver\s*2(?:\.0|\.00)?\.?(?:5)?\b/i)
-  if(match)return /\bOver\s*2\.5\b/i.test(String(outcome?.name||''))
   const parsed=String(outcome?.name||'').match(/\bOver\s*([0-9]+(?:\.[0-9]+)?)/i)
   return parsed?Number(parsed[1])===2.5:false
 }
