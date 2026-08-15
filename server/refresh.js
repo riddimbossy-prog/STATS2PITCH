@@ -2,6 +2,7 @@ import {fixturesByDate,teamHistory,leagueHistory,oddsByDate} from './apiFootball
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard,tierGate} from './engine.js'
+import {buildOver25Profile} from './over25.js'
 import {saveBoard,listBoards} from './store.js'
 import {buildLearningProfiles} from './learning.js'
 import {ENGINE_VERSION,SCHEDULED,FORM_SAMPLE} from './config.js'
@@ -103,7 +104,6 @@ async function learningProfiles(){
   }catch{return[]}
 }
 
-
 export async function refreshNow(date,onProgress=()=>{}){
   const learned=await learningProfiles()
   onProgress({stage:'fixtures-and-odds',done:0,total:2})
@@ -142,6 +142,7 @@ export async function refreshNow(date,onProgress=()=>{}){
       const earlySeasonHome=currentHomeFixtures.length<FORM_SAMPLE
       const earlySeasonAway=currentAwayFixtures.length<FORM_SAMPLE
       const earlySeason=earlySeasonHome||earlySeasonAway
+      const over25Profile=buildOver25Profile(current,homeId,awayId,{xg:f?.over25Xg||f?.xg||null})
       let history=mergeUnique(current,previous)
       let homeFixtures=venueSample(history,homeId,'home')
       let awayFixtures=venueSample(history,awayId,'away')
@@ -177,6 +178,7 @@ export async function refreshNow(date,onProgress=()=>{}){
         away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},
         earlySeason,earlySeasonHome,earlySeasonAway,
         currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},
+        over25Profile,
         homeSplit,awaySplit,marketOdds
       }
     }catch(error){
@@ -193,6 +195,7 @@ export async function refreshNow(date,onProgress=()=>{}){
     date,generatedAt:new Date().toISOString(),engineVersion:ENGINE_VERSION,
     sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,
     tierEligibleFixtures:tierEligible.length,sameTierOrUnverifiedSkipped:fixtures.length-tierEligible.length,
+    over25ProfiledFixtures:fixtures.filter(f=>f.over25Profile).length,
     statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams
   },learned)
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p]))
