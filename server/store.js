@@ -14,53 +14,20 @@ async function request(path,{method='GET',body,token=SERVICE,headers={}}={}){
 }
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
 function stampPick(p,at){return{...p,publishedAt:p?.publishedAt||at,proofKey:p?.proofKey||proofKey(p)}}
-function immutablePublishedPick(p,result,nowMs){
-  const state=String(result?.matchState||'').toLowerCase()
-  const outcome=String(result?.outcome||'').toLowerCase()
-  if(['live','settled'].includes(state)||['won','lost','void'].includes(outcome))return true
-  const kickoff=Date.parse(p?.kickoff||'')
-  return Number.isFinite(kickoff)&&kickoff<=nowMs
-}
-function refreshablePick(p,old,now){
-  const nextKey=proofKey(p),oldKey=old?.proofKey||proofKey(old)
-  if(old&&oldKey===nextKey){
-    return stampPick({...p,publishedAt:old.publishedAt||p.publishedAt,proofKey:oldKey},old.publishedAt||now)
-  }
-  return stampPick({...p,publishedAt:now,proofKey:nextKey},now)
-}
 function mergePublished(existing,incoming){
-  const now=incoming?.meta?.generatedAt||new Date().toISOString(),nowMs=Date.parse(now)
+  const now=incoming?.meta?.generatedAt||new Date().toISOString()
   const old=Array.isArray(existing?.bestPicks)?existing.bestPicks:[]
   const fresh=Array.isArray(incoming?.bestPicks)?incoming.bestPicks:[]
-  const results={...(existing?.results||{}),...(incoming?.results||{})}
-  const oldMap=new Map(old.map(p=>[String(p.fixtureId),stampPick(p,p.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)]))
-  const map=new Map()
-
-  for(const p of fresh){
-    const id=String(p.fixtureId),previous=oldMap.get(id),result=results[id]
-    if(previous&&immutablePublishedPick(previous,result,nowMs))map.set(id,previous)
-    else map.set(id,refreshablePick(p,previous,now))
-  }
-
-  for(const previous of oldMap.values()){
-    const id=String(previous.fixtureId)
-    if(!map.has(id)&&immutablePublishedPick(previous,results[id],nowMs))map.set(id,previous)
-  }
-
+  const map=new Map(old.map(p=>[String(p.fixtureId),stampPick(p,p.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)]))
+  for(const p of fresh)if(!map.has(String(p.fixtureId)))map.set(String(p.fixtureId),stampPick(p,now))
   const bestPicks=[...map.values()].sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
   return{
     ...incoming,
     bestPicks,
-    results,
+    results:{...(existing?.results||{}),...(incoming?.results||{})},
     resultSummary:incoming?.resultSummary||existing?.resultSummary||null,
-    availableMarkets:[...new Set(bestPicks.map(x=>x.market).filter(Boolean))].sort(),
-    meta:{
-      ...(incoming?.meta||{}),
-      firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,
-      freshBestPicks:fresh.length,
-      bestPicks:bestPicks.length,
-      publishedPicks:bestPicks.length
-    }
+    availableMarkets:[...new Set([...(incoming?.availableMarkets||[]),...bestPicks.map(x=>x.market).filter(Boolean)])].sort(),
+    meta:{...(incoming?.meta||{}),firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,publishedPicks:bestPicks.length}
   }
 }
 export async function loadBoard(date,{allowVersionMismatch=false}={}){
