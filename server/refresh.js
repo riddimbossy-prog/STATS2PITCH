@@ -2,6 +2,7 @@ import {fixturesByDate,teamHistory,leagueHistory,oddsByDate} from './apiFootball
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard,tierGate} from './engine.js'
+import {buildOver25Profile} from './over25.js'
 import {saveBoard,listBoards} from './store.js'
 import {buildLearningProfiles} from './learning.js'
 import {ENGINE_VERSION,SCHEDULED,FORM_SAMPLE} from './config.js'
@@ -91,7 +92,7 @@ function splitTable(history,venue){
   return new Map(rows.map((r,i)=>[String(r.id),{position:i+1,size:rows.length,ppg:+r.ppg.toFixed(2),played:r.played,sampleReady:true,venue}]))
 }
 function cachedSplitTable(leagueId,season,venue,history){
-  const key=`${leagueId}|${season}|${venue}`
+  const key=`${leagueId}|${season}|${venue}|${FORM_SAMPLE}`
   if(!splitCache.has(key))splitCache.set(key,splitTable(history,venue))
   return splitCache.get(key)
 }
@@ -102,7 +103,6 @@ async function learningProfiles(){
     return buildLearningProfiles(rows.map(x=>x.payload).filter(Boolean),20)
   }catch{return[]}
 }
-
 
 export async function refreshNow(date,onProgress=()=>{}){
   const learned=await learningProfiles()
@@ -129,7 +129,7 @@ export async function refreshNow(date,onProgress=()=>{}){
     onProgress({stage:'league-history',done:historyDone,total:leagueKeys.length,fixtures:scheduled.length})
   })
 
-  let done=0,statsVerified=0,fallbackTeams=0
+  let done=0,statsVerified=0,fallbackTeams=0,insufficientHistory=0,analysisErrors=0
   const analyzed=await mapLimit(scheduled,Math.max(1,Number(process.env.REFRESH_CONCURRENCY||2)),async f=>{
     try{
       const homeId=f?.teams?.home?.id,awayId=f?.teams?.away?.id
@@ -142,11 +142,10 @@ export async function refreshNow(date,onProgress=()=>{}){
       const earlySeasonHome=currentHomeFixtures.length<FORM_SAMPLE
       const earlySeasonAway=currentAwayFixtures.length<FORM_SAMPLE
       const earlySeason=earlySeasonHome||earlySeasonAway
+      const over25Profile=buildOver25Profile(current,homeId,awayId,{xg:f?.over25Xg||f?.xg||null})
       let history=mergeUnique(current,previous)
       let homeFixtures=venueSample(history,homeId,'home')
       let awayFixtures=venueSample(history,awayId,'away')
-      const homeSplit=cachedSplitTable(leagueId,season,'home',history).get(String(homeId))||null
-      const awaySplit=cachedSplitTable(leagueId,season,'away',history).get(String(awayId))||null
 
       if(homeFixtures.length<FORM_SAMPLE){
         history=mergeUnique(history,await getTeamHistory(homeId))
@@ -159,42 +158,65 @@ export async function refreshNow(date,onProgress=()=>{}){
         awayFixtures=venueSample(history,awayId,'away')
       }
       if(homeFixtures.length<FORM_SAMPLE||awayFixtures.length<FORM_SAMPLE){
+        insufficientHistory++
         done++
-        onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams})
+        onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors})
         return null
       }
 
+      const homeSplit=cachedSplitTable(leagueId,season,'home',history).get(String(homeId))||null
+      const awaySplit=cachedSplitTable(leagueId,season,'away',history).get(String(awayId))||null
       const apiOdds=oddsMap.get(String(f?.fixture?.id))||[]
       const statsOdds=statsApiConfigured()?await getStatsOddsForFixture(f).catch(()=>null):null
       if(statsOdds)statsVerified++
       const marketOdds=verifiedMarkets({apiPayload:apiOdds,statsPayload:statsOdds,fixture:f})
 
       done++
-      onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams})
+      onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors})
       return{
         fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,
         home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},
         away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},
         earlySeason,earlySeasonHome,earlySeasonAway,
         currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},
+        over25Profile,
         homeSplit,awaySplit,marketOdds
       }
     }catch(error){
+      analysisErrors++
       console.warn(`Fixture ${f?.fixture?.id||'unknown'} skipped: ${error?.message||error}`)
       done++
-      onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams})
+      onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors})
       return null
     }
   })
 
   const fixtures=analyzed.filter(Boolean)
-  const tierEligible=fixtures.filter(f=>tierGate(f).allowed)
+  let sameTierSkipped=0,tierUnverifiedSkipped=0
+  const tierEligible=[]
+  for(const f of fixtures){
+    const gate=tierGate(f)
+    if(gate.allowed){tierEligible.push(f);continue}
+    if(gate.reason==='same-tier')sameTierSkipped++
+    else tierUnverifiedSkipped++
+  }
   const board=buildBoard(tierEligible,{
     date,generatedAt:new Date().toISOString(),engineVersion:ENGINE_VERSION,
     sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,
-    tierEligibleFixtures:tierEligible.length,sameTierOrUnverifiedSkipped:fixtures.length-tierEligible.length,
-    statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams
+    insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,
+    tierEligibleFixtures:tierEligible.length,sameTierSkipped,tierUnverifiedSkipped,
+    sameTierOrUnverifiedSkipped:sameTierSkipped+tierUnverifiedSkipped,
+    over25ProfiledFixtures:fixtures.filter(f=>f.over25Profile).length,
+    statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,
+    diagnostics:{
+      sourceFixtures:raw.length,scheduledFixtures:scheduled.length,
+      insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,
+      analyzedFixtures:fixtures.length,sameTierSkipped,tierUnverifiedSkipped,
+      tierEligibleFixtures:tierEligible.length,qualifiedTips:0,bestPicks:0
+    }
   },learned)
+  board.meta.diagnostics.qualifiedTips=board.priority.length
+  board.meta.diagnostics.bestPicks=board.bestPicks.length
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p]))
   const eligibleIds=new Set(tierEligible.map(f=>String(f.fixtureId)))
   board.fixtures=raw.filter(f=>eligibleIds.has(String(f?.fixture?.id))).map(f=>publicFixture(f,picks.has(String(f?.fixture?.id))?'qualified':'no-qualified-pick'))
@@ -211,7 +233,7 @@ export function startRefresh(date){
   refreshNow(date,p=>job.progress=p).then(board=>{
     job.state='complete'
     job.completedAt=new Date().toISOString()
-    job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length}
+    job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,diagnostics:board.meta?.diagnostics||null}
   }).catch(e=>{
     job.state='failed'
     job.error=e.message

@@ -1,5 +1,6 @@
 import {ENGINE_VERSION,MIN_ODD,MAX_ODD,MIN_CONSENSUS,FORM_SAMPLE,FINISHED} from './config.js'
 import {learningAllows} from './learning.js'
+import {over25Gate} from './over25.js'
 
 const finite=v=>Number.isFinite(Number(v))
 const pct=(h,t)=>t?Math.round(h*100/t):null
@@ -124,8 +125,10 @@ export function analyzeFixture(f){
   const out=[]
   for(const m of f.marketOdds||[])for(const o of m.outcomes||[]){
     const price=Number(o.odd);if(!inWindow(price))continue
+    const over25=over25Gate(f,m,o);if(over25.applies&&!over25.allowed)continue
     const pair=support(f,m,o);if(!pair)continue
-    const [hr,ar]=pair;if(!finite(hr)||!finite(ar)||hr<MIN_CONSENSUS||ar<MIN_CONSENSUS)continue
+    const [hr,ar]=pair;if(!finite(hr)||!finite(ar))continue
+    if(!over25.applies&&(hr<MIN_CONSENSUS||ar<MIN_CONSENSUS))continue
     const consensus=Math.min(hr,ar)
     const banker=bankerSafety(f,m,o,hr,ar,price)
     out.push({
@@ -135,9 +138,13 @@ export function analyzeFixture(f){
       odds:+price.toFixed(2),homeConsensus:hr,awayConsensus:ar,consensus,
       earlySeason:f.earlySeason===true,earlySeasonHome:f.earlySeasonHome===true,earlySeasonAway:f.earlySeasonAway===true,currentVenueSamples:f.currentVenueSamples||null,
       homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,homeTier:tier.homeTier,awayTier:tier.awayTier,
+      over25Filter:over25.applies?{
+        grade:over25.profile?.grade||'strong',xgStatus:over25.profile?.xgStatus||'unavailable',
+        checks:over25.profile?.checks||[],metrics:over25.profile?.metrics||{}
+      }:null,
       bankerCandidate:Number(hr)===100&&Number(ar)===100,bankerApproved:banker.approved,bankerChecks:banker.checks,
       oddsVerified:o.verified===true,apiOdd:o.apiOdd??null,statsOdd:o.statsOdd??null,
-      reason:`${m.market}: ${o.name} @ ${price.toFixed(2)}. Home split ${hr}%; away split ${ar}%.`
+      reason:over25.applies?`Strict Over 2.5 filter passed (${over25.profile?.grade||'strong'}). ${m.market}: ${o.name} @ ${price.toFixed(2)}.`:`${m.market}: ${o.name} @ ${price.toFixed(2)}. Home split ${hr}%; away split ${ar}%.`
     })
   }
   return out.sort((a,b)=>b.consensus-a.consensus||Number(b.oddsVerified)-Number(a.oddsVerified)||a.odds-b.odds)
