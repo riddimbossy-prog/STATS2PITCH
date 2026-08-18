@@ -1,6 +1,7 @@
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const cfg=window.__STATS2PITCH_CONFIG__||{},base=String(cfg.supabaseUrl||'').replace(/\/+$/,''),anon=String(cfg.supabaseAnonKey||''),fn=String(cfg.functionName||'stats2pitch-api')
+const REQUIRED_ENGINE='banker-rules-v2'
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,rule:'all',country:'all',league:'all'}
 const fallback='/assets/football-real.svg'
 function endpoint(path){if(!base)throw new Error('Service unavailable');return`${base}/functions/v1/${fn}${path}`}
@@ -30,7 +31,24 @@ function card(r){const h=r?.metrics?.home||{},a=r?.metrics?.away||{},l=r?.metric
   <footer>${esc(kickoff(r.kickoff))}</footer>
 </article>`}
 function filtered(rows){return rows.filter(r=>(state.rule==='all'||r.rule===state.rule)&&(state.country==='all'||r.country===state.country)&&(state.league==='all'||r.league===state.league)).sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff))}
-function render(){renderDates();const all=state.board?.bankers||[],rules=uniq(all.map(x=>x.rule)),countries=uniq(all.map(x=>x.country));state.rule=options($('#ruleFilter'),rules,state.rule,'All banker rules',ruleName);state.country=options($('#countryFilter'),countries,state.country,'All countries',c=>`${flag(c)} ${c}`);const countryRows=state.country==='all'?all:all.filter(x=>x.country===state.country),leagues=uniq(countryRows.map(x=>x.league));state.league=options($('#leagueFilter'),leagues,state.league,'All leagues');const rows=filtered(all),meta=state.board?.bankerRulesMeta||{},skips=meta.skips||{};$('#status').textContent=`${rows.length} qualified signal${rows.length===1?'':'s'}`;$('#bankerStats').innerHTML=`<div><small>QUALIFIED</small><b>${all.length}</b></div><div><small>EARLY SKIPS</small><b>${skips['early-season']||0}</b></div><div><small>HOME &lt;1 PPG</small><b>${skips['home-under-1-ppg']||0}</b></div><div><small>TOP-5 CLASHES</small><b>${skips['both-top-five']||0}</b></div>`;$('#bankerCards').innerHTML=rows.length?rows.map(card).join(''):'<div class="empty">No fixture passed the dedicated Banker rules for this date.</div>'}
+function render(){
+  renderDates()
+  const meta=state.board?.bankerRulesMeta||{},current=meta.engine===REQUIRED_ENGINE,all=current?(state.board?.bankers||[]):[]
+  const rules=uniq(all.map(x=>x.rule)),countries=uniq(all.map(x=>x.country))
+  state.rule=options($('#ruleFilter'),rules,state.rule,'All banker rules',ruleName)
+  state.country=options($('#countryFilter'),countries,state.country,'All countries',c=>`${flag(c)} ${c}`)
+  const countryRows=state.country==='all'?all:all.filter(x=>x.country===state.country),leagues=uniq(countryRows.map(x=>x.league))
+  state.league=options($('#leagueFilter'),leagues,state.league,'All leagues')
+  const rows=filtered(all),skips=meta.skips||{}
+  $('#bankerStats').innerHTML=`<div><small>QUALIFIED</small><b>${all.length}</b></div><div><small>EARLY SKIPS</small><b>${skips['early-season']||0}</b></div><div><small>HOME &lt;1 PPG</small><b>${skips['home-under-1-ppg']||0}</b></div><div><small>TOP-5 CLASHES</small><b>${skips['both-top-five']||0}</b></div>`
+  if(!current){
+    $('#status').textContent='Waiting for refreshed rules'
+    $('#bankerCards').innerHTML='<div class="empty">The saved board uses an older Banker rules revision. Run Refresh Boards to generate the new v2 signals.</div>'
+    return
+  }
+  $('#status').textContent=`${rows.length} qualified signal${rows.length===1?'':'s'}`
+  $('#bankerCards').innerHTML=rows.length?rows.map(card).join(''):'<div class="empty">No fixture passed the dedicated Banker rules for this date.</div>'
+}
 async function load(){renderDates();$('#status').textContent='Loading…';$('#bankerCards').innerHTML='<div class="empty">Loading Banker rules…</div>';try{state.board=await api(`/board?date=${encodeURIComponent(state.date)}`);render()}catch(e){$('#status').textContent='Unavailable';$('#bankerCards').innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
 $('#ruleFilter').onchange=e=>{state.rule=e.target.value;render()};$('#countryFilter').onchange=e=>{state.country=e.target.value;state.league='all';render()};$('#leagueFilter').onchange=e=>{state.league=e.target.value;render()};$('#refresh').onclick=load
 load()
