@@ -10,10 +10,43 @@ function fixture(homeRows,awayRows,{early=false,hpos=7,apos=10,leagueClass='neut
 const dominant=[homeGame(2,0),homeGame(3,1),homeGame(2,0),homeGame(2,1),homeGame(3,0)]
 const weakAway=[awayGame(0,2),awayGame(1,3),awayGame(0,2),awayGame(1,2),awayGame(1,1)]
 
-test('strong home plus weak away produces straight win',()=>{
+test('home straight win needs any two home strength factors while all away weakness factors pass',()=>{
   const r=evaluateBankerFixture(fixture(dominant,weakAway))
   assert.equal(r.pick?.rule,'HOME_STRAIGHT_WIN')
   assert.equal(r.pick?.market,'match-winner')
+  assert.equal(r.pick?.ruleMeta?.homeFactorsPassed,2,'GF average is below 2.50, so PPG + GA must be enough')
+  assert.equal(r.pick?.ruleMeta?.awayFactorsPassed,3)
+})
+
+test('home straight win is blocked when only one of three home factors passes',()=>{
+  const oneFactorHome=[homeGame(3,2),homeGame(2,1),homeGame(2,1),homeGame(2,1),homeGame(1,1)]
+  const r=evaluateBankerFixture(fixture(oneFactorHome,weakAway))
+  assert.notEqual(r.pick?.rule,'HOME_STRAIGHT_WIN')
+  assert.equal(r.pick?.rule,'AWAY_TEAM_NOT_TO_WIN')
+})
+
+test('home straight win away-side weakness is non-negotiable',()=>{
+  const awayFailsGA=[awayGame(0,1),awayGame(0,1),awayGame(0,1),awayGame(0,1),awayGame(1,1)]
+  const r=evaluateBankerFixture(fixture(dominant,awayFailsGA))
+  assert.notEqual(r.pick?.rule,'HOME_STRAIGHT_WIN','missing the mandatory away GA >=2.00 factor must block straight win')
+  assert.equal(r.pick?.rule,'AWAY_TEAM_NOT_TO_WIN')
+})
+
+test('away team not to win keeps home 1.50 PPG mandatory and accepts any one away weakness factor',()=>{
+  const steadyHome=[homeGame(1,0),homeGame(1,1),homeGame(2,1),homeGame(0,1),homeGame(1,0)]
+  const awayOnlyGA=[awayGame(4,3),awayGame(4,3),awayGame(0,3),awayGame(0,3),awayGame(3,3)]
+  const r=evaluateBankerFixture(fixture(steadyHome,awayOnlyGA))
+  assert.equal(r.pick?.rule,'AWAY_TEAM_NOT_TO_WIN')
+  assert.equal(r.pick?.ruleMeta?.homePPGMandatory,true)
+  assert.equal(r.pick?.ruleMeta?.awayFactorsPassed,1,'only the away GA >=2.50 factor should be required here')
+})
+
+test('away team not to win cannot qualify when home is below the mandatory 1.50 PPG constant',()=>{
+  const home14=[homeGame(1,0),homeGame(1,0),homeGame(1,1),homeGame(0,1),homeGame(0,1)]
+  const awayOnlyGA=[awayGame(4,3),awayGame(4,3),awayGame(0,3),awayGame(0,3),awayGame(3,3)]
+  const r=evaluateBankerFixture(fixture(home14,awayOnlyGA))
+  assert.equal(r.skip,'no-rule-qualified')
+  assert.equal(r.pick,null)
 })
 
 test('early season is a hard skip',()=>{
