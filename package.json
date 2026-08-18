@@ -1,13 +1,13 @@
 {
   "name": "stats2pitch-fresh",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
     "refresh": "node scripts/refreshBoards.js",
     "test": "node --test",
-    "check": "node --check server/config.js && node --check server/http.js && node --check server/apiFootball.js && node --check server/statsApi.js && node --check server/odds.js && node --check server/over25.js && node --check server/engine.js && node --check server/settlement.js && node --check server/learning.js && node --check server/store.js && node --check server/refresh.js && node --check server/index.js && node --check scripts/refreshBoards.js && node --check scripts/settleResults.js && node --check public/appCrests.js && node --check public/pwa.js && npm test",
+    "check": "node --check server/config.js && node --check server/http.js && node --check server/apiFootball.js && node --check server/statsApi.js && node --check server/odds.js && node --check server/over25.js && node --check server/bankerEngine.js && node --check server/engine.js && node --check server/settlement.js && node --check server/learning.js && node --check server/store.js && node --check server/refresh.js && node --check server/index.js && node --check scripts/refreshBoards.js && node --check scripts/settleResults.js && node --check public/appCrests.js && node --check public/bankerRules.js && node --check public/pwa.js && npm test",
     "settle": "node scripts/settleResults.js"
   },
   "engines": {
