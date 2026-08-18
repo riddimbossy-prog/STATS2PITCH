@@ -42,7 +42,7 @@ test('away 1.5+ PPG, 2+ GF and 1+ GA produces Over 1.5 route',()=>{
 })
 
 test('balanced 1.5+ PPG teams use O2.5 in a high-scoring league',()=>{
-  const home=[homeGame(3,1),homeGame(2,1),homeGame(2,2),homeGame(2,0),homeGame(0,1)]
+  const home=[homeGame(3,1),homeGame(3,1),homeGame(2,2),homeGame(3,0),homeGame(0,1)]
   const away=[awayGame(1,0),awayGame(1,1),awayGame(2,1),awayGame(1,2),awayGame(2,1)]
   const r=evaluateBankerFixture(fixture(home,away,{hpos:3,apos:8,leagueClass:'high-scoring'}))
   assert.equal(r.pick?.rule,'BALANCED_HIGH_SCORING_OVER25')
@@ -50,7 +50,7 @@ test('balanced 1.5+ PPG teams use O2.5 in a high-scoring league',()=>{
 })
 
 test('balanced 1.5+ PPG teams use O1.5 in a low-scoring draw-heavy league',()=>{
-  const home=[homeGame(3,1),homeGame(2,1),homeGame(2,2),homeGame(2,0),homeGame(0,1)]
+  const home=[homeGame(3,1),homeGame(3,1),homeGame(2,2),homeGame(3,0),homeGame(0,1)]
   const away=[awayGame(1,0),awayGame(1,1),awayGame(2,1),awayGame(1,2),awayGame(2,1)]
   const r=evaluateBankerFixture(fixture(home,away,{hpos:3,apos:8,leagueClass:'low-scoring-draw-heavy'}))
   assert.equal(r.pick?.rule,'BALANCED_LOW_SCORING_OVER15')
