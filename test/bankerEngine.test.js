@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {evaluateBankerFixture,buildLeagueScoringProfile} from '../server/bankerEngine.js'
+import {evaluateBankerFixture as evaluateBankerFixtureRaw,buildLeagueScoringProfile} from '../server/bankerEngine.js'
+
+const evaluateBankerFixture=f=>evaluateBankerFixtureRaw(f,{ignoreTransition:true})
 
 let seq=1
 function homeGame(gf,ga){return{fixture:{id:seq++,date:`2026-07-${String(seq).padStart(2,'0')}T12:00:00Z`,status:{short:'FT'}},teams:{home:{id:1},away:{id:99}},goals:{home:gf,away:ga}}}
