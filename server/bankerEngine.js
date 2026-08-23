@@ -111,7 +111,7 @@ export function evaluateBankerFixture(f,{ignoreTransition=false}={}){
   }
   const winTransition=ignoreTransition?null:evaluateTransitionSafety({stronger:transitionProfiles.home,weaker:transitionProfiles.away,mode:'win',strongerName:f.home.name,weakerName:f.away.name})
   const notLoseTransition=ignoreTransition?null:evaluateTransitionSafety({stronger:transitionProfiles.home,weaker:transitionProfiles.away,mode:'not-lose',strongerName:f.home.name,weakerName:f.away.name})
-  let leakRedirect=Boolean(winTransition?.redirectGoals||notLoseTransition?.redirectGoals)
+  let leakRedirect=false
   const candidates=[]
 
   const straightHomeChecks=[
@@ -126,6 +126,7 @@ export function evaluateBankerFixture(f,{ignoreTransition=false}={}){
   ]
   const straightHomeFactorCount=countPassed(straightHomeChecks)
   const straightAwayAllPass=straightAwayChecks.every(x=>x.ok)
+  if(!ignoreTransition&&straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass&&winTransition?.redirectGoals)leakRedirect=true
 
   if(straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass&&(ignoreTransition||winTransition?.allowed))candidates.push(candidate(
     'HOME_STRAIGHT_WIN','match-winner','Home',`${f.home.name} Straight Win`,100,
@@ -144,6 +145,7 @@ export function evaluateBankerFixture(f,{ignoreTransition=false}={}){
   ]
   const notWinAwayFactorCount=countPassed(notWinAwayChecks)
   const notWinHomePass=Number(home.ppg)>=BANKER_RULES.notWinHomeMinPPG
+  if(!ignoreTransition&&notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors&&notLoseTransition?.redirectGoals)leakRedirect=true
 
   if(notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors&&(ignoreTransition||notLoseTransition?.allowed))candidates.push(candidate(
     'AWAY_TEAM_NOT_TO_WIN','double-chance','Home or Draw',`${f.away.name} Not to Win`,90,
