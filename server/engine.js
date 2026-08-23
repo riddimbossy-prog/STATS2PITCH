@@ -1,6 +1,7 @@
 import {ENGINE_VERSION,MIN_ODD,MAX_ODD,MIN_CONSENSUS,FORM_SAMPLE,FINISHED} from './config.js'
 import {learningAllows} from './learning.js'
 import {over25Gate} from './over25.js'
+import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 
 const finite=v=>Number.isFinite(Number(v))
 const pct=(h,t)=>t?Math.round(h*100/t):null
@@ -95,7 +96,35 @@ export function tierGate(f){
   return{allowed:true,homeTier,awayTier,reason:'different-tier'}
 }
 
-function bankerSafety(f,m,o,hr,ar,price){
+function transitionForMarket(f,m,o,profiles){
+  const k=m.marketKey,n=norm(o.name)
+  let side=null,mode=null
+  if(k==='match-winner'){
+    if(n==='home'||n==='1'){side='home';mode='win'}
+    else if(n==='away'||n==='2'){side='away';mode='win'}
+  }else if(k==='double-chance'){
+    if(n.includes('home or draw')||n==='1x'){side='home';mode='not-lose'}
+    else if(n.includes('draw or away')||n==='x2'){side='away';mode='not-lose'}
+  }else if(k==='draw-no-bet'){
+    if(n==='home'||n==='1'){side='home';mode='not-lose'}
+    else if(n==='away'||n==='2'){side='away';mode='not-lose'}
+  }
+  if(!side)return null
+  const other=side==='home'?'away':'home'
+  return evaluateTransitionSafety({
+    stronger:profiles[side],weaker:profiles[other],mode,
+    strongerName:f[side].name,weakerName:f[other].name
+  })
+}
+
+function redirectGoalMarket(p){
+  if(p.market==='both-teams-score')return norm(p.selection)==='yes'
+  if(p.market!=='total-goals')return false
+  const parsed=ou(p.selection)
+  return parsed?.side==='over'&&(parsed.line===1.5||parsed.line===2.5)
+}
+
+function bankerSafety(f,m,o,hr,ar,price,transition=null){
   const checks=[]
   const add=(ok,label)=>checks.push({ok,label})
   const fullSample=f.home.fixtures.length>=FORM_SAMPLE&&f.away.fixtures.length>=FORM_SAMPLE
@@ -116,13 +145,22 @@ function bankerSafety(f,m,o,hr,ar,price){
       if(bottom3)approved=false
     }
   }
+  if(transition){
+    for(const row of transition.checks||[])add(row.ok,`Transition: ${row.label}`)
+    if(!transition.allowed)approved=false
+  }
   return{approved,checks}
 }
 
-export function analyzeFixture(f){
+export function analyzeFixture(f,{ignoreTransition=false}={}){
   if(f.home.fixtures.length<FORM_SAMPLE||f.away.fixtures.length<FORM_SAMPLE)return[]
   const tier=tierGate(f);if(!tier.allowed)return[]
+  const profiles={
+    home:buildTransitionProfile(f.home.fixtures,f.home.id),
+    away:buildTransitionProfile(f.away.fixtures,f.away.id)
+  }
   const out=[]
+  let leakRedirect=null
   for(const m of f.marketOdds||[])for(const o of m.outcomes||[]){
     const price=Number(o.odd);if(!inWindow(price))continue
     const over25=over25Gate(f,m,o);if(over25.applies&&!over25.allowed)continue
@@ -130,7 +168,9 @@ export function analyzeFixture(f){
     const [hr,ar]=pair;if(!finite(hr)||!finite(ar))continue
     if(!over25.applies&&(hr<MIN_CONSENSUS||ar<MIN_CONSENSUS))continue
     const consensus=Math.min(hr,ar)
-    const banker=bankerSafety(f,m,o,hr,ar,price)
+    const transition=ignoreTransition?null:transitionForMarket(f,m,o,profiles)
+    if(transition&&!transition.allowed){if(transition.redirectGoals)leakRedirect=transition;continue}
+    const banker=bankerSafety(f,m,o,hr,ar,price,transition)
     out.push({
       fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
       home:f.home.name,away:f.away.name,homeLogo:f.home.logo,awayLogo:f.away.logo,
@@ -138,6 +178,7 @@ export function analyzeFixture(f){
       odds:+price.toFixed(2),homeConsensus:hr,awayConsensus:ar,consensus,
       earlySeason:f.earlySeason===true,earlySeasonHome:f.earlySeasonHome===true,earlySeasonAway:f.earlySeasonAway===true,currentVenueSamples:f.currentVenueSamples||null,
       homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,homeTier:tier.homeTier,awayTier:tier.awayTier,
+      transitionSafety:transition||null,
       over25Filter:over25.applies?{
         grade:over25.profile?.grade||'strong',xgStatus:over25.profile?.xgStatus||'unavailable',
         checks:over25.profile?.checks||[],metrics:over25.profile?.metrics||{}
@@ -147,7 +188,8 @@ export function analyzeFixture(f){
       reason:over25.applies?`Strict Over 2.5 filter passed (${over25.profile?.grade||'strong'}). ${m.market}: ${o.name} @ ${price.toFixed(2)}.`:`${m.market}: ${o.name} @ ${price.toFixed(2)}. Home split ${hr}%; away split ${ar}%.`
     })
   }
-  return out.sort((a,b)=>b.consensus-a.consensus||Number(b.oddsVerified)-Number(a.oddsVerified)||a.odds-b.odds)
+  const pool=!ignoreTransition&&leakRedirect?out.filter(redirectGoalMarket):out
+  return pool.sort((a,b)=>b.consensus-a.consensus||Number(b.oddsVerified)-Number(a.oddsVerified)||a.odds-b.odds).map(p=>leakRedirect&&!ignoreTransition?{...p,transitionRedirect:{reason:leakRedirect.reason,stronger:leakRedirect.stronger,weaker:leakRedirect.weaker}}:p)
 }
 export function buildBoard(fixtures,meta={},learningProfiles=[]){
   const raw=(fixtures||[]).flatMap(analyzeFixture)

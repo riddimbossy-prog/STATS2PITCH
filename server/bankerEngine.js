@@ -1,4 +1,5 @@
 import {FINISHED,FORM_SAMPLE} from './config.js'
+import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
 const round2=v=>Math.round(Number(v)*100)/100
@@ -7,34 +8,23 @@ const finished=f=>FINISHED.has(String(f?.fixture?.status?.short||'').toUpperCase
 
 export const BANKER_RULES=Object.freeze({
   homeRedFlagPPG:1.0,
-
-  // Home Straight Win: any 2 of these 3 home-strength factors must pass.
   straightHomeMinPPG:2.5,
   straightHomeMinGF:2.5,
   straightHomeMaxGA:1.2,
   straightHomeMinFactors:2,
-
-  // Home Straight Win: ALL away weakness factors are mandatory.
   straightAwayMaxPPG:1.0,
   straightAwayMinGA:2.0,
   straightAwayMinLossRate:60,
-
-  // Away Team Not to Win: home PPG is mandatory; any away weakness factor can qualify.
   notWinHomeMinPPG:1.5,
   notWinAwayMaxPPG:1.0,
   notWinAwayMinGA:2.5,
   notWinAwayMinLossRate:80,
   notWinAwayMinFactors:1,
-
-  // Away-strength O1.5.
   awayStrengthMinPPG:1.5,
   awayStrengthMinGF:2.0,
   awayStrengthMinGA:1.0,
-
-  // Balanced-teams goals rule.
   balancedPPG:1.5,
   balancedAttack:2.0,
-
   topFive:5,
   leagueMinMatches:20,
   highLeagueOver25:56,
@@ -96,7 +86,7 @@ function basePick(f,home,away,leagueProfile){
     home:f.home.name,away:f.away.name,homeLogo:f.home.logo||null,awayLogo:f.away.logo||null,
     homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,
     metrics:{home,away,league:leagueProfile},
-    engine:'banker-rules-v2'
+    engine:'banker-rules-v3-transition-safe'
   }
 }
 
@@ -106,14 +96,22 @@ function candidate(rule,market,selection,displaySelection,priority,reasons,ruleM
 
 function countPassed(checks){return checks.filter(x=>x.ok).length}
 function passedLabels(checks){return checks.filter(x=>x.ok).map(x=>x.label)}
+function isRedirectGoal(c){return c.market==='total-goals'&&(c.selection==='Over 1.5'||c.selection==='Over 2.5')}
 
-export function evaluateBankerFixture(f){
+export function evaluateBankerFixture(f,{ignoreTransition=false}={}){
   const home=profile(f?.home?.fixtures,f?.home?.id,'home'),away=profile(f?.away?.fixtures,f?.away?.id,'away'),leagueProfile=f?.bankerLeagueProfile||{class:'insufficient'}
   if(!home.ready||!away.ready)return{pick:null,skip:'incomplete-5+5'}
   if(f?.earlySeason===true)return{pick:null,skip:'early-season'}
   if(Number(home.ppg)<BANKER_RULES.homeRedFlagPPG)return{pick:null,skip:'home-under-1-ppg'}
   if(sameTopFive(f))return{pick:null,skip:'both-top-five'}
 
+  const transitionProfiles={
+    home:buildTransitionProfile(f?.home?.fixtures,f?.home?.id),
+    away:buildTransitionProfile(f?.away?.fixtures,f?.away?.id)
+  }
+  const winTransition=ignoreTransition?null:evaluateTransitionSafety({stronger:transitionProfiles.home,weaker:transitionProfiles.away,mode:'win',strongerName:f.home.name,weakerName:f.away.name})
+  const notLoseTransition=ignoreTransition?null:evaluateTransitionSafety({stronger:transitionProfiles.home,weaker:transitionProfiles.away,mode:'not-lose',strongerName:f.home.name,weakerName:f.away.name})
+  let leakRedirect=false
   const candidates=[]
 
   const straightHomeChecks=[
@@ -128,14 +126,16 @@ export function evaluateBankerFixture(f){
   ]
   const straightHomeFactorCount=countPassed(straightHomeChecks)
   const straightAwayAllPass=straightAwayChecks.every(x=>x.ok)
+  if(!ignoreTransition&&straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass&&winTransition?.redirectGoals)leakRedirect=true
 
-  if(straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass)candidates.push(candidate(
+  if(straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass&&(ignoreTransition||winTransition?.allowed))candidates.push(candidate(
     'HOME_STRAIGHT_WIN','match-winner','Home',`${f.home.name} Straight Win`,100,
     [
       `Home qualifies on ${straightHomeFactorCount}/3 strength factors: ${passedLabels(straightHomeChecks).join(' · ')}`,
-      `Away weakness is non-negotiable and all 3 factors pass: ${passedLabels(straightAwayChecks).join(' · ')}`
+      `Away weakness is non-negotiable and all 3 factors pass: ${passedLabels(straightAwayChecks).join(' · ')}`,
+      ...(winTransition?.allowed?[`Transition safety passed: score-first, lead-hold, opponent concede-first/stay-down and comeback checks.`]:[])
     ],
-    {homeFactorsPassed:straightHomeFactorCount,homeFactorsRequired:BANKER_RULES.straightHomeMinFactors,awayFactorsPassed:3,awayFactorsRequired:3}
+    {homeFactorsPassed:straightHomeFactorCount,homeFactorsRequired:BANKER_RULES.straightHomeMinFactors,awayFactorsPassed:3,awayFactorsRequired:3,transitionSafety:winTransition}
   ))
 
   const notWinAwayChecks=[
@@ -145,14 +145,16 @@ export function evaluateBankerFixture(f){
   ]
   const notWinAwayFactorCount=countPassed(notWinAwayChecks)
   const notWinHomePass=Number(home.ppg)>=BANKER_RULES.notWinHomeMinPPG
+  if(!ignoreTransition&&notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors&&notLoseTransition?.redirectGoals)leakRedirect=true
 
-  if(notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors)candidates.push(candidate(
+  if(notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors&&(ignoreTransition||notLoseTransition?.allowed))candidates.push(candidate(
     'AWAY_TEAM_NOT_TO_WIN','double-chance','Home or Draw',`${f.away.name} Not to Win`,90,
     [
       `Home PPG ${home.ppg} ≥ 1.50 is the mandatory constant`,
-      `Away qualifies on ${notWinAwayFactorCount}/3 weakness factors: ${passedLabels(notWinAwayChecks).join(' · ')}`
+      `Away qualifies on ${notWinAwayFactorCount}/3 weakness factors: ${passedLabels(notWinAwayChecks).join(' · ')}`,
+      ...(notLoseTransition?.allowed?[`Transition safety passed before the not-to-lose decision.`]:[])
     ],
-    {homePPGMandatory:true,awayFactorsPassed:notWinAwayFactorCount,awayFactorsRequired:BANKER_RULES.notWinAwayMinFactors}
+    {homePPGMandatory:true,awayFactorsPassed:notWinAwayFactorCount,awayFactorsRequired:BANKER_RULES.notWinAwayMinFactors,transitionSafety:notLoseTransition}
   ))
 
   const bothBalanced=Number(home.ppg)>=BANKER_RULES.balancedPPG&&Number(away.ppg)>=BANKER_RULES.balancedPPG
@@ -173,12 +175,22 @@ export function evaluateBankerFixture(f){
     [`Away split PPG ${away.ppg} ≥ 1.50`,`Away scores ${away.avgGF} per match ≥ 2.00`,`Away concedes ${away.avgGA} per match ≥ 1.00`]
   ))
 
-  // The both-under-1-PPG Under route remains subordinate to the global home-under-1-PPG red flag.
-  if(!candidates.length)return{pick:null,skip:'no-rule-qualified'}
+  let pool=candidates
+  if(!ignoreTransition&&leakRedirect){
+    pool=candidates.filter(isRedirectGoal).map(c=>({...c,ruleMeta:{...c.ruleMeta,transitionRedirect:{reason:'stronger-team-leaks-over-80',stronger:transitionProfiles.home,weaker:transitionProfiles.away}}}))
+    if(!pool.length)return{pick:null,skip:'transition-goal-redirect-unqualified'}
+  }
+  if(!pool.length){
+    const transitionFailed=!ignoreTransition&&(
+      (straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass&&!winTransition?.allowed)||
+      (notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors&&!notLoseTransition?.allowed)
+    )
+    return{pick:null,skip:transitionFailed?'transition-safety-failed':'no-rule-qualified'}
+  }
 
-  candidates.sort((a,b)=>b.priority-a.priority)
-  const winner=candidates[0]
-  return{pick:{...basePick(f,home,away,leagueProfile),...winner,alsoQualified:candidates.slice(1).map(x=>x.rule)},skip:null}
+  pool.sort((a,b)=>b.priority-a.priority)
+  const winner=pool[0]
+  return{pick:{...basePick(f,home,away,leagueProfile),...winner,alsoQualified:pool.slice(1).map(x=>x.rule)},skip:null}
 }
 
 export function buildBankerRules(fixtures=[]){
@@ -189,5 +201,5 @@ export function buildBankerRules(fixtures=[]){
     else skipCounts[result.skip]=(skipCounts[result.skip]||0)+1
   }
   picks.sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)||b.priority-a.priority)
-  return{picks,meta:{engine:'banker-rules-v2',count:picks.length,skips:skipCounts,rules:BANKER_RULES}}
+  return{picks,meta:{engine:'banker-rules-v3-transition-safe',count:picks.length,skips:skipCounts,rules:BANKER_RULES}}
 }
