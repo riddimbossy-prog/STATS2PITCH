@@ -40,6 +40,11 @@ export async function leagueHistory(leagueId,season){
   return unwrap(await call('/fixtures',{league:leagueId,season}))
 }
 
+export async function fixtureEvents(fixtureId){
+  if(!fixtureId)return[]
+  return unwrap(await call('/fixtures/events',{fixture:fixtureId}))
+}
+
 export async function fixtureOdds(fixtureId){
   const rows=[]
   for(let page=1;page<=ODDS_MAX_PAGES;page++){
