@@ -1,1 +1,268 @@
-PLACEHOLDER2
+/* Stats2Pitch Bankers page — 2026 dark facelift overrides */
+
+.banker-rule-intro {
+  margin: 0 0 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.banker-rule-intro strong {
+  display: block;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.banker-rule-intro p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 500;
+  max-width: 850px;
+  line-height: 1.5;
+}
+.banker-hard-rules {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.banker-hard-rules b {
+  font-size: 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.banker-hard-rules b.red {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+#bankerStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+#bankerStats > div {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+#bankerStats small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+#bankerStats b {
+  display: block;
+  font: 700 24px var(--mono);
+  margin-top: 4px;
+  color: var(--ink);
+}
+
+#bankerCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.banker-rule-card {
+  background: var(--surface);
+  border: 1px solid rgba(255, 107, 44, 0.25);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: 0.18s;
+}
+.banker-rule-card:hover {
+  border-color: var(--banker);
+  box-shadow: 0 0 24px var(--banker-glow), var(--shadow);
+  transform: translateY(-2px);
+}
+.banker-rule-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 107, 44, 0.06);
+}
+.banker-rule-top span {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.banker-rule-top b {
+  font-size: 10px;
+  background: var(--banker);
+  color: #fff;
+  padding: 5px 9px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 0 10px var(--banker-glow);
+}
+.banker-rule-match {
+  display: grid;
+  grid-template-columns: 1fr 36px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 18px 14px;
+}
+.banker-rule-match > strong {
+  text-align: center;
+  font: 700 11px var(--mono);
+  color: var(--faint);
+}
+.banker-rule-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  min-width: 0;
+}
+.banker-rule-team span {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.banker-rule-team img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.banker-rule-team b {
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--ink);
+  font-weight: 600;
+}
+.banker-rule-pick {
+  margin: 0 14px 14px;
+  border: 1px solid rgba(255, 107, 44, 0.3);
+  background: rgba(255, 107, 44, 0.08);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+}
+.banker-rule-pick small {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+.banker-rule-pick b {
+  display: block;
+  font-size: 17px;
+  color: var(--banker);
+  margin-top: 3px;
+}
+.banker-rule-maths {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 14px 14px;
+}
+.banker-rule-maths section {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 10px;
+  border-radius: 10px;
+}
+.banker-rule-maths h4 {
+  font-size: 10px;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.banker-rule-maths section > div {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.banker-rule-maths span {
+  border: 1px solid var(--border);
+  padding: 6px;
+  background: var(--surface);
+  border-radius: 6px;
+}
+.banker-rule-maths small {
+  display: block;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+}
+.banker-rule-maths span b {
+  font: 700 12px var(--mono);
+  color: var(--ink);
+}
+.banker-rule-league {
+  margin: 0 14px 12px;
+  border: 1px solid rgba(200, 245, 66, 0.25);
+  padding: 10px 12px;
+  background: rgba(200, 245, 66, 0.08);
+  border-radius: 10px;
+}
+.banker-rule-league b {
+  display: block;
+  font-size: 11px;
+  color: var(--accent);
+}
+.banker-rule-league span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.banker-rule-card ul {
+  margin: 0 20px 12px 28px;
+  padding: 0;
+  color: var(--muted);
+}
+.banker-rule-card li {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 5px 0;
+}
+.banker-rule-card footer {
+  border-top: 1px solid var(--border);
+  padding: 10px 14px;
+  font: 600 11px var(--mono);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+@media (max-width: 700px) {
+  #bankerStats { grid-template-columns: 1fr 1fr; }
+  #bankerCards { grid-template-columns: 1fr; }
+  .banker-rule-maths { grid-template-columns: 1fr; }
+  .banker-rule-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .banker-rule-top b { white-space: normal; }
+}
+@media (max-width: 390px) {
+  .banker-rule-intro { padding: 14px; }
+  .banker-rule-match { grid-template-columns: 1fr 28px 1fr; }
+  .banker-rule-team span { width: 46px; height: 46px; }
+  .banker-rule-team img { width: 36px; height: 36px; }
+}
