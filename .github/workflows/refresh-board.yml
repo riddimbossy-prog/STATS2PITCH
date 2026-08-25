@@ -48,7 +48,7 @@ jobs:
           ENGINE_MIN_CONSENSUS: "80"
           ODDS_VERIFY_MAX_RELATIVE_DIFF: "0.15"
           ODDS_REQUIRE_CROSS_SOURCE: "false"
-          BOARD_DAYS_FORWARD: "6"
+          APP_TIMEZONE: "Africa/Accra"
           REFRESH_CONCURRENCY: "3"
 
       - name: Settle published picks

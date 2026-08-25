@@ -46,21 +46,11 @@ function priorityClass(row){
   return rating>=78?'elite_strong':'elite_supported'
 }
 
-function reason(row){
-  const direct=text(row?.shortReason)||text(row?.reason)
-  if(direct)return direct
-  if(Array.isArray(row?.reasons)&&row.reasons.length)return row.reasons.map(text).filter(Boolean).slice(0,8).join(' • ')
-  return'Qualified by the Away-Fav Streak engine.'
-}
-
-export function buildEliteFeed(board,{date,limit=10}={}){
-  const safeLimit=Math.max(1,Math.min(10,Number(limit)||10))
+export function buildEliteFeed(board,{date}={}){
   const rows=(Array.isArray(board?.bestPicks)?board.bestPicks:[])
     .filter(row=>text(row?.engine||'')==='away-fav-streak-v1')
     .filter(row=>['btts','away-win','away-o15','over-15'].includes(text(row?.route)))
-    .filter(row=>(number(row?.engineRating)??number(row?.elite_score)??0)>=64)
-    .filter(row=>text(row?.contradiction||'LOW').toUpperCase()!=='HIGH')
-    .slice(0,safeLimit)
+    .sort((a,b)=>Date.parse(a?.kickoff||0)-Date.parse(b?.kickoff||0))
     .map((row,index)=>{
       const home=teamName(row?.home,text(row?.homeTeam||row?.home_team))
       const away=teamName(row?.away,text(row?.awayTeam||row?.away_team))
@@ -83,25 +73,17 @@ export function buildEliteFeed(board,{date,limit=10}={}){
         pick:finalSelection(row),
         average_odds:number(row?.odds),
         classification:priorityClass(row),
-        label:'Away-Fav Streak',
-        elite_score:Math.round(number(row?.engineRating)??number(row?.elite_score)??70),
-        engine_rating:number(row?.engineRating)??number(row?.elite_score),
-        family_count:number(row?.familyCount)??(Array.isArray(row?.families)?row.families.length:null),
-        families:Array.isArray(row?.filterFamilies)?row.filterFamilies:Array.isArray(row?.families)?row.families:[],
-        contradiction:text(row?.contradiction||'LOW').toUpperCase(),
+        label:'Elite',
         status:'upcoming',
-        reason:reason(row),
         last_verified_at:board?.meta?.generatedAt||new Date().toISOString()
       }
     })
   return{
     version:4,
     source:'stats2pitch',
-    engine:'away-fav-streak-v1',
     date:date||board?.meta?.date||null,
     generated_at:board?.meta?.generatedAt||null,
     count:rows.length,
-    max:10,
     items:rows
   }
 }

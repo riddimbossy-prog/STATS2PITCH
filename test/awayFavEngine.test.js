@@ -151,30 +151,45 @@ test('missing streak market fails closed and is never proxied from team-goals',(
   assert.equal(odds.streakSource,null)
 })
 
-test('board keeps one pick per fixture, drops sub-64 scores, and caps at 10',()=>{
+test('board keeps one pick per fixture and publishes every qualifier',()=>{
   const fixtures=Array.from({length:12},(_,index)=>fixture({
     fixtureId:index+1,
     kickoff:`2026-08-25T${String(12+index).padStart(2,'0')}:00:00Z`
   }))
   const board=buildAwayFavBoard(fixtures)
-  assert.ok(board.bestPicks.length<=10)
-  assert.equal(new Set(board.bestPicks.map(row=>row.fixtureId)).size,board.bestPicks.length)
-  assert.ok(board.bestPicks.every(row=>row.engineRating>=64))
+  assert.equal(board.bestPicks.length,12)
+  assert.equal(board.priority.length,12)
+  assert.equal(new Set(board.bestPicks.map(row=>row.fixtureId)).size,12)
   assert.ok(board.bestPicks.every(row=>row.engine==='away-fav-streak-v1'))
+  const kickoffs=board.bestPicks.map(row=>Date.parse(row.kickoff))
+  assert.deepEqual(kickoffs,[...kickoffs].sort((a,b)=>a-b))
 })
 
-test('elite export only publishes away-fav streak picks',()=>{
+test('elite export publishes every away-fav qualifier without method fields',()=>{
   const qualified=diagnoseAwayFavFixture(fixture()).pick
+  const extras=Array.from({length:11},(_,index)=>({
+    ...qualified,
+    fixtureId:200+index,
+    kickoff:`2026-08-2${index<7?6:5}T${String(10+index).padStart(2,'0')}:00:00Z`,
+    home:`Home ${index}`,
+    away:`Away ${index}`
+  }))
   const feed=buildEliteFeed({
     meta:{date:'2026-08-25',generatedAt:'2026-08-25T09:00:00Z',engine:'away-fav-streak-v1'},
     bestPicks:[
       qualified,
+      ...extras,
       {fixtureId:999,home:'Old',away:'Consensus',market:'match-winner',selection:'Home',odds:1.40,engineRating:90,engine:'stats2pitch-consensus-v4-over25'}
     ]
   },{date:'2026-08-25'})
-  assert.equal(feed.items.length,1)
-  assert.equal(feed.items[0].label,'Away-Fav Streak')
-  assert.equal(feed.items[0].engine,'away-fav-streak-v1')
+  assert.equal(feed.items.length,12)
+  assert.equal(feed.items[0].label,'Elite')
   assert.equal(feed.items[0].market,'Both Teams To Score')
-  assert.equal(feed.engine,'away-fav-streak-v1')
+  assert.equal(feed.engine,undefined)
+  assert.equal(feed.max,undefined)
+  assert.ok(feed.items.every(row=>row.reason==null))
+  assert.ok(feed.items.every(row=>row.elite_score==null))
+  assert.ok(feed.items.every(row=>!row.families))
+  const kickoffs=feed.items.map(row=>Date.parse(row.kickoff))
+  assert.deepEqual(kickoffs,[...kickoffs].sort((a,b)=>a-b))
 })

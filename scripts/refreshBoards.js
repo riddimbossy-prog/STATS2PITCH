@@ -1,22 +1,22 @@
 import {refreshNow} from '../server/refresh.js'
+import {accraWeek} from '../server/week.js'
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))
-const base=new Date()
-const days=String(process.env.BOARD_DAYS_FORWARD||6)==='week'?(7-base.getUTCDay()):Math.max(0,Math.min(6,Number(process.env.BOARD_DAYS_FORWARD||6)))
+const dates=accraWeek().dates
 let completed=0,failed=0
 
-for(let i=0;i<=days;i++){
-  const d=new Date(base.getTime()+i*86400000).toISOString().slice(0,10)
+for(let i=0;i<dates.length;i++){
+  const d=dates[i]
   console.log(`Refreshing ${d}`)
   try{
     const board=await refreshNow(d,p=>console.log(d,p))
     completed++
-    console.log(`${d}: ${board.bestPicks.length} best picks · ${board.priority.length} qualified markets`)
+    console.log(`${d}: ${board.bestPicks.length} published picks · ${board.priority.length} qualified`)
   }catch(error){
     failed++
     console.error(`${d}: refresh failed: ${error?.message||error}`)
   }
-  if(i<days)await sleep(Number(process.env.BOARD_DAY_PAUSE_MS||3000))
+  if(i<dates.length-1)await sleep(Number(process.env.BOARD_DAY_PAUSE_MS||3000))
 }
 
 console.log(`Refresh complete: ${completed} day(s) completed, ${failed} day(s) failed`)

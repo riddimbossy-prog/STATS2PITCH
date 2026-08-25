@@ -32,7 +32,7 @@ async function api(req,res,url){
     const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today()
     const board=await loadBoard(date)
     if(!board?.meta?.generatedAt)return send(res,409,{error:'missing-snapshot',date})
-    return send(res,200,buildEliteFeed(board,{date,limit:url.searchParams.get('limit')||10}))
+    return send(res,200,buildEliteFeed(board,{date}))
   }
   if(url.pathname==='/api/export/elite/refresh'&&req.method==='POST'){
     if(!eliteFeedAuthorized(req))return send(res,401,{error:'unauthorized'})
