@@ -1,7 +1,7 @@
 import {ENGINE_VERSION,MIN_ODD,MAX_ODD,MIN_CONSENSUS,FORM_SAMPLE,FINISHED} from './config.js'
-import {learningAllows} from './learning.js'
 import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
+import {buildAwayFavBoard} from './awayFavEngine.js'
 
 const finite=v=>Number.isFinite(Number(v))
 const pct=(h,t)=>t?Math.round(h*100/t):null
@@ -191,15 +191,18 @@ export function analyzeFixture(f,{ignoreTransition=false}={}){
   const pool=!ignoreTransition&&leakRedirect?out.filter(redirectGoalMarket):out
   return pool.sort((a,b)=>b.consensus-a.consensus||Number(b.oddsVerified)-Number(a.oddsVerified)||a.odds-b.odds).map(p=>leakRedirect&&!ignoreTransition?{...p,transitionRedirect:{reason:leakRedirect.reason,stronger:leakRedirect.stronger,weaker:leakRedirect.weaker}}:p)
 }
+
 export function buildBoard(fixtures,meta={},learningProfiles=[]){
-  const raw=(fixtures||[]).flatMap(analyzeFixture)
-  const all=[]
-  for(const p of raw){
-    const learned=learningAllows(p,learningProfiles)
-    if(!learned.allowed)continue
-    all.push({...p,learningProfile:learned.profile?{sample:learned.profile.sample,winRate:learned.profile.winRate,gate:learned.profile.gate}:null})
+  const board=buildAwayFavBoard(fixtures,meta)
+  return{
+    ...board,
+    meta:{
+      ...board.meta,
+      ...meta,
+      engineVersion:ENGINE_VERSION,
+      minConsensus:MIN_CONSENSUS,
+      formSample:FORM_SAMPLE,
+      learningProfiles:Array.isArray(learningProfiles)?learningProfiles.filter(x=>x?.ready).length:0
+    }
   }
-  const best=[],seen=new Set()
-  for(const p of all){if(seen.has(String(p.fixtureId)))continue;seen.add(String(p.fixtureId));best.push(p)}
-  return{meta:{...meta,engineVersion:ENGINE_VERSION,minOdd:MIN_ODD,maxOdd:MAX_ODD,minConsensus:MIN_CONSENSUS,formSample:FORM_SAMPLE,qualified:all.length,bestPicks:best.length,learningProfiles:learningProfiles.filter(x=>x.ready).length},priority:all,bestPicks:best,availableMarkets:[...new Set(all.map(x=>x.market))].sort()}
 }

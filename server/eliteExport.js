@@ -23,33 +23,41 @@ function fixtureName(row){
 }
 
 function finalSelection(row){
-  return text(row?.selectionLabel)||text(row?.selectedTeam)||text(row?.pick)||text(row?.selection)||'Selection'
+  return text(row?.displaySelection)||text(row?.selectionLabel)||text(row?.pick)||text(row?.selection)||'Selection'
 }
 
 function finalMarket(row){
   const market=text(row?.market)
+  if(market==='both-teams-score'||market==='BTTS')return'Both Teams To Score'
+  if(market==='match-winner'||market==='1X2')return'Match winner'
+  if(market==='away-team-goals')return'Away team goals'
+  if(market==='home-team-goals')return'Home team goals'
+  if(market==='total-goals')return'Total goals'
   if(market==='DNB')return'Draw No Bet'
   if(market==='DC')return text(row?.downgradeMarket)||'Double Chance'
   return market||text(row?.marketLabel)||'Market'
 }
 
 function priorityClass(row){
-  const priority=text(row?.priorityLabel).toUpperCase()
-  if(priority==='ELITE')return'elite_strong'
-  const rating=number(row?.engineRating)??number(row?.elite_score)??70
-  return rating>=88?'elite_strong':'elite_supported'
+  const classification=text(row?.classification)
+  if(classification==='elite_strong')return'elite_strong'
+  if(classification==='elite_supported')return'elite_supported'
+  const rating=number(row?.engineRating)??number(row?.elite_score)??0
+  return rating>=78?'elite_strong':'elite_supported'
 }
 
 function reason(row){
   const direct=text(row?.shortReason)||text(row?.reason)
   if(direct)return direct
   if(Array.isArray(row?.reasons)&&row.reasons.length)return row.reasons.map(text).filter(Boolean).slice(0,8).join(' • ')
-  return'Qualified by Stats2Pitch split-stat and market-safety rules.'
+  return'Qualified by the Away-Fav Streak engine.'
 }
 
 export function buildEliteFeed(board,{date,limit=10}={}){
   const safeLimit=Math.max(1,Math.min(10,Number(limit)||10))
   const rows=(Array.isArray(board?.bestPicks)?board.bestPicks:[])
+    .filter(row=>text(row?.engine||'').includes('away-fav-streak')||text(row?.route||''))
+    .filter(row=>(number(row?.engineRating)??number(row?.elite_score)??0)>=64)
     .filter(row=>text(row?.contradiction||'LOW').toUpperCase()!=='HIGH')
     .slice(0,safeLimit)
     .map((row,index)=>{
@@ -73,10 +81,10 @@ export function buildEliteFeed(board,{date,limit=10}={}){
         pick:finalSelection(row),
         average_odds:number(row?.odds),
         classification:priorityClass(row),
-        label:'Stats2Pitch Elite',
-        elite_score:Math.round(number(row?.engineRating)??70),
-        engine_rating:number(row?.engineRating),
-        family_count:number(row?.familyCount),
+        label:'Away-Fav Streak',
+        elite_score:Math.round(number(row?.engineRating)??number(row?.elite_score)??70),
+        engine_rating:number(row?.engineRating)??number(row?.elite_score),
+        family_count:number(row?.familyCount)??(Array.isArray(row?.families)?row.families.length:null),
         families:Array.isArray(row?.filterFamilies)?row.filterFamilies:Array.isArray(row?.families)?row.families:[],
         contradiction:text(row?.contradiction||'LOW').toUpperCase(),
         status:'upcoming',
@@ -85,8 +93,9 @@ export function buildEliteFeed(board,{date,limit=10}={}){
       }
     })
   return{
-    version:3,
+    version:4,
     source:'stats2pitch',
+    engine:board?.meta?.engine||'away-fav-streak-v1',
     date:date||board?.meta?.date||null,
     generated_at:board?.meta?.generatedAt||null,
     count:rows.length,

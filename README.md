@@ -1,37 +1,35 @@
-# Stats2Pitch Fresh Engine v3
+# Stats2Pitch Away-Fav Streak Engine
 
-This repository is a clean replacement for the previous Stats2Pitch engine stack.
+This repository is the live generator for sporty.codes Elite Picks.
 
-## Only one prediction rule
+## Only one Elite rule
 
-1. Read every supported market from the odds provider.
-2. The decimal odd must be **1.20–1.55 inclusive**.
-3. Use the home team's **last 5 HOME** matches.
-4. Use the away team's **last 5 AWAY** matches.
-5. The exact same market event must be supported by **at least 80% for the home profile AND at least 80% for the away profile**.
-6. Anything failing either gate is discarded.
-7. One strongest qualifying market is shown as the Best Pick for each fixture.
+The previous consensus / banker-export Elite path is gone. Elite now uses **Away-Fav Streak v1**.
 
-Supported translations include full-time 1X2, double chance, DNB, BTTS Yes/No, match totals, first-half 1X2, first-half totals, and home/away team totals when the provider identifies them exactly.
+1. Universe: Goals Streak 2+ **Yes** priced **1.10–1.49**. Favourite is always the **away** team.
+2. Required published odds: streak (or a tagged away O1.5 proxy), away team goals Over 0.5, away team goals Over 1.5, home team goals Over 0.5. Missing odds fail closed.
+3. Skip: both teams top 5, both teams bottom 3, early-season venue samples under 5, similar split form (PPG, GF and GA all close).
+4. First match wins:
+   - both Over 0.5 **< 1.30** → **BTTS Yes**
+   - away Over 1.5 **< 1.50** and home Over 0.5 **> 1.60** and away 1X2 **≤ 1.55** → **Away win**
+   - away Over 1.5 **< 1.50** and home Over 0.5 **> 1.60** → **Away team goals Over 1.5**
+   - away Over 1.5 **< 1.50** and home Over 0.5 **≤ 1.60** → **Total Over 1.5**
+5. Never home-favourite Over 2.5. Never BTTS for a home favourite. One pick per fixture. Max 10 per day.
+6. Strong ≥ 78, Supported ≥ 64, anything lower is dropped.
 
 ## Odds verification
 
-API-Football is the primary feed. When TheStatsAPI is configured, matching selections are compared. By default, two prices must be within 15% relative difference to be marked cross-source verified. Set `ODDS_REQUIRE_CROSS_SOURCE=true` to reject every single-source selection.
+API-Football is the primary feed. When TheStatsAPI is configured, matching selections are compared. Goals Streak 2+ is used when the provider publishes it. If that market is absent, implied streak = away team goals Over 1.5 × 1.08, and it still has to land inside 1.10–1.49.
 
 ## Clean cache behavior
 
-Supabase snapshots are loaded only when their `engineVersion` exactly equals `stats2pitch-consensus-v3`. Old engine snapshots are ignored automatically.
-
-## GitHub Desktop replacement
-
-Delete the old repository contents **except the hidden `.git` folder**, then copy everything from this ZIP into the repository folder. Commit all changes and Push origin.
-
-Keep your GitHub repository secrets. They are not stored in this ZIP.
+Supabase snapshots are loaded only when `engineVersion` equals `away-fav-streak-v1`. Older consensus snapshots are ignored. A version change does not merge leftover consensus picks into the new board.
 
 Required secrets:
 - API_FOOTBALL_KEY
 - SUPABASE_URL
 - SUPABASE_SERVICE_ROLE_KEY
+- STATS2PITCH_ELITE_FEED_TOKEN (Sporty Elite export)
 
 Recommended:
 - STATS_API_KEY

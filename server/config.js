@@ -1,4 +1,4 @@
-export const ENGINE_VERSION='stats2pitch-consensus-v4-over25'
+export const ENGINE_VERSION='away-fav-streak-v1'
 export const MIN_ODD=Number(process.env.ENGINE_MIN_ODD||1.20)
 export const MAX_ODD=Number(process.env.ENGINE_MAX_ODD||1.55)
 export const MIN_CONSENSUS=Number(process.env.ENGINE_MIN_CONSENSUS||80)

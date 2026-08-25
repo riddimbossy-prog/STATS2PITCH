@@ -49,6 +49,7 @@ function marketKey(raw=''){
   if(n.includes('hometeamtotal')||n.includes('hometeamgoals'))return'home-team-goals'
   if(n.includes('awayteamtotal')||n.includes('awayteamgoals'))return'away-team-goals'
   if(n.includes('teamtotal')||n.includes('teamgoals'))return'team-goals'
+  if(n.includes('goalsstreak')||n.includes('goalstreak')||(n.includes('streak')&&(n.includes('2')||n.includes('consecutive'))))return'goals-streak-2'
   if(n.includes('asianhandicap')||n==='handicap'||n.includes('spread'))return'handicap'
   if(n.includes('total')||n.includes('overunder')||n==='goals'||n.includes('matchgoals'))return'total-goals'
   return slug(raw)
@@ -57,7 +58,7 @@ function marketName(key,raw=''){
   return ({
     'match-winner':'Match winner','double-chance':'Double chance','draw-no-bet':'Draw no bet','both-teams-score':'Both teams to score',
     'first-half-winner':'First-half winner','first-half-goals':'First-half goals','home-team-goals':'Home team goals','away-team-goals':'Away team goals',
-    'team-goals':'Team goals','handicap':'Handicap','total-goals':'Total goals'
+    'team-goals':'Team goals','handicap':'Handicap','total-goals':'Total goals','goals-streak-2':'Goals Streak 2+'
   })[key]||text(raw).replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())||'Market'
 }
 
@@ -238,7 +239,10 @@ export function canonicalOdds(markets){
     over15:findOutcome(markets,'total-goals',['Over 1.5']),under15:findOutcome(markets,'total-goals',['Under 1.5']),
     over25:findOutcome(markets,'total-goals',['Over 2.5']),under25:findOutcome(markets,'total-goals',['Under 2.5']),
     over35:findOutcome(markets,'total-goals',['Over 3.5']),under35:findOutcome(markets,'total-goals',['Under 3.5']),
-    bttsYes:findOutcome(markets,'both-teams-score',['Yes']),bttsNo:findOutcome(markets,'both-teams-score',['No'])
+    bttsYes:findOutcome(markets,'both-teams-score',['Yes']),bttsNo:findOutcome(markets,'both-teams-score',['No']),
+    homeO05:findOutcome(markets,'home-team-goals',['Over 0.5']),homeO15:findOutcome(markets,'home-team-goals',['Over 1.5']),
+    awayO05:findOutcome(markets,'away-team-goals',['Over 0.5']),awayO15:findOutcome(markets,'away-team-goals',['Over 1.5']),
+    streakYes:findOutcome(markets,'goals-streak-2',['Yes'])
   }
 }
 

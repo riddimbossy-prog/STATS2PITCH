@@ -1,4 +1,4 @@
-const ENGINE_VERSION='stats2pitch-consensus-v4-over25'
+const ENGINE_VERSION='away-fav-streak-v1'
 const SUPABASE_URL=(Deno.env.get('SUPABASE_URL')||'').replace(/\/$/,'')
 const SUPABASE_ANON_KEY=Deno.env.get('SUPABASE_ANON_KEY')||''
 const SUPABASE_SERVICE_ROLE_KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||''

@@ -32,6 +32,7 @@ function completeness(key,outcomes){
   const m=outcomeMap(outcomes)
   if(key==='match-winner')return ['home','draw','away'].every(k=>m.has(k))?100:0
   if(key==='both-teams-score')return ['yes','no'].every(k=>m.has(k))?100:0
+  if(key==='goals-streak-2')return m.has('yes')?90:0
   if(key==='draw-no-bet')return m.has('home')&&m.has('away')?100:0
   if(key==='double-chance')return ['home or draw','home or away','draw or away'].filter(k=>m.has(k)).length>=2?90:0
   if(key==='total-goals'||key==='first-half-goals'||key.includes('team-goals')){
@@ -146,7 +147,10 @@ export function buildCoherentOdds({apiPayload=[],statsPayload=null,fixture=null}
     over15:find('total-goals',['Over 1.5']),under15:find('total-goals',['Under 1.5']),
     over25:find('total-goals',['Over 2.5']),under25:find('total-goals',['Under 2.5']),
     over35:find('total-goals',['Over 3.5']),under35:find('total-goals',['Under 3.5']),
-    bttsYes:find('both-teams-score',['Yes']),bttsNo:find('both-teams-score',['No'])
+    bttsYes:find('both-teams-score',['Yes']),bttsNo:find('both-teams-score',['No']),
+    homeO05:find('home-team-goals',['Over 0.5']),homeO15:find('home-team-goals',['Over 1.5']),
+    awayO05:find('away-team-goals',['Over 0.5']),awayO15:find('away-team-goals',['Over 1.5']),
+    streakYes:find('goals-streak-2',['Yes'])
   }
   return{marketOdds,canonical,policy:'verified-cross-source-v2',maxRelativeDiff:MAX_RELATIVE_DIFF,requireCrossSource:REQUIRE_CROSS_SOURCE}
 }

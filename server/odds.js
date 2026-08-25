@@ -29,13 +29,14 @@ function key(raw=''){
   if(n.includes('hometeamtotal')||n.includes('hometeamgoals'))return'home-team-goals'
   if(n.includes('awayteamtotal')||n.includes('awayteamgoals'))return'away-team-goals'
   if(n.includes('teamtotal')||n.includes('teamgoals'))return'team-goals'
+  if(n.includes('goalsstreak')||n.includes('goalstreak')||(n.includes('streak')&&(n.includes('2')||n.includes('consecutive'))))return'goals-streak-2'
   if(n.includes('total')||n.includes('overunder')||n==='goals'||n.includes('matchgoals'))return'total-goals'
   return null
 }
 function marketName(k){return ({
   'match-winner':'Match winner','double-chance':'Double chance','draw-no-bet':'Draw no bet','both-teams-score':'Both teams to score',
   'first-half-winner':'First-half winner','first-half-goals':'First-half goals','home-team-goals':'Home team goals','away-team-goals':'Away team goals',
-  'team-goals':'Team goals','total-goals':'Total goals'
+  'team-goals':'Team goals','total-goals':'Total goals','goals-streak-2':'Goals Streak 2+'
 })[k]||k}
 function parseLineName(raw,line){
   const n=sideName(raw)

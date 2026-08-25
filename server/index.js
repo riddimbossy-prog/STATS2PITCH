@@ -8,6 +8,7 @@ import {fixturesByDate} from './apiFootball.js'
 import {normalizeFixtureStatus,settlePick} from './settlement.js'
 import {buildLearningProfiles} from './learning.js'
 import {ENGINE_VERSION} from './config.js'
+import {eliteFeedAuthorized,buildEliteFeed} from './eliteExport.js'
 
 const PORT=Number(process.env.PORT||3000),PUBLIC=fileURLToPath(new URL('../public/',import.meta.url))
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml','.mp4':'video/mp4'}
@@ -26,6 +27,32 @@ async function api(req,res,url){
   if(url.pathname==='/api/performance'){const days=Math.max(1,Math.min(90,Number(url.searchParams.get('days')||30))),to=today(),from=addDays(to,-days+1),rows=await listBoards(from,to),boards=rows.map(x=>x.payload).filter(Boolean);return send(res,200,{days,...performance(boards),learning:buildLearningProfiles(boards)})}
   if(url.pathname==='/api/refresh'&&req.method==='POST'){const b=await json(req),date=dateOk(b.date)?b.date:today();await clearBoard(date);return send(res,202,{ok:true,job:startRefresh(date)})}
   if(url.pathname==='/api/refresh-status'){const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today();return send(res,200,refreshStatus(date))}
+  if(url.pathname==='/api/export/elite'){
+    if(!eliteFeedAuthorized(req))return send(res,401,{error:'unauthorized'})
+    const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today()
+    const board=await loadBoard(date)
+    if(!board?.meta?.generatedAt)return send(res,409,{error:'missing-snapshot',date})
+    return send(res,200,buildEliteFeed(board,{date,limit:url.searchParams.get('limit')||10}))
+  }
+  if(url.pathname==='/api/export/elite/refresh'&&req.method==='POST'){
+    if(!eliteFeedAuthorized(req))return send(res,401,{error:'unauthorized'})
+    const body=await json(req).catch(()=>({}))
+    const date=dateOk(body.date||url.searchParams.get('date'))?String(body.date||url.searchParams.get('date')):today()
+    const board=await loadBoard(date)
+    if(board?.meta?.generatedAt)return send(res,200,{status:'ready',date,generated_at:board.meta.generatedAt})
+    return send(res,202,{status:'started',date,job:startRefresh(date)})
+  }
+  if(url.pathname==='/api/export/elite/refresh-status'){
+    if(!eliteFeedAuthorized(req))return send(res,401,{error:'unauthorized'})
+    const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today()
+    const job=refreshStatus(date)
+    if(job?.state==='complete')return send(res,200,{status:'complete',date,result:job.result||null})
+    if(job?.state==='failed')return send(res,200,{status:'failed',date,error:job.error||'refresh failed'})
+    if(job?.state==='running')return send(res,200,{status:'running',date,progress:job.progress||null})
+    const board=await loadBoard(date)
+    if(board?.meta?.generatedAt)return send(res,200,{status:'complete',date,generated_at:board.meta.generatedAt})
+    return send(res,200,{status:'idle',date})
+  }
   return send(res,404,{error:'Not found'})
 }
 async function staticFile(req,res,url){let p=url.pathname==='/'?'index.html':normalize(url.pathname).replace(/^\/+/,''),file=join(PUBLIC,p);try{const data=await readFile(file);res.writeHead(200,{'Content-Type':mime[extname(file)]||'application/octet-stream','Cache-Control':extname(file)==='.html'?'no-store':'public, max-age=300'});res.end(data)}catch{const data=await readFile(join(PUBLIC,'index.html'));res.writeHead(200,{'Content-Type':mime['.html'],'Cache-Control':'no-store'});res.end(data)}}

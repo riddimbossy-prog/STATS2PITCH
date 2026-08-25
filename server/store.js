@@ -16,6 +16,8 @@ const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim(
 function stampPick(p,at){return{...p,publishedAt:p?.publishedAt||at,proofKey:p?.proofKey||proofKey(p)}}
 function mergePublished(existing,incoming){
   const now=incoming?.meta?.generatedAt||new Date().toISOString()
+  const sameEngine=String(existing?.meta?.engineVersion||'')===String(incoming?.meta?.engineVersion||'')
+  if(!sameEngine)return incoming
   const old=Array.isArray(existing?.bestPicks)?existing.bestPicks:[]
   const fresh=Array.isArray(incoming?.bestPicks)?incoming.bestPicks:[]
   const map=new Map(old.map(p=>[String(p.fixtureId),stampPick(p,p.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)]))
