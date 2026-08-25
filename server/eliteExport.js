@@ -56,7 +56,8 @@ function reason(row){
 export function buildEliteFeed(board,{date,limit=10}={}){
   const safeLimit=Math.max(1,Math.min(10,Number(limit)||10))
   const rows=(Array.isArray(board?.bestPicks)?board.bestPicks:[])
-    .filter(row=>text(row?.engine||'').includes('away-fav-streak')||text(row?.route||''))
+    .filter(row=>text(row?.engine||'')==='away-fav-streak-v1')
+    .filter(row=>['btts','away-win','away-o15','over-15'].includes(text(row?.route)))
     .filter(row=>(number(row?.engineRating)??number(row?.elite_score)??0)>=64)
     .filter(row=>text(row?.contradiction||'LOW').toUpperCase()!=='HIGH')
     .slice(0,safeLimit)
@@ -66,6 +67,7 @@ export function buildEliteFeed(board,{date,limit=10}={}){
       return{
         id:`stats2pitch-${text(row?.fixtureId)||index}-${text(row?.market)||'market'}`,
         source:'stats2pitch',
+        engine:'away-fav-streak-v1',
         source_fixture_id:text(row?.fixtureId)||null,
         prediction_date:date||board?.meta?.date||null,
         fixture:fixtureName(row),
@@ -95,7 +97,7 @@ export function buildEliteFeed(board,{date,limit=10}={}){
   return{
     version:4,
     source:'stats2pitch',
-    engine:board?.meta?.engine||'away-fav-streak-v1',
+    engine:'away-fav-streak-v1',
     date:date||board?.meta?.date||null,
     generated_at:board?.meta?.generatedAt||null,
     count:rows.length,

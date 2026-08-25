@@ -4,10 +4,10 @@ This repository is the live generator for sporty.codes Elite Picks.
 
 ## Only one Elite rule
 
-The previous consensus / banker-export Elite path is gone. Elite now uses **Away-Fav Streak v1**.
+The previous consensus Elite path is gone. Elite now uses **Away-Fav Streak v1** only.
 
-1. Universe: Goals Streak 2+ **Yes** priced **1.10–1.49**. Favourite is always the **away** team.
-2. Required published odds: streak (or a tagged away O1.5 proxy), away team goals Over 0.5, away team goals Over 1.5, home team goals Over 0.5. Missing odds fail closed.
+1. Universe: published Goals Streak 2+ **Yes** priced **1.10–1.49**. Favourite is always the **away** team. Missing streak odds fail closed — there is no proxy.
+2. Required published odds: streak Yes, away team goals Over 0.5, away team goals Over 1.5, home team goals Over 0.5.
 3. Skip: both teams top 5, both teams bottom 3, early-season venue samples under 5, similar split form (PPG, GF and GA all close).
 4. First match wins:
    - both Over 0.5 **< 1.30** → **BTTS Yes**
@@ -17,9 +17,11 @@ The previous consensus / banker-export Elite path is gone. Elite now uses **Away
 5. Never home-favourite Over 2.5. Never BTTS for a home favourite. One pick per fixture. Max 10 per day.
 6. Strong ≥ 78, Supported ≥ 64, anything lower is dropped.
 
+Bankers stay on their own page and do not feed Elite.
+
 ## Odds verification
 
-API-Football is the primary feed. When TheStatsAPI is configured, matching selections are compared. Goals Streak 2+ is used when the provider publishes it. If that market is absent, implied streak = away team goals Over 1.5 × 1.08, and it still has to land inside 1.10–1.49.
+API-Football is the primary feed. When TheStatsAPI is configured, matching selections are compared. Goals Streak 2+ must be published by the provider. If that market is absent, the fixture is skipped.
 
 ## Clean cache behavior
 

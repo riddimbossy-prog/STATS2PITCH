@@ -200,7 +200,7 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
       ...board.meta,
       ...meta,
       engineVersion:ENGINE_VERSION,
-      minConsensus:MIN_CONSENSUS,
+      engine:'away-fav-streak-v1',
       formSample:FORM_SAMPLE,
       learningProfiles:Array.isArray(learningProfiles)?learningProfiles.filter(x=>x?.ready).length:0
     }

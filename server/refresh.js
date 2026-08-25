@@ -1,8 +1,7 @@
 import {fixturesByDate,teamHistory,leagueHistory,oddsByDate,fixtureEvents} from './apiFootball.js'
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {verifiedMarkets} from './odds.js'
-import {venueSample,buildBoard,tierGate,analyzeFixture} from './engine.js'
-import {buildOver25Profile} from './over25.js'
+import {venueSample,buildBoard} from './engine.js'
 import {buildBankerRules,buildLeagueScoringProfile,evaluateBankerFixture} from './bankerEngine.js'
 import {saveBoard,listBoards} from './store.js'
 import {buildLearningProfiles} from './learning.js'
@@ -56,8 +55,6 @@ function teamSideMarket(market,selection){
 }
 
 function needsTransitionEvidence(record){
-  const engineCandidates=analyzeFixture(record,{ignoreTransition:true})
-  if(engineCandidates.some(p=>teamSideMarket(p.market,p.selection)))return true
   const banker=evaluateBankerFixture(record,{ignoreTransition:true}).pick
   return Boolean(banker&&teamSideMarket(banker.market,banker.selection))
 }
@@ -79,7 +76,7 @@ export async function refreshNow(date,onProgress=()=>{}){
       const current=Number.isFinite(season)?await getLeagueHistory(leagueId,season):[],previous=Number.isFinite(season)&&season>0?await getLeagueHistory(leagueId,season-1):[]
       const currentHomeFixtures=venueSample(current,homeId,'home'),currentAwayFixtures=venueSample(current,awayId,'away')
       const earlySeasonHome=currentHomeFixtures.length<FORM_SAMPLE,earlySeasonAway=currentAwayFixtures.length<FORM_SAMPLE,earlySeason=earlySeasonHome||earlySeasonAway
-      const over25Profile=buildOver25Profile(current,homeId,awayId,{xg:f?.over25Xg||f?.xg||null}),bankerLeagueProfile=buildLeagueScoringProfile(current)
+      const bankerLeagueProfile=buildLeagueScoringProfile(current)
       let history=mergeUnique(current,previous),homeFixtures=venueSample(history,homeId,'home'),awayFixtures=venueSample(history,awayId,'away')
       if(homeFixtures.length<FORM_SAMPLE){history=mergeUnique(history,await getTeamHistory(homeId));fallbackTeams++;homeFixtures=venueSample(history,homeId,'home')}
       if(awayFixtures.length<FORM_SAMPLE){history=mergeUnique(history,await getTeamHistory(awayId));fallbackTeams++;awayFixtures=venueSample(history,awayId,'away')}
@@ -87,7 +84,7 @@ export async function refreshNow(date,onProgress=()=>{}){
       const homeSplit=cachedSplitTable(leagueId,season,'home',history).get(String(homeId))||null,awaySplit=cachedSplitTable(leagueId,season,'away',history).get(String(awayId))||null
       const apiOdds=oddsMap.get(String(f?.fixture?.id))||[],statsOdds=statsApiConfigured()?await getStatsOddsForFixture(f).catch(()=>null):null
       if(statsOdds)statsVerified++;const marketOdds=verifiedMarkets({apiPayload:apiOdds,statsPayload:statsOdds,fixture:f})
-      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},over25Profile,bankerLeagueProfile,homeSplit,awaySplit,marketOdds}
+      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,homeSplit,awaySplit,marketOdds}
       if(needsTransitionEvidence(record)){record=await hydrateTransitionSamples(record);transitionHydratedFixtures++}
       done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures})
       return record
@@ -95,9 +92,7 @@ export async function refreshNow(date,onProgress=()=>{}){
   })
 
   const fixtures=analyzed.filter(Boolean),bankerRules=buildBankerRules(fixtures)
-  let sameTierSkipped=0,tierUnverifiedSkipped=0;const tierEligible=[]
-  for(const f of fixtures){const gate=tierGate(f);if(gate.allowed){tierEligible.push(f);continue}if(gate.reason==='same-tier')sameTierSkipped++;else tierUnverifiedSkipped++}
-  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),engineVersion:ENGINE_VERSION,sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,tierEligibleFixtures:tierEligible.length,sameTierSkipped,tierUnverifiedSkipped,sameTierOrUnverifiedSkipped:sameTierSkipped+tierUnverifiedSkipped,over25ProfiledFixtures:fixtures.filter(f=>f.over25Profile).length,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,sameTierSkipped,tierUnverifiedSkipped,tierEligibleFixtures:tierEligible.length,transitionHydratedFixtures,qualifiedTips:0,bestPicks:0,bankerRulePicks:bankerRules.picks.length}},learned)
+  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),engineVersion:ENGINE_VERSION,engine:'away-fav-streak-v1',sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,qualifiedTips:0,bestPicks:0,bankerRulePicks:bankerRules.picks.length}},learned)
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p])),eligibleIds=new Set(fixtures.map(f=>String(f.fixtureId)))

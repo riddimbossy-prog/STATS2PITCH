@@ -138,12 +138,17 @@ test('open game with a scoring home side becomes total over 1.5 never over 2.5',
   assert.notEqual(result.pick.selection,'Over 2.5')
 })
 
-test('streak proxy from away over 1.5 is used only when the live streak market is missing',()=>{
+test('missing streak market fails closed and is never proxied from team-goals',()=>{
+  const result=diagnoseAwayFavFixture(fixture({
+    marketOdds:markets({awayO05:1.18,awayO15:1.20,homeO05:1.20,bttsYes:1.40})
+  }))
+  assert.equal(result.skip,'missing-odds')
+  assert.equal(result.pick,null)
   const odds=extractOdds(fixture({
     marketOdds:markets({awayO05:1.18,awayO15:1.20,homeO05:1.20,bttsYes:1.40})
   }))
-  assert.equal(odds.streakSource,'proxy-away-o15')
-  assert.equal(odds.streak,1.30)
+  assert.equal(odds.streak,null)
+  assert.equal(odds.streakSource,null)
 })
 
 test('board keeps one pick per fixture, drops sub-64 scores, and caps at 10',()=>{
@@ -169,6 +174,7 @@ test('elite export only publishes away-fav streak picks',()=>{
   },{date:'2026-08-25'})
   assert.equal(feed.items.length,1)
   assert.equal(feed.items[0].label,'Away-Fav Streak')
+  assert.equal(feed.items[0].engine,'away-fav-streak-v1')
   assert.equal(feed.items[0].market,'Both Teams To Score')
   assert.equal(feed.engine,'away-fav-streak-v1')
 })
