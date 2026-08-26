@@ -19,6 +19,14 @@ function mergeRows(oldRows,freshRows,now,existing){
   for(const p of Array.isArray(freshRows)?freshRows:[])if(!map.has(String(p.fixtureId)))map.set(String(p.fixtureId),stampPick(p,now))
   return[...map.values()].sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
 }
+function countTips(board){
+  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
+}
+function incomingFeedEmpty(board){
+  const source=Number(board?.meta?.sourceFixtures??board?.meta?.diagnostics?.sourceFixtures??0)
+  const scheduled=Number(board?.meta?.scheduledFixtures??board?.meta?.diagnostics?.scheduledFixtures??0)
+  return source===0&&scheduled===0&&countTips(board)===0
+}
 function mergePublished(existing,incoming){
   const now=incoming?.meta?.generatedAt||new Date().toISOString()
   const sameEngine=String(existing?.meta?.engineVersion||'')===String(incoming?.meta?.engineVersion||'')
@@ -51,6 +59,19 @@ export async function listBoards(fromDate,toDate){
 }
 export async function saveBoard(date,board,{preservePublished=true}={}){
   const existing=preservePublished?await loadBoard(date,{allowVersionMismatch:true}).catch(()=>null):null
+  if(preservePublished&&existing&&incomingFeedEmpty(board)&&countTips(existing)>0){
+    const kept={
+      ...existing,
+      meta:{
+        ...(existing.meta||{}),
+        refresh:{...(board?.meta?.refresh||{}),state:'preserved',reason:'empty-upstream-feed',generatedAt:board?.meta?.generatedAt||new Date().toISOString()},
+        lastEmptyRefreshAt:board?.meta?.generatedAt||new Date().toISOString()
+      }
+    }
+    memory.set(date,kept)
+    if(configured())await request('/rest/v1/prediction_snapshots?on_conflict=snapshot_date',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:{snapshot_date:date,generated_at:new Date().toISOString(),payload:kept}})
+    return kept
+  }
   const finalBoard=preservePublished?mergePublished(existing,board):board
   memory.set(date,finalBoard)
   if(configured())await request('/rest/v1/prediction_snapshots?on_conflict=snapshot_date',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:{snapshot_date:date,generated_at:new Date().toISOString(),payload:finalBoard}})
