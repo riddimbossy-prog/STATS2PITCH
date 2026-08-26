@@ -1,0 +1,447 @@
+/* Stats2Pitch mobile 2026 — matches the designed phone UI.
+   Desktop (≥801px) is unchanged. */
+
+.year-badge,
+.icon-btn,
+.m-card-top,
+.m-kick-row,
+.m-footer,
+.odd-kicker,
+.filter-scrim {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  html, body {
+    background: #070708;
+  }
+  body {
+    background-image:
+      radial-gradient(ellipse 90% 40% at 50% -10%, rgba(200, 245, 66, 0.07), transparent 60%);
+  }
+
+  /* Header */
+  header {
+    background: rgba(7, 7, 8, 0.92);
+    border-bottom: 0;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+  .header-inner {
+    padding: 10px 16px 8px;
+    gap: 10px;
+  }
+  .brand { gap: 10px; }
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    font-size: 14px;
+    border-radius: 11px;
+    box-shadow: 0 0 18px rgba(200, 245, 66, 0.28);
+  }
+  .brand-text {
+    font-size: 17px;
+    letter-spacing: -0.4px;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .brand-sub { display: none; }
+  .year-badge {
+    display: inline;
+    font-style: normal;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0;
+  }
+  .page-tabs,
+  #installApp,
+  #refresh { display: none !important; }
+
+  .header-actions {
+    margin-left: auto;
+    gap: 8px;
+  }
+  .icon-btn {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1.5px solid rgba(200, 245, 66, 0.45);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .icon-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .icon-btn:hover { background: rgba(200, 245, 66, 0.08); }
+
+  /* Page body */
+  .wrap {
+    padding: 12px 14px 118px;
+    max-width: 100%;
+  }
+  #todayStats,
+  #countryChips,
+  #status,
+  .page-intro,
+  .section-title p {
+    display: none !important;
+  }
+
+  /* Dates — lime selected pill with calendar */
+  .controls-shell {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  #dates {
+    width: 100%;
+    flex: none;
+    gap: 8px;
+    padding: 0 0 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .date {
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 0;
+    background: #1c1c1f;
+    color: #9a9aa3;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: none;
+  }
+  .date .date-cal {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+  }
+  .date.active {
+    background: var(--accent);
+    color: #0a0a0b;
+    border-color: var(--accent);
+    box-shadow: 0 0 16px rgba(200, 245, 66, 0.28);
+  }
+
+  /* Filters hidden until profile tap */
+  .toolbar.filters {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    background: #141416;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    padding: 12px;
+    gap: 8px;
+  }
+  body.filters-open .toolbar.filters { display: grid; }
+  .toolbar select,
+  .toolbar button { width: 100%; }
+
+  /* Cards */
+  #cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .card {
+    border-radius: 20px;
+    background: #141416;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    padding-bottom: 4px;
+    overflow: hidden;
+  }
+  .card:hover {
+    transform: none;
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  }
+  .card:has(.banker-badge),
+  .card:has(.m-banker) {
+    background: linear-gradient(180deg, rgba(200, 245, 66, 0.05), #141416 38%);
+    border-color: rgba(200, 245, 66, 0.12);
+  }
+  .card:has(.banker-badge):hover {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    border-color: rgba(200, 245, 66, 0.18);
+  }
+
+  .league,
+  .banker-badge,
+  .match-badge.upcoming,
+  .confidence,
+  .time,
+  .details,
+  .early-note {
+    display: none !important;
+  }
+  .match-badge.live,
+  .match-badge.won,
+  .match-badge.lost {
+    top: 12px;
+    right: 12px;
+    z-index: 3;
+  }
+
+  .m-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 0;
+    gap: 8px;
+  }
+  .m-banker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+  }
+  .m-banker .m-star {
+    font-size: 14px;
+    line-height: 1;
+  }
+  .m-conf {
+    margin-left: auto;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .m-kick-row {
+    display: block;
+    text-align: right;
+    padding: 2px 16px 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8b8b93;
+  }
+  .m-kick-row:before {
+    content: '⏱ ';
+  }
+  .m-card-top .m-kick-row {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    text-align: left;
+    font-size: 12px;
+  }
+  .m-card-top .m-kick-row:before { content: none; }
+
+  .teams,
+  .crest-matchup {
+    padding: 14px 12px 6px;
+    gap: 6px;
+  }
+  .crest-wrap {
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    border: 0;
+    background: #1c1c1f;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+  .team-crest {
+    width: 48px;
+    height: 48px;
+  }
+  .team-name {
+    font-size: 13px;
+    font-weight: 600;
+    max-width: 130px;
+    color: #ececec;
+  }
+  .versus {
+    font-size: 15px;
+    font-weight: 700;
+    color: #6e6e76;
+    letter-spacing: 0.04em;
+  }
+
+  .pick {
+    margin: 4px 16px 8px;
+    border: 0;
+    background: transparent;
+    padding: 8px 0 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 2px;
+  }
+  .card:has(.banker-badge) .pick,
+  .card:has(.m-banker) .pick {
+    background: transparent;
+    border: 0;
+  }
+  .pick strong:before { display: none; }
+  .pick-kicker {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: #7c7c84;
+    text-transform: uppercase;
+  }
+  .pick strong {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .pick .odd { display: none; }
+
+  .m-footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 16px 16px;
+  }
+  .m-ev span {
+    display: block;
+    font-size: 12px;
+    color: #8b8b93;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .m-ev b {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+  }
+  .m-ev b.neg { color: #f87171; }
+  .odd.odd-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    padding: 8px 14px 7px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #0a0a0b;
+    box-shadow: 0 0 16px rgba(200, 245, 66, 0.3);
+  }
+  .card:has(.banker-badge) .odd.odd-stack,
+  .card:has(.m-banker) .odd.odd-stack {
+    background: var(--accent);
+    color: #0a0a0b;
+  }
+  .odd-kicker {
+    display: block;
+    font-family: var(--font);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    opacity: 0.7;
+  }
+  .odd.odd-stack {
+    font-size: 20px;
+  }
+
+  /* Banker rules page */
+  .banker-rule-intro {
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .banker-rule-intro strong { font-size: 15px; }
+  .banker-rule-intro p { font-size: 12px; }
+  .banker-hard-rules b { font-size: 10px; }
+  #bankerStats {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  #bankerCards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .banker-rule-card {
+    border-radius: 20px;
+    border-color: rgba(200, 245, 66, 0.14);
+  }
+
+  /* Results compact */
+  .section-title {
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .section-title h2 { font-size: 15px; }
+  .performance-summary {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .perf-head, .perf-row {
+    grid-template-columns: 1.4fr 0.6fr 0.6fr 0.6fr 0.8fr;
+    font-size: 11px;
+    padding: 10px 10px;
+  }
+
+  /* Bottom tab bar */
+  .mobile-nav {
+    display: flex;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    width: min(92vw, 380px);
+    height: 64px;
+    border-radius: 22px;
+    background: rgba(20, 20, 22, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    overflow: hidden;
+    padding: 0 6px;
+  }
+  .mobile-nav a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: #7a7a82;
+    padding: 8px 4px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    position: relative;
+    background: transparent;
+  }
+  .mobile-nav a svg {
+    width: 22px;
+    height: 22px;
+  }
+  .mobile-nav a.active {
+    background: transparent;
+    color: var(--accent);
+  }
+  .mobile-nav a.active:after {
+    content: '';
+    position: absolute;
+    left: 28%;
+    right: 28%;
+    bottom: 5px;
+    height: 2px;
+    border-radius: 99px;
+    background: var(--accent);
+  }
+}
+
+@media (min-width: 801px) {
+  .pick-kicker { display: none; }
+  .odd-stack .odd-kicker { display: none; }
+}
