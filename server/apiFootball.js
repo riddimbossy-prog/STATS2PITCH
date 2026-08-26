@@ -29,7 +29,15 @@ async function call(path,params={}){
   }))
 }
 
-export async function fixturesByDate(date){return unwrap(await call('/fixtures',{date}))}
+export async function fixturesByDate(date){
+  const body=await call('/fixtures',{date})
+  const rows=unwrap(body)
+  if(!rows.length){
+    const errors=body?.errors&&typeof body.errors==='object'?body.errors:{}
+    console.warn(`API-Football fixtures ${date} returned 0 (results=${body?.results??'n/a'} errors=${JSON.stringify(errors)})`)
+  }
+  return rows
+}
 
 export async function teamHistory(teamId){
   return unwrap(await call('/fixtures',{team:teamId,last:HISTORY_LAST}))

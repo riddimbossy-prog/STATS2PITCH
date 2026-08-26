@@ -1,3 +1,4 @@
+const ELITE_FEED_TOKEN=Deno.env.get('STATS2PITCH_ELITE_FEED_TOKEN')||''
 const ENGINE_VERSION='stats2pitch-v5-var-tips'
 const SUPABASE_URL=(Deno.env.get('SUPABASE_URL')||'').replace(/\/$/,'')
 const SUPABASE_ANON_KEY=Deno.env.get('SUPABASE_ANON_KEY')||''
@@ -49,6 +50,45 @@ async function verifyAdmin(req:Request){
   const role=String(user?.app_metadata?.role||user?.user_metadata?.role||'').toLowerCase()
   const email=String(user?.email||'').toLowerCase()
   return role==='admin'||ADMIN_EMAILS.includes(email)?user:null
+}
+function eliteAuthorized(req:Request){
+  if(!ELITE_FEED_TOKEN)return false
+  const bearer=String(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'').trim()
+  return bearer===ELITE_FEED_TOKEN
+}
+function eliteItems(board:any,date:string){
+  const source=Array.isArray(board?.varTips)?board.varTips:(Array.isArray(board?.bestPicks)?board.bestPicks:[])
+  return source
+    .filter((row:any)=>String(row?.engine||'')==='away-fav-streak-v1')
+    .filter((row:any)=>['btts','away-win','away-o15','over-15'].includes(String(row?.route||'')))
+    .sort((a:any,b:any)=>Date.parse(a?.kickoff||0)-Date.parse(b?.kickoff||0))
+    .map((row:any,index:number)=>{
+      const home=String(row?.home||row?.home_team||'')
+      const away=String(row?.away||row?.away_team||'')
+      const market=String(row?.market||'')
+      const marketName=market==='both-teams-score'?'Both Teams To Score':market==='match-winner'?'Match winner':market==='away-team-goals'?'Away team goals':market==='total-goals'?'Total goals':market||'Market'
+      return{
+        id:`stats2pitch-${row?.fixtureId||index}-${market||'market'}`,
+        source:'stats2pitch',
+        source_fixture_id:row?.fixtureId?String(row.fixtureId):null,
+        prediction_date:date,
+        fixture:home&&away?`${home} vs ${away}`:'Fixture',
+        home_team:home||null,
+        away_team:away||null,
+        home_logo:row?.homeLogo||row?.home_logo||null,
+        away_logo:row?.awayLogo||row?.away_logo||null,
+        league:row?.league||null,
+        country:row?.country||null,
+        kickoff:row?.kickoff||null,
+        market:marketName,
+        pick:row?.displaySelection||row?.pick||row?.selection||'Selection',
+        average_odds:Number.isFinite(Number(row?.odds))?Number(row.odds):null,
+        classification:'elite_supported',
+        label:'Elite',
+        status:'upcoming',
+        last_verified_at:board?.meta?.generatedAt||new Date().toISOString()
+      }
+    })
 }
 function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],fixtures:[],availableMarkets:[],results:{}}}
 async function snapshot(date:string){
@@ -135,6 +175,13 @@ Deno.serve(async req=>{
     if(route==='/board'&&req.method==='GET'){
       const date=requestedDate(url),row=await snapshot(date),status=snapshotState(date,row),board=row?.board||emptyBoard(date)
       return json({...board,meta:{...(board.meta||{}),date,refresh:status,requiresRefresh:status.state!=='complete'}})
+    }
+    if((route==='/export/elite'||route==='/api/export/elite')&&req.method==='GET'){
+      if(!eliteAuthorized(req))return json({error:'unauthorized'},401)
+      const date=requestedDate(url),row=await snapshot(date)
+      if(!row?.board?.meta?.generatedAt)return json({error:'missing-snapshot',date},409)
+      const items=eliteItems(row.board,date)
+      return json({version:4,source:'stats2pitch',date,generated_at:row.board.meta.generatedAt,count:items.length,items})
     }
     if(route==='/results'&&req.method==='GET'){
       const date=requestedDate(url),row=await snapshot(date),board=row?.board||emptyBoard(date)

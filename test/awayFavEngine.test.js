@@ -113,6 +113,31 @@ test('early season and similar form are skipped',()=>{
   assert.equal(similar.skip,'similar-form')
 })
 
+test('missing table or venue history does not skip a priced qualifier',()=>{
+  const result=diagnoseAwayFavFixture(fixture({
+    homeFixtures:[],
+    awayFixtures:[],
+    homeSplit:null,
+    awaySplit:null
+  }))
+  assert.equal(result.skip,null)
+  assert.equal(result.pick.route,'btts')
+})
+
+test('SportyBet 2+ in-a-row market is the streak universe',()=>{
+  const odds=extractOdds(fixture({
+    marketOdds:[
+      {marketKey:'60010',market:'Any Team To Score 2 or More Goals in a Row',outcomes:[{name:'Yes',odd:1.27}]},
+      {marketKey:'away-team-goals',market:'Away O/U',outcomes:[{name:'Over 0.5',odd:1.18},{name:'Over 1.5',odd:1.32}]},
+      {marketKey:'home-team-goals',market:'Home O/U',outcomes:[{name:'Over 0.5',odd:1.20}]},
+      {marketKey:'total-goals',market:'Over/Under',outcomes:[{name:'Over 0.5',odd:1.04}]},
+      {marketKey:'total-goals',market:'Over/Under',outcomes:[{name:'Over 1.5',odd:1.29}]}
+    ]
+  }))
+  assert.equal(odds.streak,1.27)
+  assert.equal(odds.over15,1.29)
+})
+
 test('both over 0.5 under 1.30 routes to BTTS yes',()=>{
   const result=diagnoseAwayFavFixture(fixture())
   assert.equal(result.skip,null)
