@@ -28,9 +28,11 @@ function incomingFeedEmpty(board){
   return source===0&&scheduled===0&&countTips(board)===0
 }
 function mergePublished(existing,incoming){
+  if(!existing)return incoming
+  if(incomingFeedEmpty(incoming)&&countTips(existing)>0)return existing
   const now=incoming?.meta?.generatedAt||new Date().toISOString()
   const sameEngine=String(existing?.meta?.engineVersion||'')===String(incoming?.meta?.engineVersion||'')
-  if(!sameEngine)return incoming
+  if(!sameEngine)return countTips(incoming)>0?incoming:existing
   const bestPicks=mergeRows(existing?.bestPicks,incoming?.bestPicks,now,existing)
   const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
   return{

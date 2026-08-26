@@ -63,7 +63,7 @@ export async function refreshNow(date,onProgress=()=>{}){
   const learned=await learningProfiles()
   onProgress({stage:'fixtures-and-odds',done:0,total:2})
   const raw=await fixturesByDate(date);onProgress({stage:'fixtures-and-odds',done:1,total:2,fixtures:raw.length})
-  const oddsMap=await oddsByDate(date);onProgress({stage:'fixtures-and-odds',done:2,total:2,fixtures:raw.length,oddsFixtures:oddsMap.size})
+  const oddsMap=raw.length?await oddsByDate(date):new Map();onProgress({stage:'fixtures-and-odds',done:2,total:2,fixtures:raw.length,oddsFixtures:oddsMap.size})
   const scheduled=raw.filter(f=>SCHEDULED.has(String(f?.fixture?.status?.short||'').toUpperCase()))
   const leagueKeys=[...new Map(scheduled.map(f=>[leagueKey(f?.league?.id,f?.league?.season),{league:f?.league?.id,season:Number(f?.league?.season)}])).values()].filter(x=>x.league&&Number.isFinite(x.season))
   let historyDone=0;onProgress({stage:'league-history',done:0,total:leagueKeys.length,fixtures:scheduled.length})

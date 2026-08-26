@@ -10,8 +10,14 @@ for(let i=0;i<dates.length;i++){
   console.log(`Refreshing ${d}`)
   try{
     const board=await refreshNow(d,p=>console.log(d,p))
+    const src=Number(board?.meta?.sourceFixtures??board?.meta?.diagnostics?.sourceFixtures??0)
+    const published=board.bestPicks.length
     completed++
-    console.log(`${d}: ${board.bestPicks.length} published picks · ${board.priority.length} qualified`)
+    console.log(`${d}: ${published} published picks · ${board.priority.length} qualified · ${src} source fixtures`)
+    if(src===0&&published===0){
+      failed++
+      console.error(`${d}: API-Football returned zero fixtures; board not regenerated`)
+    }
   }catch(error){
     failed++
     console.error(`${d}: refresh failed: ${error?.message||error}`)

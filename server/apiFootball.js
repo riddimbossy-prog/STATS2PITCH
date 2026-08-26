@@ -8,6 +8,15 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))
 const minInterval=Math.max(100,Number(process.env.API_FOOTBALL_MIN_INTERVAL_MS||650))
 let queue=Promise.resolve(),lastStarted=0
 
+function footballErrors(body){
+  const e=body?.errors
+  if(!e)return ''
+  if(typeof e==='string')return e
+  if(Array.isArray(e))return e.map(x=>x?.message||x).filter(Boolean).join('; ')
+  if(typeof e==='object')return Object.entries(e).map(([k,v])=>`${k}:${v}`).join('; ')
+  return String(e)
+}
+
 async function paced(task){
   const run=queue.then(async()=>{
     const wait=Math.max(0,minInterval-(Date.now()-lastStarted))
@@ -32,9 +41,11 @@ async function call(path,params={}){
 export async function fixturesByDate(date){
   const body=await call('/fixtures',{date})
   const rows=unwrap(body)
+  const err=footballErrors(body)
+  if(!rows.length&&err)throw new Error(`API-Football fixtures ${date} blocked: ${err}`)
   if(!rows.length){
-    const errors=body?.errors&&typeof body.errors==='object'?body.errors:{}
-    console.warn(`API-Football fixtures ${date} returned 0 (results=${body?.results??'n/a'} errors=${JSON.stringify(errors)})`)
+    const results=body?.results??'n/a'
+    console.warn(`API-Football fixtures ${date} returned 0 (results=${results} errors=${JSON.stringify(body?.errors||{})})`)
   }
   return rows
 }
