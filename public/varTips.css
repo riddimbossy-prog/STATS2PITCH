@@ -1,0 +1,96 @@
+/* Stats2Pitch VAR Tips — dedicated board chrome */
+
+.var-intro {
+  margin: 0 0 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.var-intro strong {
+  display: block;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.var-intro p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 500;
+  max-width: 850px;
+  line-height: 1.5;
+}
+
+#varStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+#varStats button {
+  appearance: none;
+  text-align: left;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  min-width: 0;
+  box-shadow: var(--shadow);
+  transition: 0.15s;
+}
+#varStats button:hover {
+  border-color: rgba(200, 245, 66, 0.35);
+}
+#varStats small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+#varStats b {
+  display: block;
+  font: 700 24px var(--mono);
+  margin-top: 4px;
+  color: var(--ink);
+}
+
+.var-badge {
+  position: absolute;
+  top: 34px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+  border-radius: 6px;
+  z-index: 2;
+  background: var(--accent);
+  color: #0a0a0b;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.card:has(.var-badge) {
+  border-color: rgba(200, 245, 66, 0.28);
+  background: linear-gradient(160deg, rgba(200, 245, 66, 0.05), var(--surface));
+}
+.card:has(.var-badge):hover {
+  border-color: var(--accent);
+  box-shadow: var(--glow-lime), var(--shadow);
+}
+.card:has(.var-badge) .league {
+  background: rgba(200, 245, 66, 0.06);
+  border-bottom-color: rgba(200, 245, 66, 0.16);
+}
+
+@media (max-width: 800px) {
+  #varStats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 620px) {
+  .var-intro { padding: 14px 16px; }
+}

@@ -46,8 +46,13 @@ function priorityClass(row){
   return rating>=78?'elite_strong':'elite_supported'
 }
 
+function eliteSource(board){
+  if(Array.isArray(board?.varTips))return board.varTips
+  return Array.isArray(board?.bestPicks)?board.bestPicks:[]
+}
+
 export function buildEliteFeed(board,{date}={}){
-  const rows=(Array.isArray(board?.bestPicks)?board.bestPicks:[])
+  const rows=eliteSource(board)
     .filter(row=>text(row?.engine||'')==='away-fav-streak-v1')
     .filter(row=>['btts','away-win','away-o15','over-15'].includes(text(row?.route)))
     .sort((a,b)=>Date.parse(a?.kickoff||0)-Date.parse(b?.kickoff||0))

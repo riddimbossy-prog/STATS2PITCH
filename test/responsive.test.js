@@ -4,10 +4,11 @@ import fs from 'node:fs'
 const css=fs.readFileSync(new URL('../public/conceptC.css',import.meta.url),'utf8')
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8')
 
-test('Concept C stylesheet is active and mobile bottom nav exists',()=>{
-  assert.match(html,/conceptC\.css\?v=4\.1\.2/)
+test('Concept D stylesheet is active and mobile bottom nav exists',()=>{
+  assert.match(html,/conceptD\.css\?v=5\.1\.0/)
   assert.doesNotMatch(html,/product\.css/)
   assert.match(html,/class="mobile-nav"/)
+  assert.match(html,/var-tips\.html/)
 })
 test('Concept C has tablet, phone and foldable breakpoints',()=>{
   assert.match(css,/@media\(max-width:800px\)/)

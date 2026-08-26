@@ -1,4 +1,5 @@
 import {ENGINE_VERSION,MIN_ODD,MAX_ODD,MIN_CONSENSUS,FORM_SAMPLE,FINISHED} from './config.js'
+import {learningAllows} from './learning.js'
 import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 import {buildAwayFavBoard} from './awayFavEngine.js'
@@ -193,16 +194,36 @@ export function analyzeFixture(f,{ignoreTransition=false}={}){
 }
 
 export function buildBoard(fixtures,meta={},learningProfiles=[]){
-  const board=buildAwayFavBoard(fixtures,meta)
+  const learnedList=Array.isArray(learningProfiles)?learningProfiles:[]
+  const raw=(fixtures||[]).flatMap(analyzeFixture)
+  const all=[]
+  for(const p of raw){
+    const learned=learningAllows(p,learnedList)
+    if(!learned.allowed)continue
+    all.push({...p,learningProfile:learned.profile?{sample:learned.profile.sample,winRate:learned.profile.winRate,gate:learned.profile.gate}:null})
+  }
+  const best=[],seen=new Set()
+  for(const p of all){if(seen.has(String(p.fixtureId)))continue;seen.add(String(p.fixtureId));best.push(p)}
+  const varBoard=buildAwayFavBoard(fixtures,meta)
   return{
-    ...board,
     meta:{
-      ...board.meta,
       ...meta,
       engineVersion:ENGINE_VERSION,
-      engine:'away-fav-streak-v1',
+      engine:'stats2pitch-consensus-v4-over25',
+      minOdd:MIN_ODD,
+      maxOdd:MAX_ODD,
+      minConsensus:MIN_CONSENSUS,
       formSample:FORM_SAMPLE,
-      learningProfiles:Array.isArray(learningProfiles)?learningProfiles.filter(x=>x?.ready).length:0
-    }
+      qualified:all.length,
+      bestPicks:best.length,
+      learningProfiles:learnedList.filter(x=>x?.ready).length,
+      varTipsEngine:varBoard.meta?.engine||'away-fav-streak-v1',
+      varTipsCount:Array.isArray(varBoard.bestPicks)?varBoard.bestPicks.length:0
+    },
+    priority:all,
+    bestPicks:best,
+    availableMarkets:[...new Set(all.map(x=>x.market))].sort(),
+    varTips:varBoard.bestPicks||[],
+    varTipsMeta:varBoard.meta||null
   }
 }

@@ -8,6 +8,7 @@ test('GitHub Pages plus Supabase production path includes results, admin and set
   assert.equal(renderExists,false)
   assert.match(html,/runtime-config\.js/)
   assert.match(html,/bankers\.html/)
+  assert.match(html,/var-tips\.html/)
   assert.match(html,/results\.html/)
   assert.match(pages,/actions\/deploy-pages@v4/)
   assert.match(refresh,/npm run settle/)

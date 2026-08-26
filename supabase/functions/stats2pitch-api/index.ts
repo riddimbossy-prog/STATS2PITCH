@@ -1,4 +1,4 @@
-const ENGINE_VERSION='away-fav-streak-v1'
+const ENGINE_VERSION='stats2pitch-v5-var-tips'
 const SUPABASE_URL=(Deno.env.get('SUPABASE_URL')||'').replace(/\/$/,'')
 const SUPABASE_ANON_KEY=Deno.env.get('SUPABASE_ANON_KEY')||''
 const SUPABASE_SERVICE_ROLE_KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||''
@@ -50,7 +50,7 @@ async function verifyAdmin(req:Request){
   const email=String(user?.email||'').toLowerCase()
   return role==='admin'||ADMIN_EMAILS.includes(email)?user:null
 }
-function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],fixtures:[],availableMarkets:[],results:{}}}
+function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],fixtures:[],availableMarkets:[],results:{}}}
 async function snapshot(date:string){
   const rows=await rest(`/rest/v1/prediction_snapshots?select=payload,generated_at&snapshot_date=eq.${encodeURIComponent(date)}&limit=1`)
   const row=Array.isArray(rows)?rows[0]:null,payload=row?.payload||null
@@ -141,7 +141,8 @@ Deno.serve(async req=>{
       let fixtures:any[]=[];try{fixtures=await liveScores(date)}catch{}
       const map=new Map(fixtures.map(f=>[String(f.fixtureId),f])),stored=board?.results||{}
       const picks=(board?.bestPicks||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):stored[String(p.fixtureId)]||{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
-      return json({date,picks,fixtures})
+      const varTips=(board?.varTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
+      return json({date,picks,varTips,fixtures})
     }
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}
     if(route==='/performance'&&req.method==='GET'){

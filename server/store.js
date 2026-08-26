@@ -14,22 +14,25 @@ async function request(path,{method='GET',body,token=SERVICE,headers={}}={}){
 }
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
 function stampPick(p,at){return{...p,publishedAt:p?.publishedAt||at,proofKey:p?.proofKey||proofKey(p)}}
+function mergeRows(oldRows,freshRows,now,existing){
+  const map=new Map((Array.isArray(oldRows)?oldRows:[]).map(p=>[String(p.fixtureId),stampPick(p,p.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)]))
+  for(const p of Array.isArray(freshRows)?freshRows:[])if(!map.has(String(p.fixtureId)))map.set(String(p.fixtureId),stampPick(p,now))
+  return[...map.values()].sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
+}
 function mergePublished(existing,incoming){
   const now=incoming?.meta?.generatedAt||new Date().toISOString()
   const sameEngine=String(existing?.meta?.engineVersion||'')===String(incoming?.meta?.engineVersion||'')
   if(!sameEngine)return incoming
-  const old=Array.isArray(existing?.bestPicks)?existing.bestPicks:[]
-  const fresh=Array.isArray(incoming?.bestPicks)?incoming.bestPicks:[]
-  const map=new Map(old.map(p=>[String(p.fixtureId),stampPick(p,p.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)]))
-  for(const p of fresh)if(!map.has(String(p.fixtureId)))map.set(String(p.fixtureId),stampPick(p,now))
-  const bestPicks=[...map.values()].sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
+  const bestPicks=mergeRows(existing?.bestPicks,incoming?.bestPicks,now,existing)
+  const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
   return{
     ...incoming,
     bestPicks,
+    varTips,
     results:{...(existing?.results||{}),...(incoming?.results||{})},
     resultSummary:incoming?.resultSummary||existing?.resultSummary||null,
     availableMarkets:[...new Set([...(incoming?.availableMarkets||[]),...bestPicks.map(x=>x.market).filter(Boolean)])].sort(),
-    meta:{...(incoming?.meta||{}),firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,publishedPicks:bestPicks.length}
+    meta:{...(incoming?.meta||{}),firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,publishedPicks:bestPicks.length,varTipsCount:varTips.length}
   }
 }
 export async function loadBoard(date,{allowVersionMismatch=false}={}){

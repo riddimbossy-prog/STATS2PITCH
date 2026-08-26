@@ -59,10 +59,23 @@ function fixture(overrides={}){
   }
 }
 
-test('board version is the away-fav streak engine',()=>{
-  assert.equal(ENGINE_VERSION,'away-fav-streak-v1')
-  assert.equal(buildBoard([]).meta.engineVersion,ENGINE_VERSION)
-  assert.equal(buildBoard([]).meta.engine,'away-fav-streak-v1')
+test('board version is consensus All Picks plus VAR Tips',()=>{
+  assert.equal(ENGINE_VERSION,'stats2pitch-v5-var-tips')
+  const board=buildBoard([])
+  assert.equal(board.meta.engineVersion,ENGINE_VERSION)
+  assert.equal(board.meta.engine,'stats2pitch-consensus-v4-over25')
+  assert.equal(board.meta.varTipsEngine,'away-fav-streak-v1')
+  assert.ok(Array.isArray(board.bestPicks))
+  assert.ok(Array.isArray(board.varTips))
+})
+
+test('combined board attaches VAR Tips separately from All Picks',()=>{
+  const board=buildBoard([fixture()])
+  assert.equal(board.varTips.length,1)
+  assert.equal(board.varTips[0].engine,'away-fav-streak-v1')
+  assert.equal(board.varTips[0].route,'btts')
+  assert.equal(board.meta.varTipsCount,1)
+  assert.ok(board.bestPicks.every(row=>row.engine!=='away-fav-streak-v1'))
 })
 
 test('missing required odds fail closed',()=>{
@@ -165,7 +178,7 @@ test('board keeps one pick per fixture and publishes every qualifier',()=>{
   assert.deepEqual(kickoffs,[...kickoffs].sort((a,b)=>a-b))
 })
 
-test('elite export publishes every away-fav qualifier without method fields',()=>{
+test('elite export reads VAR Tips and publishes every qualifier without method fields',()=>{
   const qualified=diagnoseAwayFavFixture(fixture()).pick
   const extras=Array.from({length:11},(_,index)=>({
     ...qualified,
@@ -174,13 +187,11 @@ test('elite export publishes every away-fav qualifier without method fields',()=
     home:`Home ${index}`,
     away:`Away ${index}`
   }))
+  const consensus={fixtureId:999,home:'Old',away:'Consensus',market:'match-winner',selection:'Home',odds:1.40,engineRating:90,engine:'stats2pitch-consensus-v4-over25'}
   const feed=buildEliteFeed({
-    meta:{date:'2026-08-25',generatedAt:'2026-08-25T09:00:00Z',engine:'away-fav-streak-v1'},
-    bestPicks:[
-      qualified,
-      ...extras,
-      {fixtureId:999,home:'Old',away:'Consensus',market:'match-winner',selection:'Home',odds:1.40,engineRating:90,engine:'stats2pitch-consensus-v4-over25'}
-    ]
+    meta:{date:'2026-08-25',generatedAt:'2026-08-25T09:00:00Z',engine:'stats2pitch-consensus-v4-over25',varTipsEngine:'away-fav-streak-v1'},
+    varTips:[qualified,...extras],
+    bestPicks:[consensus]
   },{date:'2026-08-25'})
   assert.equal(feed.items.length,12)
   assert.equal(feed.items[0].label,'Elite')
