@@ -1,6 +1,7 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal} from './whyPopup.js'
 import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip} from './net.js'
+import {adviceFor} from './performanceAdvice.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
 const view=document.body.dataset.view||'all'
@@ -66,7 +67,30 @@ async function loadBoardData(){
 }
 function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`);renderBoard()}catch{}},30000)}
 function performanceRows(){const dimension=state.performanceGroup;return(state.performance?.groups||[]).filter(x=>x.dimension===dimension)}
-function renderPerformance(){const p=state.performance||{summary:{},groups:[]},s=p.summary||{},host=$('#performanceSummary');if(host)host.innerHTML=`<div><small>Picks</small><b>${s.picks||0}</b></div><div class="win"><small>Won</small><b>${s.won||0}</b></div><div class="loss"><small>Lost</small><b>${s.lost||0}</b></div><div><small>Void</small><b>${s.void||0}</b></div><div class="rate"><small>Success</small><b>${Number(s.winRate||0).toFixed(1)}%</b></div>`;const rows=performanceRows(),table=$('#performanceTable');if(table)table.innerHTML=rows.length?`<div class="perf-head"><span>${esc(state.performanceGroup)}</span><span>Picks</span><span>Won</span><span>Lost</span><span>Success</span></div>`+rows.map(r=>`<div class="perf-row"><strong>${state.performanceGroup==='country'?`${flag(r.value)} `:''}${esc(r.value.replaceAll('-',' '))}</strong><span>${r.picks}</span><span>${r.won}</span><span>${r.lost}</span><b>${Number(r.winRate).toFixed(1)}%</b></div>`):'<div class="empty">No settled performance data yet.</div>';const g=$('#performanceGroup');if(g)g.value=state.performanceGroup}
+function groupTitle(value){const label=esc(String(value||'Unknown').replaceAll('-',' '));return state.performanceGroup==='country'?`${flag(value)} ${label}`:label}
+function toneLabel(tone){return({bank:'Bank on',avoid:'Avoid',steady:'Steady',watch:'Mixed',thin:'Too few'})[tone]||''}
+function meterCard(r){
+  const rate=Number(r.winRate)||0
+  return`<article class="perf-meter ${esc(r.tone)}"><div class="perf-meter-top"><strong>${groupTitle(r.value)}</strong><span class="perf-tone ${esc(r.tone)}">${toneLabel(r.tone)}</span></div><div class="perf-meter-rate"><b>${rate.toFixed(1)}%</b><span>${r.picks} settled</span></div><div class="perf-bar" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,rate))}%"></i></div><div class="perf-meter-meta"><span class="win">${r.won} won</span><span class="loss">${r.lost} lost</span></div></article>`
+}
+function adviceList(items){return`<ul>${items.map(r=>`<li><strong>${groupTitle(r.value)}</strong><span>${Number(r.winRate).toFixed(1)}% · ${r.picks} settled · ${r.won}W / ${r.lost}L</span></li>`).join('')}</ul>`}
+function renderPerformance(){
+  const p=state.performance||{summary:{},groups:[]},s=p.summary||{},host=$('#performanceSummary')
+  const ring=Number(s.winRate||0)
+  const ringColor=ring>=70?'var(--accent)':ring>=58?'#d4d4d8':'var(--lost)'
+  if(host)host.innerHTML=`<div class="perf-hero"><div class="perf-ring" style="--p:${ring};--ring:${ringColor}"><div class="perf-ring-copy"><b>${ring.toFixed(1)}%</b><small>Success</small></div></div><div class="perf-hero-grid"><div><small>Picks</small><b>${s.picks||0}</b></div><div class="win"><small>Won</small><b>${s.won||0}</b></div><div class="loss"><small>Lost</small><b>${s.lost||0}</b></div><div><small>Void</small><b>${s.void||0}</b></div></div></div>`
+  const advice=adviceFor(performanceRows())
+  const adviceHost=$('#performanceAdvice')
+  if(adviceHost){
+    const bankBody=advice.bank.length?adviceList(advice.bank):'<p class="perf-empty-note">Nothing clears the bank bar yet — need a high hit rate and at least 15 settled picks.</p>'
+    const avoidBody=advice.avoid.length?adviceList(advice.avoid):'<p class="perf-empty-note">No group with a large enough sample is failing. Tiny samples below are not a sell signal.</p>'
+    adviceHost.innerHTML=`<div class="perf-callout bank"><div class="perf-callout-kicker">Bank on</div><p>High hit rate with a large enough settled sample. Core of the slip.</p>${bankBody}</div><div class="perf-callout avoid"><div class="perf-callout-kicker">Avoid</div><p>Enough settled picks, but the hit rate is not holding. Leave these off the slip.</p>${avoidBody}</div><p class="perf-rule">A group needs 12+ settled picks before it can be banked or avoided. A 100% run on two picks is not a bank.</p>`
+  }
+  const table=$('#performanceTable')
+  if(table)table.innerHTML=advice.rows.length?advice.rows.map(meterCard).join(''):'<div class="empty">No settled performance data yet.</div>'
+  const g=$('#performanceGroup');if(g)g.value=state.performanceGroup
+}
+
 async function loadResultsView(){skeleton();const [perf]=await Promise.all([api('/performance?days=30')]);state.performance=perf;renderPerformance();await loadBoardData()}
 function bind(){for(const[id,key]of[['statusFilter','status'],['seasonFilter','seasonStage'],['countryFilter','country'],['leagueFilter','league'],['market','market']]){const el=$('#'+id);if(el)el.onchange=e=>{state[key]=e.target.value;if(key==='country')state.league='all';renderBoard()}};$('#clearFilters')?.addEventListener('click',()=>{state.status=view==='results'?'settled':'upcoming';state.country=state.league=state.market=state.seasonStage='all';renderBoard()});$('#performanceGroup')?.addEventListener('change',e=>{state.performanceGroup=e.target.value;renderPerformance()});$('#refresh')?.addEventListener('click',load);$('#notifyBell')?.addEventListener('click',load);$('#profileBtn')?.addEventListener('click',()=>document.body.classList.toggle('filters-open'))}
 async function load(){

@@ -27,7 +27,12 @@ html, body { font-size: 19px !important; }
 .filter-intro p, .var-intro p, .goals-intro p, .banker-rule-intro p { font-size: 16px !important; }
 .confidence, .m-ev, .m-ev span { font-size: 15px !important; }
 .settled-summary { font-size: 16px !important; }
-.perf-head, .perf-row, .performance-summary small { font-size: 15px !important; }
-.performance-summary b { font-size: 24px !important; }
+.perf-head, .perf-row, .performance-summary small, .perf-hero-grid small { font-size: 15px !important; }
+.performance-summary b, .perf-hero-grid b { font-size: 24px !important; }
+.perf-ring-copy b { font-size: 26px !important; }
+.perf-meter-rate b { font-size: 26px !important; }
+.perf-callout p, .perf-empty-note, .perf-rule { font-size: 15px !important; }
+.perf-callout li strong, .perf-meter-top strong { font-size: 16px !important; }
+.perf-tone, .perf-callout-kicker { font-size: 12px !important; }
 .empty { font-size: 16px !important; }
 .close { font-size: 16px !important; }

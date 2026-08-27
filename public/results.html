@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0b">
   <title>Results · Stats2Pitch</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=5.5.1">
+  <link rel="manifest" href="/manifest.webmanifest?v=5.5.2">
   <link rel="icon" type="image/png" href="/assets/stats2pitch-favicon-v2.png">
   <link rel="apple-touch-icon" href="/assets/stats2pitch-favicon-v2.png">
   <link rel="preconnect" href="https://s.sporty.net" crossorigin>
@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/conceptD.css?v=5.5.1">
-  <link rel="stylesheet" href="/mobile2026.css?v=5.5.1">
-  <link rel="stylesheet" href="/fontPlus2.css?v=5.5.1">
+  <link rel="stylesheet" href="/conceptD.css?v=5.5.2">
+  <link rel="stylesheet" href="/mobile2026.css?v=5.5.2">
+  <link rel="stylesheet" href="/fontPlus2.css?v=5.5.2">
 </head>
 <body data-view="results">
   <div class="app">
@@ -51,11 +51,12 @@
       <div class="section-title">
         <div>
           <h2>30-Day Performance</h2>
-          <p>Settled picks only. Voids are excluded from success rate.</p>
+          <p>Settled All Picks only. Voids are excluded from success rate. Bank and avoid calls need a large enough sample.</p>
         </div>
         <span class="results-range">Last 30 days</span>
       </div>
       <section id="performanceSummary" class="performance-summary"></section>
+      <section id="performanceAdvice" class="perf-advice"></section>
       <div class="performance-controls">
         <strong>Breakdown</strong>
         <select id="performanceGroup">
@@ -121,10 +122,11 @@
     </a>
   </nav>
   <script src="/runtime-config.js"></script>
-  <link rel="modulepreload" href="/net.js?v=5.5.1">
-  <link rel="modulepreload" href="/appCrests.js?v=5.5.1">
-  <script src="/leagueFlags.js?v=5.5.1"></script>
-  <script type="module" src="/appCrests.js?v=5.5.1"></script>
-  <script src="/pwa.js?v=5.5.1"></script>
+  <link rel="modulepreload" href="/net.js?v=5.5.2">
+  <link rel="modulepreload" href="/performanceAdvice.js?v=5.5.2">
+  <link rel="modulepreload" href="/appCrests.js?v=5.5.2">
+  <script src="/leagueFlags.js?v=5.5.2"></script>
+  <script type="module" src="/appCrests.js?v=5.5.2"></script>
+  <script src="/pwa.js?v=5.5.2"></script>
 </body>
 </html>

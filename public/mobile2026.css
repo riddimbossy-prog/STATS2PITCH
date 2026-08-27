@@ -463,9 +463,31 @@
   }
   .section-title h2 { font-size: 17px; }
   .performance-summary {
+    margin-bottom: 12px;
+  }
+  .perf-hero {
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+  }
+  .perf-ring { width: 120px; height: 120px; }
+  .perf-hero-grid {
+    width: 100%;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
+  .perf-advice {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .perf-callout { padding: 14px 12px 10px; }
+  .performance-table {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .perf-meter { padding: 12px; }
+  .perf-meter-rate b { font-size: 24px; }
   .perf-head, .perf-row {
     grid-template-columns: 1.4fr 0.6fr 0.6fr 0.6fr 0.8fr;
     font-size: 13px;
