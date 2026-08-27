@@ -4,7 +4,7 @@ import {isSrlMatch} from './redFlags.js'
 
 export const ENGINE_ID='goals-bankers-v1'
 export const STREAK_MIN=1.10
-export const STREAK_MAX=1.40
+export const STREAK_MAX=1.50
 export const ROUTES=Object.freeze(['FAV_WIN','FAV_2PLUS','OVER_2.5','GG','SKIP'])
 
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))

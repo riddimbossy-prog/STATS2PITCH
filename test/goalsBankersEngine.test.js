@@ -79,12 +79,13 @@ function decide(partial){
   return decideGoalsBanker(odds(partial))
 }
 
-test('streak gate skips outside 1.10-1.40 inclusive and never publishes streak',()=>{
+test('streak gate skips outside 1.10-1.50 inclusive and never publishes streak',()=>{
   assert.equal(decide({streak_yes:null}).route,'SKIP')
   assert.equal(decide({streak_yes:1.09}).route,'SKIP')
-  assert.equal(decide({streak_yes:1.41}).route,'SKIP')
+  assert.equal(decide({streak_yes:1.51}).route,'SKIP')
   assert.notEqual(decide({streak_yes:1.10}).route,'SKIP')
   assert.notEqual(decide({streak_yes:1.40}).route,'SKIP')
+  assert.notEqual(decide({streak_yes:1.50}).route,'SKIP')
   const pick=diagnoseGoalsBankerFixture(fixture()).pick
   assert.ok(pick)
   assert.notEqual(pick.market,'goals-streak-2')
