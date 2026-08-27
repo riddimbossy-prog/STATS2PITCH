@@ -5,12 +5,11 @@ import {readFile} from 'node:fs/promises'
 const read=p=>readFile(new URL(`../${p}`,import.meta.url),'utf8')
 
 test('VAR Tips is a dedicated public tab with no method copy',async()=>{
-  const [html,js,css,index,bankers,results,filter,sw,manifest]=await Promise.all([
+  const [html,js,css,index,results,filter,sw,manifest]=await Promise.all([
     read('public/var-tips.html'),
     read('public/varTips.js'),
     read('public/varTips.css'),
     read('public/index.html'),
-    read('public/bankers.html'),
     read('public/results.html'),
     read('public/filter-tips.html'),
     read('public/sw.js'),
@@ -24,21 +23,25 @@ test('VAR Tips is a dedicated public tab with no method copy',async()=>{
   assert.doesNotMatch(html,/Away-Fav|Goals Streak|first-match|trade secret|over 0\.5|1\.10/i)
   assert.doesNotMatch(js,/Goals Streak|first-match|streak window|fav is home/i)
   assert.match(css,/\.var-intro/)
-  for(const page of [index,bankers,results,html,filter]){
+  for(const page of [index,results,html,filter]){
     assert.match(page,/href="\/var-tips\.html"/)
     assert.match(page,/href="\/filter-tips\.html"/)
     assert.match(page,/>All Picks</)
     assert.match(page,/>Filter Tips</)
     assert.match(page,/>VAR Tips</)
-    assert.match(page,/>Bankers</)
     assert.match(page,/>Results</)
+    assert.doesNotMatch(page,/bankers\.html/)
+    assert.doesNotMatch(page,/>Bankers</)
   }
   assert.match(sw,/\/var-tips\.html/)
   assert.match(sw,/\/filter-tips\.html/)
   assert.match(sw,/varTips\.js/)
   assert.match(sw,/filterTips\.js/)
+  assert.doesNotMatch(sw,/bankers\.html/)
+  assert.doesNotMatch(sw,/bankerRules\.js/)
   assert.match(manifest,/"url":"\/var-tips\.html"/)
   assert.match(manifest,/"url":"\/filter-tips\.html"/)
+  assert.doesNotMatch(manifest,/bankers\.html/)
 })
 
 test('Filter Tips is a dedicated public tab',async()=>{
@@ -55,13 +58,12 @@ test('Filter Tips is a dedicated public tab',async()=>{
   assert.doesNotMatch(html,/1\.20|1\.55|GG 2\+|trade secret/i)
 })
 
-test('All Picks and Bankers no longer brand the VAR engine on the public pages',async()=>{
-  const [index,bankers,app]=await Promise.all([
+test('All Picks no longer brand the VAR engine on the public pages',async()=>{
+  const [index,app]=await Promise.all([
     read('public/index.html'),
-    read('public/bankers.html'),
     read('public/appCrests.js')
   ])
   assert.doesNotMatch(index,/Away-Fav/)
-  assert.doesNotMatch(bankers,/Away-Fav Streak/)
   assert.doesNotMatch(app,/Away-Fav Streak/)
+  assert.doesNotMatch(app,/bankers\.html/)
 })

@@ -29,8 +29,7 @@
     }
     const status=document.getElementById('status')
     if(status&&mode!=='all'){
-      const banker=document.body.dataset.view==='bankers'
-      const noun=banker?'banker':'pick'
+      const noun='pick'
       status.textContent=`${visible} ${noun}${visible===1?'':'s'} · ${mode==='early'?'Early season':'Solid season'}`
     }
   }

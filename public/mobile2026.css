@@ -395,28 +395,6 @@
     to { transform: none; opacity: 1; }
   }
 
-  /* Banker rules page */
-  .banker-rule-intro {
-    padding: 14px;
-    margin-bottom: 12px;
-  }
-  .banker-rule-intro strong { font-size: 17px; }
-  .banker-rule-intro p { font-size: 14px; }
-  .banker-hard-rules b { font-size: 12px; }
-  #bankerStats {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  #bankerCards {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  .banker-rule-card {
-    border-radius: 20px;
-    border-color: rgba(200, 245, 66, 0.14);
-  }
-
   /* Results compact */
   .section-title {
     padding: 12px 14px;

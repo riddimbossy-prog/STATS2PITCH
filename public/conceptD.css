@@ -170,7 +170,7 @@ header {
 /* Today stats */
 #todayStats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -1006,9 +1006,8 @@ body.modal-open { overflow: hidden; }
     font-size: 14px;
   }
   .wrap { padding: 20px 16px 96px; }
-  #todayStats { grid-template-columns: repeat(3, 1fr); }
-  #todayStats > *:nth-child(4),
-  #todayStats > *:nth-child(5) { display: none; }
+  #todayStats { grid-template-columns: repeat(2, 1fr); }
+  #todayStats > *:nth-child(4) { display: none; }
   .mobile-nav { display: flex; }
   .performance-summary { grid-template-columns: repeat(3, 1fr); }
 }

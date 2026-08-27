@@ -3,7 +3,8 @@ STATS2PITCH v4 — FULL PRODUCT BUILD
 
 PUBLIC PAGES
 - /                 All Picks
-- /bankers.html     Verified 100% Agreement Bankers
+- /filter-tips.html Filter Tips
+- /var-tips.html    VAR Tips
 - /results.html     Daily proof + 30-day performance
 - /admin.html       Private admin screen (not linked publicly)
 
