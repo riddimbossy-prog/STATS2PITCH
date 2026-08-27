@@ -25,6 +25,7 @@ export const RULES=Object.freeze({
   bonusTightBtts:10,
   bonusAwayTwoPlus:8,
   bonusPpgGap:6,
+  bonusPricedFav:8,
   penaltyCheap:8,
   strongAt:78,
   supportedAt:64
@@ -167,22 +168,26 @@ function scorePick(odds,home,away,route,published,side='away'){
   const oppO05=side==='home'?odds.awayO05:odds.homeO05
   const favLabel=side==='home'?'Home':'Away'
   const oppLabel=side==='home'?'away':'home'
-  if(odds.streak>=RULES.streakSweetMin&&odds.streak<=RULES.streakSweetMax){
+  if(finite(odds.streak)&&odds.streak>=RULES.streakSweetMin&&odds.streak<=RULES.streakSweetMax){
     score+=RULES.bonusStreakSweet
     reasons.push(`Goals Streak 2+ sits in the sweet band at ${odds.streak.toFixed(2)}.`)
-  }else{
+  }else if(finite(odds.streak)){
     reasons.push(`Goals Streak 2+ Yes ${odds.streak.toFixed(2)} is inside the 1.10–1.49 universe.`)
+  }else{
+    score+=RULES.bonusPricedFav
+    reasons.push(`${favLabel} favourite is priced for a VAR route.`)
   }
-  if(route==='btts'&&odds.awayO05<=RULES.bothO05Tight&&odds.homeO05<=RULES.bothO05Tight){
+  if(route==='btts'&&finite(odds.awayO05)&&finite(odds.homeO05)&&odds.awayO05<=RULES.bothO05Tight&&odds.homeO05<=RULES.bothO05Tight){
     score+=RULES.bonusTightBtts
     reasons.push(`Both team-goal Over 0.5 prices are ≤ ${RULES.bothO05Tight.toFixed(2)}, so BTTS is the first-match route.`)
   }
-  if(favO15<RULES.awayO15Max&&oppO05>=RULES.homeO05VeryWeak){
+  if(finite(favO15)&&finite(oppO05)&&favO15<RULES.awayO15Max&&oppO05>=RULES.homeO05VeryWeak){
     score+=RULES.bonusAwayTwoPlus
     reasons.push(`${favLabel} Over 1.5 ${favO15.toFixed(2)} against a ${oppLabel} Over 0.5 of ${oppO05.toFixed(2)}.`)
   }
-  const ppgGap=round2((side==='home'?home.ppg:away.ppg)-(side==='home'?away.ppg:home.ppg))
-  if(ppgGap>=RULES.ppgGapBoost){
+  const favPpg=side==='home'?home.ppg:away.ppg,oppPpg=side==='home'?away.ppg:home.ppg
+  const ppgGap=finite(favPpg)&&finite(oppPpg)?round2(favPpg-oppPpg):null
+  if(ppgGap!==null&&ppgGap>=RULES.ppgGapBoost){
     score+=RULES.bonusPpgGap
     reasons.push(`${favLabel} venue PPG leads by ${ppgGap.toFixed(2)}.`)
   }
@@ -199,29 +204,37 @@ function routePick(odds,side='away'){
   const favO15=side==='home'?odds.homeO15:odds.awayO15
   const oppO05=side==='home'?odds.awayO05:odds.homeO05
   const favWin=side==='home'?odds.homeWin:odds.awayWin
-  if(odds.awayO05<RULES.bothO05Max&&odds.homeO05<RULES.bothO05Max){
+  const winPick=()=>side==='home'
+    ?{route:'home-win',market:'match-winner',selection:'Home',displaySelection:'1X2 · Home',odds:favWin,family:'1X2'}
+    :{route:'away-win',market:'match-winner',selection:'Away',displaySelection:'1X2 · Away',odds:favWin,family:'1X2'}
+  const o15Pick=()=>side==='home'
+    ?{route:'home-o15',market:'home-team-goals',selection:'Over 1.5',displaySelection:'Home Team · Over 1.5',odds:favO15,family:'Team Goals'}
+    :{route:'away-o15',market:'away-team-goals',selection:'Over 1.5',displaySelection:'Away Team · Over 1.5',odds:favO15,family:'Team Goals'}
+  if(finite(odds.awayO05)&&finite(odds.homeO05)&&odds.awayO05<RULES.bothO05Max&&odds.homeO05<RULES.bothO05Max){
     if(!odds.bttsYes)return{skip:'btts-odds-missing'}
     return{route:'btts',market:'both-teams-score',selection:'Yes',displaySelection:'BTTS · Yes',odds:odds.bttsYes,family:'BTTS'}
   }
-  if(favO15<RULES.awayO15Max&&oppO05>RULES.homeO05Weak){
-    if(favWin&&favWin<=RULES.awayWinMax){
-      return side==='home'
-        ?{route:'home-win',market:'match-winner',selection:'Home',displaySelection:'1X2 · Home',odds:favWin,family:'1X2'}
-        :{route:'away-win',market:'match-winner',selection:'Away',displaySelection:'1X2 · Away',odds:favWin,family:'1X2'}
-    }
-    return side==='home'
-      ?{route:'home-o15',market:'home-team-goals',selection:'Over 1.5',displaySelection:'Home Team · Over 1.5',odds:favO15,family:'Team Goals'}
-      :{route:'away-o15',market:'away-team-goals',selection:'Over 1.5',displaySelection:'Away Team · Over 1.5',odds:favO15,family:'Team Goals'}
+  if(finite(favO15)&&finite(oppO05)&&favO15<RULES.awayO15Max&&oppO05>RULES.homeO05Weak){
+    if(favWin&&favWin<=RULES.awayWinMax)return winPick()
+    return o15Pick()
   }
-  if(favO15<RULES.awayO15Max&&oppO05<=RULES.homeO05Weak){
+  if(finite(favO15)&&finite(oppO05)&&favO15<RULES.awayO15Max&&oppO05<=RULES.homeO05Weak){
     if(!odds.over15)return{skip:'over15-odds-missing'}
     return{route:'over-15',market:'total-goals',selection:'Over 1.5',displaySelection:'Over 1.5',odds:odds.over15,family:'Goals'}
   }
+  if(finite(favWin)&&favWin<=RULES.awayWinMax)return winPick()
+  if(finite(odds.bttsYes)&&odds.bttsYes>=RULES.publishedCheap&&odds.bttsYes<=1.55){
+    return{route:'btts',market:'both-teams-score',selection:'Yes',displaySelection:'BTTS · Yes',odds:odds.bttsYes,family:'BTTS'}
+  }
+  if(finite(odds.over15)&&odds.over15>=RULES.publishedCheap&&odds.over15<=1.55){
+    return{route:'over-15',market:'total-goals',selection:'Over 1.5',displaySelection:'Over 1.5',odds:odds.over15,family:'Goals'}
+  }
+  if(finite(favO15)&&favO15<RULES.awayO15Max)return o15Pick()
   return{skip:'no-route'}
 }
 
 function packPick(fixture,odds,home,away,routed,rating,side){
-  const families=['Streak 2+','Team Goals',routed.family].filter((value,index,all)=>all.indexOf(value)===index)
+  const families=[odds.streak?'Streak 2+':null,'Team Goals',routed.family].filter((value,index,all)=>value&&all.indexOf(value)===index)
   return{
     fixtureId:fixture.fixtureId,
     league:fixture.league,
@@ -273,16 +286,16 @@ function packPick(fixture,odds,home,away,routed,rating,side){
 
 export function diagnoseAwayFavFixture(fixture){
   const odds=extractOdds(fixture)
-  if(!odds.streak||!odds.homeO05||!odds.awayO05){
+  if(finite(odds.streak)){
+    if(!odds.homeO05||!odds.awayO05)return{pick:null,skip:'missing-odds',odds}
+    if(odds.streak<RULES.streakMin||odds.streak>RULES.streakMax)return{pick:null,skip:'streak-window',odds}
+  }else if(!odds.homeWin&&!odds.awayWin&&!odds.bttsYes&&!odds.over15&&!odds.homeO15&&!odds.awayO15){
     return{pick:null,skip:'missing-odds',odds}
-  }
-  if(odds.streak<RULES.streakMin||odds.streak>RULES.streakMax){
-    return{pick:null,skip:'streak-window',odds}
   }
   const side=favouriteSide(odds)
   if(!side)return{pick:null,skip:'fav-unclear',odds}
-  if(side==='away'&&!odds.awayO15)return{pick:null,skip:'missing-odds',odds}
-  if(side==='home'&&!odds.homeO15)return{pick:null,skip:'missing-odds',odds}
+  if(side==='away'&&!odds.awayO15&&!odds.awayWin&&!odds.bttsYes&&!odds.over15)return{pick:null,skip:'missing-odds',odds}
+  if(side==='home'&&!odds.homeO15&&!odds.homeWin&&!odds.bttsYes&&!odds.over15)return{pick:null,skip:'missing-odds',odds}
   const table=tableGate(fixture?.homeSplit,fixture?.awaySplit)
   if(!table.ok)return{pick:null,skip:table.skip,odds}
   const home=venueMetrics(fixture?.home?.fixtures,fixture?.home?.id,'home')
@@ -296,6 +309,7 @@ export function diagnoseAwayFavFixture(fixture){
   const routed=routePick(odds,side)
   if(routed.skip)return{pick:null,skip:routed.skip,odds,home,away}
   const rating=scorePick(odds,home,away,routed.route,routed.odds,side)
+  if(rating.classification==='drop')return{pick:null,skip:'low-score',odds,home,away,rating,favourite:side}
   return{pick:packPick(fixture,odds,home,away,routed,rating,side),skip:null,odds,home,away,rating,favourite:side}
 }
 

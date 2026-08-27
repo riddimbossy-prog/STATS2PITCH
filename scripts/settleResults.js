@@ -19,7 +19,11 @@ for(const row of rows){
     await saveBoard(date,settled,{preservePublished:true})
     updated++
     console.log(`${date}: results updated`,settled.resultSummary)
-  }catch(error){failed++;console.error(`${date}: settlement failed`,error?.message||error)}
+  }catch(error){
+    const msg=String(error?.message||error)
+    if(/do not have access to this date|request limit for the day|rate.?limit/i.test(msg)){skipped++;console.warn(`${date}: skipped — football data plan cannot read this date`);continue}
+    failed++;console.error(`${date}: settlement failed`,msg)
+  }
 }
 console.log(`Settlement complete: ${updated} updated, ${skipped} skipped, ${failed} failed`)
-if(updated===0&&failed>0)process.exitCode=1
+if(failed>0&&updated===0&&skipped===0)process.exitCode=1

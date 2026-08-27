@@ -216,17 +216,41 @@ test('home-fav open game with a scoring away side becomes total over 1.5',()=>{
   assert.equal(result.pick.selection,'Over 1.5')
 })
 
-test('missing streak market fails closed and is never proxied from team-goals',()=>{
-  const result=diagnoseAwayFavFixture(fixture({
-    marketOdds:markets({awayO05:1.18,awayO15:1.20,homeO05:1.20,bttsYes:1.40})
-  }))
-  assert.equal(result.skip,'missing-odds')
-  assert.equal(result.pick,null)
+test('missing streak market is not proxied from team-goals',()=>{
   const odds=extractOdds(fixture({
     marketOdds:markets({awayO05:1.18,awayO15:1.20,homeO05:1.20,bttsYes:1.40})
   }))
   assert.equal(odds.streak,null)
   assert.equal(odds.streakSource,null)
+})
+
+test('priced favourite without streak still publishes a 1X2 route',()=>{
+  const result=diagnoseAwayFavFixture(fixture({
+    homeFixtures:[],
+    awayFixtures:[],
+    homeSplit:null,
+    awaySplit:null,
+    marketOdds:markets({awayWin:1.38,homeWin:4.20,over15:1.28,bttsYes:1.62})
+  }))
+  assert.equal(result.skip,null)
+  assert.equal(result.pick.favourite,'away')
+  assert.equal(result.pick.route,'away-win')
+  assert.equal(result.pick.market,'match-winner')
+  assert.ok(result.pick.engineRating>=RULES.supportedAt)
+  assert.ok(!result.pick.families.includes('Streak 2+'))
+})
+
+test('home favourite without streak publishes from match-winner odds',()=>{
+  const result=diagnoseAwayFavFixture(fixture({
+    homeFixtures:[],
+    awayFixtures:[],
+    homeSplit:null,
+    awaySplit:null,
+    marketOdds:markets({homeWin:1.35,awayWin:5.10,over15:1.30,bttsYes:1.70})
+  }))
+  assert.equal(result.skip,null)
+  assert.equal(result.pick.favourite,'home')
+  assert.equal(result.pick.route,'home-win')
 })
 
 test('board keeps one pick per fixture and publishes every qualifier',()=>{
