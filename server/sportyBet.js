@@ -19,13 +19,61 @@ const headers=()=>({
 })
 
 let cache=null
-export function resetSportyCache(){cache=null}
+let teamCrests=new Map()
+let eventCrestCache=new Map()
+export function resetSportyCache(){cache=null;teamCrests=new Map();eventCrestCache=new Map()}
 
 function nid(raw){
   const m=String(raw??'').match(/(\d+)$/)
   return m?Number(m[1]):null
 }
 function crest(id){return id?`https://img.sportradar.com/ls/crest/big/${id}.png`:null}
+function crestKey(id){
+  const n=nid(id)
+  return n!=null?String(n):String(id||'')
+}
+export function isSportyCrest(url){return /s\.sporty\.net\//i.test(String(url||''))}
+export function eventQuery(id){
+  const raw=String(id??'').trim()
+  if(!raw)return null
+  if(/^\d+$/.test(raw))return{gameId:raw}
+  return{eventId:raw}
+}
+export function rememberCrest(id,url){
+  if(!id||!isSportyCrest(url))return
+  teamCrests.set(crestKey(id),String(url).trim())
+}
+export function knownCrest(id,fallback=''){
+  const cached=teamCrests.get(crestKey(id))
+  if(isSportyCrest(cached))return cached
+  if(isSportyCrest(fallback))return String(fallback).trim()
+  const next=String(fallback||'').trim()
+  return next||null
+}
+export function applyEventIcons(fixture,ev={}){
+  rememberCrest(ev?.homeTeamId||fixture?.teams?.home?.id,ev?.homeTeamIcon)
+  rememberCrest(ev?.awayTeamId||fixture?.teams?.away?.id,ev?.awayTeamIcon)
+  if(fixture?.teams?.home)fixture.teams.home.logo=knownCrest(fixture.teams.home.id,ev?.homeTeamIcon||fixture.teams.home.logo)
+  if(fixture?.teams?.away)fixture.teams.away.logo=knownCrest(fixture.teams.away.id,ev?.awayTeamIcon||fixture.teams.away.logo)
+  return fixture
+}
+function needsCrest(fixture){
+  return !isSportyCrest(fixture?.teams?.home?.logo)||!isSportyCrest(fixture?.teams?.away?.logo)
+}
+async function mapLimit(items,limit,fn){
+  if(!items.length)return []
+  const out=new Array(items.length)
+  let i=0
+  async function worker(){
+    while(true){
+      const x=i++
+      if(x>=items.length)return
+      out[x]=await fn(items[x],x)
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(Math.max(1,limit),items.length)},worker))
+  return out
+}
 function accraDate(ms){
   if(!Number.isFinite(Number(ms)))return ''
   return new Intl.DateTimeFormat('en-CA',{timeZone:ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(Number(ms)))
@@ -71,7 +119,7 @@ export function sportyEventToFixture(ev,tournament={}){
   const awayId=nid(ev?.awayTeamId)
   const fixtureId=nid(ev?.eventId)||nid(ev?.gameId)
   const leagueId=nid(tour?.id)||nid(tournament?.id)||tour?.id||tournament?.id||null
-  return{
+  return applyEventIcons({
     fixture:{id:fixtureId,date:kick,status:{short:status.short,long:status.long},timestamp:ev?.estimateStartTime||null},
     league:{
       id:leagueId,
@@ -90,7 +138,7 @@ export function sportyEventToFixture(ev,tournament={}){
       gameId:ev?.gameId||null,
       markets:Array.isArray(ev?.markets)?ev.markets:[]
     }
-  }
+  },ev)
 }
 
 function flattenPage(data){
@@ -110,6 +158,45 @@ async function call(path,params={}){
   })
   if(body?.bizCode!==10000)throw new Error(`SportyBet ${path} blocked: ${body?.innerMsg||body?.message||body?.bizCode}`)
   return body.data
+}
+
+async function loadEventIcons(fixture){
+  const eventId=fixture?.sporty?.eventId
+  const gameId=fixture?.sporty?.gameId
+  const key=String(eventId||gameId||'')
+  if(!key)return null
+  if(eventCrestCache.has(key))return eventCrestCache.get(key)
+  const pending=(async()=>{
+    const primary=eventQuery(eventId)||eventQuery(gameId)
+    if(!primary)return null
+    try{
+      return await call(`/api/${COUNTRY}/factsCenter/event`,primary)
+    }catch(error){
+      const fallback=eventId&&gameId?eventQuery(gameId):null
+      if(fallback&&(fallback.gameId||fallback.eventId)!==(primary.gameId||primary.eventId)){
+        return call(`/api/${COUNTRY}/factsCenter/event`,fallback)
+      }
+      throw error
+    }
+  })()
+  eventCrestCache.set(key,pending)
+  return pending
+}
+
+export async function hydrateSportyCrests(fixtures,{concurrency=4}={}){
+  const rows=Array.isArray(fixtures)?fixtures:[]
+  for(const f of rows)applyEventIcons(f,{})
+  const missing=rows.filter(needsCrest)
+  await mapLimit(missing,concurrency,async f=>{
+    try{
+      const ev=await loadEventIcons(f)
+      if(ev)applyEventIcons(f,ev)
+    }catch(error){
+      console.warn(`SportyBet crest ${f?.sporty?.eventId||f?.sporty?.gameId||f?.fixture?.id}: ${error?.message||error}`)
+    }
+  })
+  for(const f of rows)applyEventIcons(f,{})
+  return rows
 }
 
 async function fetchPage(pageNum,timeline){
@@ -140,12 +227,15 @@ export async function sportyUpcoming({timeline=TIMELINE,force=false}={}){
 export async function sportyFixturesByDate(date){
   const want=String(date||'')
   const rows=await sportyUpcoming()
-  return rows.filter(f=>accraDate(f?.fixture?.timestamp)===want)
+  const day=rows.filter(f=>accraDate(f?.fixture?.timestamp)===want)
+  await hydrateSportyCrests(day)
+  return day
 }
 
 export async function sportyEvent(eventId){
-  if(!eventId)return null
-  const data=await call(`/api/${COUNTRY}/factsCenter/event`,{eventId})
+  const params=eventQuery(eventId)
+  if(!params)return null
+  const data=await call(`/api/${COUNTRY}/factsCenter/event`,params)
   return data?sportyEventToFixture(data,data?.sport?.category?.tournament||{}):null
 }
 
