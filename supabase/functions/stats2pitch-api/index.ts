@@ -90,6 +90,26 @@ function eliteItems(board:any,date:string){
       }
     })
 }
+function isLogo(v:any){const s=String(v||'').trim();return /^https?:\/\//i.test(s)||s.startsWith('/')}
+function preferLogo(...values:any[]){
+  const urls=values.map(v=>String(v||'').trim()).filter(isLogo)
+  return urls.find(u=>/s\.sporty\.net\//i.test(u))||urls[0]||null
+}
+function attachCrests(board:any){
+  if(!board)return board
+  const fx=new Map((board.fixtures||[]).map((f:any)=>[String(f.fixtureId),f]))
+  const patch=(row:any)=>{
+    if(!row)return row
+    const f:any=fx.get(String(row.fixtureId))||{}
+    const homeLogo=preferLogo(row.homeLogo,f.homeLogo)
+    const awayLogo=preferLogo(row.awayLogo,f.awayLogo)
+    if(homeLogo===row.homeLogo&&awayLogo===row.awayLogo)return row
+    return{...row,homeLogo,awayLogo}
+  }
+  const next={...board}
+  for(const key of ['bestPicks','varTips','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  return next
+}
 function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],fixtures:[],availableMarkets:[],results:{}}}
 async function snapshot(date:string){
   const rows=await rest(`/rest/v1/prediction_snapshots?select=payload,generated_at&snapshot_date=eq.${encodeURIComponent(date)}&limit=1`)
@@ -241,7 +261,7 @@ Deno.serve(async req=>{
     if(route==='/health')return json({ok:true,version:'4.0.0',engineVersion:ENGINE_VERSION})
     if(route==='/config')return json({version:'4.0.0',engineVersion:ENGINE_VERSION})
     if(route==='/board'&&req.method==='GET'){
-      const date=requestedDate(url),row=await snapshot(date),status=snapshotState(date,row),board=row?.board||emptyBoard(date)
+      const date=requestedDate(url),row=await snapshot(date),status=snapshotState(date,row),board=attachCrests(row?.board||emptyBoard(date))
       return json({...board,meta:{...(board.meta||{}),date,refresh:status,requiresRefresh:status.state!=='complete'}})
     }
     if((route==='/export/elite'||route==='/api/export/elite')&&req.method==='GET'){

@@ -83,7 +83,7 @@ function sameTopFive(f){
 function basePick(f,home,away,leagueProfile){
   return{
     fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
-    home:f.home.name,away:f.away.name,homeLogo:f.home.logo||null,awayLogo:f.away.logo||null,
+    home:f.home.name,away:f.away.name,homeId:f.home?.id??null,awayId:f.away?.id??null,homeLogo:f.home.logo||null,awayLogo:f.away.logo||null,
     homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,
     metrics:{home,away,league:leagueProfile},
     engine:'banker-rules-v3-transition-safe'
