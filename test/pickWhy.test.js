@@ -13,7 +13,7 @@ const finished=(id,homeId,awayId,h,a,home='Home FC',away='Away FC')=>({
 })
 const sample=(id,venue)=>Array.from({length:5},(_,i)=>venue==='home'
   ?finished(i+1,id,900+i,2,0,id===1?'Home FC':'Other',`Opp ${i}`)
-  :finished(i+1,900+i,id,0,2,`Opp ${i}`,id===2?'Away FC':'Other'))
+  :finished(i+1,900+i,id,2,0,`Opp ${i}`,id===2?'Away FC':'Other'))
 function analyzedFixture(){
   return{
     fixtureId:1,league:'Test',country:'Test',kickoff:'2026-08-20T12:00:00Z',
