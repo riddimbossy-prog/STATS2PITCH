@@ -37,18 +37,20 @@ export function attachCrests(board){
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
 function stampPick(p,at){return{...p,publishedAt:p?.publishedAt||at,proofKey:p?.proofKey||proofKey(p)}}
 function mergeRows(oldRows,freshRows,now,existing){
-  const map=new Map((Array.isArray(oldRows)?oldRows:[]).map(p=>[String(p.fixtureId),stampPick(p,p.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)]))
+  const oldMap=new Map((Array.isArray(oldRows)?oldRows:[]).map(p=>[String(p.fixtureId),p]))
+  const out=[]
   for(const p of Array.isArray(freshRows)?freshRows:[]){
-    const id=String(p.fixtureId)
-    if(!map.has(id)){map.set(id,stampPick(p,now));continue}
-    const old=map.get(id)
-    const homeLogo=preferLogo(old.homeLogo,p.homeLogo)
-    const awayLogo=preferLogo(old.awayLogo,p.awayLogo)
-    const homeId=old.homeId??p.homeId??null
-    const awayId=old.awayId??p.awayId??null
-    if(homeLogo!==old.homeLogo||awayLogo!==old.awayLogo||homeId!==old.homeId||awayId!==old.awayId)map.set(id,{...old,homeLogo,awayLogo,homeId,awayId})
+    const old=oldMap.get(String(p.fixtureId))
+    const stamped=stampPick(p,old&&old.proofKey===proofKey(p)?(old.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now):now)
+    out.push({
+      ...stamped,
+      homeLogo:preferLogo(stamped.homeLogo,old?.homeLogo),
+      awayLogo:preferLogo(stamped.awayLogo,old?.awayLogo),
+      homeId:stamped.homeId??old?.homeId??null,
+      awayId:stamped.awayId??old?.awayId??null
+    })
   }
-  return[...map.values()].sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
+  return out.sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
 }
 function countTips(board){
   return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
@@ -88,8 +90,8 @@ export async function loadBoard(date,{allowVersionMismatch=false}={}){
 export async function listBoards(fromDate,toDate){
   if(!configured())return[...memory.entries()].filter(([d])=>(!fromDate||d>=fromDate)&&(!toDate||d<=toDate)).map(([snapshot_date,payload])=>({snapshot_date,payload}))
   let path='/rest/v1/prediction_snapshots?select=snapshot_date,payload,generated_at&order=snapshot_date.asc'
-  if(fromDate)path+=`&snapshot_date=gte.${encodeURIComponent(fromDate)}`
-  if(toDate)path+=`&snapshot_date=lte.${encodeURIComponent(toDate)}`
+  if(fromDate)path+=`&snapshot_date.gte.${encodeURIComponent(fromDate)}`
+  if(toDate)path+=`&snapshot_date.lte.${encodeURIComponent(toDate)}`
   return await request(path)
 }
 export async function saveBoard(date,board,{preservePublished=true}={}){
