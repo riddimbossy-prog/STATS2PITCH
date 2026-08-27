@@ -54,7 +54,7 @@ function eliteSource(board){
 export function buildEliteFeed(board,{date}={}){
   const rows=eliteSource(board)
     .filter(row=>text(row?.engine||'')==='away-fav-streak-v1')
-    .filter(row=>['btts','away-win','away-o15','over-15'].includes(text(row?.route)))
+    .filter(row=>['btts','away-win','away-o15','home-win','home-o15','over-15'].includes(text(row?.route)))
     .sort((a,b)=>Date.parse(a?.kickoff||0)-Date.parse(b?.kickoff||0))
     .map((row,index)=>{
       const home=teamName(row?.home,text(row?.homeTeam||row?.home_team))

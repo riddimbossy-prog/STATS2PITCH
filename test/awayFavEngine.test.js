@@ -23,7 +23,7 @@ const strongAway=[[2,0],[3,1],[2,1],[2,0],[3,0]]
 const weakHome=[[0,2],[1,2],[0,1],[0,2],[1,3]]
 const evenForm=[[1,1],[1,0],[0,1],[1,1],[2,2]]
 
-function markets({streak,awayO05,awayO15,homeO05,homeO15,over15,awayWin,bttsYes}={}){
+function markets({streak,awayO05,awayO15,homeO05,homeO15,over15,awayWin,homeWin,bttsYes}={}){
   const rows=[]
   const add=(marketKey,market,name,odd)=>{
     if(!Number.isFinite(Number(odd)))return
@@ -38,6 +38,7 @@ function markets({streak,awayO05,awayO15,homeO05,homeO15,over15,awayWin,bttsYes}
   add('home-team-goals','Home team goals','Over 1.5',homeO15)
   add('total-goals','Total goals','Over 1.5',over15)
   add('match-winner','Match winner','Away',awayWin)
+  add('match-winner','Match winner','Home',homeWin)
   add('both-teams-score','Both teams to score','Yes',bttsYes)
   return rows
 }
@@ -91,9 +92,11 @@ test('streak outside 1.10-1.49 is skipped',()=>{
   assert.equal(low.skip,'streak-window')
 })
 
-test('home favourite on team-goals over 1.5 is skipped',()=>{
+test('home favourite on team-goals over 1.5 now qualifies on the home path',()=>{
   const result=diagnoseAwayFavFixture(fixture({marketOdds:markets({streak:1.22,awayO05:1.18,awayO15:1.40,homeO05:1.20,homeO15:1.25,bttsYes:1.40})}))
-  assert.equal(result.skip,'fav-is-home')
+  assert.equal(result.skip,null)
+  assert.equal(result.pick.favourite,'home')
+  assert.equal(result.pick.route,'btts')
 })
 
 test('both top five and both bottom three are skipped',()=>{
@@ -170,10 +173,47 @@ test('open game with a scoring home side becomes total over 1.5 never over 2.5',
   const result=diagnoseAwayFavFixture(fixture({
     marketOdds:markets({streak:1.28,awayO05:1.40,awayO15:1.38,homeO05:1.50,over15:1.33,awayWin:1.90,bttsYes:1.70})
   }))
+  assert.equal(result.pick.favourite,'away')
   assert.equal(result.pick.route,'over-15')
   assert.equal(result.pick.market,'total-goals')
   assert.equal(result.pick.selection,'Over 1.5')
   assert.notEqual(result.pick.selection,'Over 2.5')
+})
+
+test('home win beats team-goals 2+ when away over 0.5 is weak and 1X2 is short enough',()=>{
+  const result=diagnoseAwayFavFixture(fixture({
+    homeFixtures:venueRows(1,'home',strongAway),
+    awayFixtures:venueRows(2,'away',weakHome),
+    homeSplit:{position:4,size:20,sampleReady:true,ppg:2.4,played:5,venue:'home'},
+    awaySplit:{position:16,size:20,sampleReady:true,ppg:0.4,played:5,venue:'away'},
+    marketOdds:markets({streak:1.25,homeO05:1.40,homeO15:1.35,awayO05:1.75,awayO15:2.10,over15:1.30,homeWin:1.42,awayWin:4.20,bttsYes:1.70})
+  }))
+  assert.equal(result.pick.favourite,'home')
+  assert.equal(result.pick.route,'home-win')
+  assert.equal(result.pick.market,'match-winner')
+  assert.equal(result.pick.selection,'Home')
+})
+
+test('home team goals over 1.5 is used when the home win is not short enough',()=>{
+  const result=diagnoseAwayFavFixture(fixture({
+    homeFixtures:venueRows(1,'home',strongAway),
+    awayFixtures:venueRows(2,'away',weakHome),
+    marketOdds:markets({streak:1.25,homeO05:1.40,homeO15:1.35,awayO05:1.82,awayO15:2.20,over15:1.30,homeWin:1.80,awayWin:4.00,bttsYes:1.70})
+  }))
+  assert.equal(result.pick.favourite,'home')
+  assert.equal(result.pick.route,'home-o15')
+  assert.equal(result.pick.market,'home-team-goals')
+  assert.equal(result.pick.selection,'Over 1.5')
+})
+
+test('home-fav open game with a scoring away side becomes total over 1.5',()=>{
+  const result=diagnoseAwayFavFixture(fixture({
+    marketOdds:markets({streak:1.28,homeO05:1.40,homeO15:1.38,awayO05:1.50,awayO15:1.90,over15:1.33,homeWin:1.55,awayWin:4.10,bttsYes:1.70})
+  }))
+  assert.equal(result.pick.favourite,'home')
+  assert.equal(result.pick.route,'over-15')
+  assert.equal(result.pick.market,'total-goals')
+  assert.equal(result.pick.selection,'Over 1.5')
 })
 
 test('missing streak market fails closed and is never proxied from team-goals',()=>{
