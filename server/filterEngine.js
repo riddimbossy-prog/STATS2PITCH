@@ -1,6 +1,6 @@
 import {ENGINE_VERSION,FINISHED,FORM_SAMPLE} from './config.js'
 import {venueMetrics} from './awayFavEngine.js'
-import {attachWhy,last5Form} from './pickWhy.js'
+import {attachWhy,last5Form,last5Overall,fixtureHasStats} from './pickWhy.js'
 
 export const ENGINE_ID='sporty-filter-v1'
 export const RULES=Object.freeze({
@@ -232,6 +232,8 @@ function publicReasons(pick,home,away,direction,odds){
 }
 
 function packPick(fixture,odds,home,away,routed,direction){
+  const lastMatchesHome=last5Overall(fixture?.home?.lastMatches||fixture?.home?.fixtures,fixture?.home?.id)
+  const lastMatchesAway=last5Overall(fixture?.away?.lastMatches||fixture?.away?.fixtures,fixture?.away?.id)
   const last5Home=last5Form(fixture?.home?.fixtures,fixture?.home?.id,'home')
   const last5Away=last5Form(fixture?.away?.fixtures,fixture?.away?.id,'away')
   const pick={
@@ -266,10 +268,11 @@ function packPick(fixture,odds,home,away,routed,direction){
     sportyEventId:fixture.sportyEventId||null
   }
   const reasons=publicReasons(pick,home,away,direction,odds)
-  return attachWhy(pick,fixture,{reasons,last5Home,last5Away,homeAvg:home,awayAvg:away,h2h:fixture.h2h||[]})
+  return attachWhy(pick,fixture,{reasons,last5Home,last5Away,lastMatchesHome,lastMatchesAway,homeAvg:home,awayAvg:away,h2h:fixture.h2h||[]})
 }
 
 export function diagnoseFilterFixture(fixture){
+  if(!fixtureHasStats(fixture))return{pick:null,skip:'no-stats'}
   if(fixture?.earlySeason===true)return{pick:null,skip:'early-season'}
   if(isCupCompetition(fixture?.league))return{pick:null,skip:'cup'}
   const table=tableGate(fixture?.homeSplit,fixture?.awaySplit)

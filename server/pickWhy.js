@@ -12,7 +12,8 @@ export function compactFixture(f,teamId=null){
     home:home.name||'',
     away:away.name||'',
     hs:finite(hs)?hs:null,
-    as:finite(as)?as:null
+    as:finite(as)?as:null,
+    league:f?.league?.name||''
   }
   if(teamId!=null&&finite(hs)&&finite(as)){
     const isHome=String(home.id)===String(teamId)
@@ -30,6 +31,60 @@ export function last5Form(fixtures,teamId,venue,n=FORM_SAMPLE){
     .sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0))
     .slice(0,n)
     .map(f=>compactFixture(f,teamId))
+}
+
+export function last5Overall(fixtures,teamId,n=FORM_SAMPLE){
+  return (fixtures||[])
+    .filter(f=>{
+      if(!done(f))return false
+      const h=String(f?.teams?.home?.id??''),a=String(f?.teams?.away?.id??'')
+      const id=String(teamId??'')
+      return !!id&&(h===id||a===id)&&finite(f?.goals?.home)&&finite(f?.goals?.away)
+    })
+    .sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0))
+    .slice(0,n)
+    .map(f=>compactFixture(f,teamId))
+}
+
+export function teamStats(rows){
+  let played=0,wins=0,gf=0,ga=0,btts=0,o15=0,o25=0,fts=0,cs=0,pts=0
+  for(const r of rows||[]){
+    if(!finite(r.hs)||!finite(r.as)||!r.result)continue
+    const own=r.venue==='H'?r.hs:r.as
+    const opp=r.venue==='H'?r.as:r.hs
+    played++
+    gf+=own
+    ga+=opp
+    pts+=r.result==='W'?3:r.result==='D'?1:0
+    if(r.result==='W')wins++
+    if(own>0&&opp>0)btts++
+    if(own+opp>1.5)o15++
+    if(own+opp>2.5)o25++
+    if(own===0)fts++
+    if(opp===0)cs++
+  }
+  const pct=v=>played?Math.round(v*100/played):null
+  return played?{
+    played,
+    winPct:pct(wins),
+    ppg:round2(pts/played),
+    gf:round2(gf/played),
+    ga:round2(ga/played),
+    btts:pct(btts),
+    over15:pct(o15),
+    over25:pct(o25),
+    fts:pct(fts),
+    cs:pct(cs)
+  }:{played:0,winPct:null,ppg:null,gf:null,ga:null,btts:null,over15:null,over25:null,fts:null,cs:null}
+}
+
+export function fixtureHasStats(f){
+  if(f?.statsReady===false)return false
+  if(f?.statsReady===true)return true
+  const homeId=f?.home?.id,awayId=f?.away?.id
+  const home=last5Overall(f?.home?.lastMatches||f?.home?.fixtures,homeId,1)
+  const away=last5Overall(f?.away?.lastMatches||f?.away?.fixtures,awayId,1)
+  return home.length>=1&&away.length>=1
 }
 
 export function h2hSnapshot(history,homeId,awayId,n=5){
@@ -90,12 +145,18 @@ export function varPublicReasons(pick,homeAvg,awayAvg){
 
 export function buildWhy(f,extra={}){
   const homeId=f?.home?.id,awayId=f?.away?.id
+  const overallHome=f?.home?.lastMatches||f?.home?.fixtures
+  const overallAway=f?.away?.lastMatches||f?.away?.fixtures
+  const lastMatchesHome=extra.lastMatchesHome||extra.last5Home||last5Overall(overallHome,homeId)
+  const lastMatchesAway=extra.lastMatchesAway||extra.last5Away||last5Overall(overallAway,awayId)
   const last5Home=extra.last5Home||last5Form(f?.home?.fixtures,homeId,'home')
   const last5Away=extra.last5Away||last5Form(f?.away?.fixtures,awayId,'away')
   const h2h=Array.isArray(extra.h2h)?extra.h2h:(Array.isArray(f?.h2h)?f.h2h:[])
-  const homeAvg=extra.homeAvg||formAverages(last5Home)
-  const awayAvg=extra.awayAvg||formAverages(last5Away)
-  return{last5Home,last5Away,h2h,homeAvg,awayAvg}
+  const homeStats=extra.homeStats||teamStats(lastMatchesHome)
+  const awayStats=extra.awayStats||teamStats(lastMatchesAway)
+  const homeAvg=extra.homeAvg||formAverages(last5Home.length?last5Home:lastMatchesHome)
+  const awayAvg=extra.awayAvg||formAverages(last5Away.length?last5Away:lastMatchesAway)
+  return{last5Home,last5Away,lastMatchesHome,lastMatchesAway,h2h,homeAvg,awayAvg,homeStats,awayStats}
 }
 
 export function attachWhy(pick,f,extra={}){

@@ -29,13 +29,18 @@ test('SportyBet markets parse 1X2, totals, team goals, BTTS and streak',()=>{
 })
 
 test('verified SportyBet odds feed VAR without API-Football',()=>{
+  const form=Array.from({length:5},(_,i)=>({
+    fixture:{id:i+1,date:`2026-08-0${i+1}T12:00:00Z`,status:{short:'FT'}},
+    teams:{home:{id:i%2?2:1,name:i%2?'Man City':'Crystal Palace'},away:{id:i%2?1:2,name:i%2?'Crystal Palace':'Man City'}},
+    goals:{home:i%2?2:0,away:i%2?0:2}
+  }))
   const fixture={
     fixtureId:5789,
     league:'Premier League',
     country:'England',
     kickoff:'2026-08-28T19:00:00Z',
-    home:{id:1,name:'Crystal Palace',logo:null,fixtures:[]},
-    away:{id:2,name:'Man City',logo:null,fixtures:[]},
+    home:{id:1,name:'Crystal Palace',logo:null,fixtures:form},
+    away:{id:2,name:'Man City',logo:null,fixtures:form},
     homeSplit:null,
     awaySplit:null,
     sportyEventId:'sr:match:5789',
@@ -49,6 +54,24 @@ test('verified SportyBet odds feed VAR without API-Football',()=>{
   assert.equal(result.skip,null)
   assert.ok(result.pick)
   assert.equal(result.pick.favourite,'away')
+})
+
+test('VAR skips a SportyBet match when last-match stats are missing',()=>{
+  const fixture={
+    fixtureId:5789,
+    league:'Premier League',
+    country:'England',
+    kickoff:'2026-08-28T19:00:00Z',
+    home:{id:1,name:'Crystal Palace',logo:null,fixtures:[]},
+    away:{id:2,name:'Man City',logo:null,fixtures:[]},
+    homeSplit:null,
+    awaySplit:null,
+    sportyEventId:'sr:match:5789',
+    marketOdds:verifiedMarkets({sportyMarkets:palaceMarkets})
+  }
+  const result=diagnoseAwayFavFixture(fixture)
+  assert.equal(result.skip,'no-stats')
+  assert.equal(result.pick,null)
 })
 
 test('SportyBet events keep numeric fixture ids and the raw event id',()=>{

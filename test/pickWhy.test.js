@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {last5Form,h2hSnapshot,consensusReasons,varPublicReasons,attachWhy} from '../server/pickWhy.js'
+import {last5Form,last5Overall,h2hSnapshot,consensusReasons,varPublicReasons,attachWhy,fixtureHasStats,teamStats} from '../server/pickWhy.js'
 import {analyzeFixture} from '../server/engine.js'
 import {diagnoseAwayFavFixture} from '../server/awayFavEngine.js'
 import {readFile} from 'node:fs/promises'
@@ -85,7 +85,21 @@ test('attachWhy preserves pick fields',()=>{
   const next=attachWhy({fixtureId:7,home:'A',away:'B',odds:1.3,homeConsensus:100,awayConsensus:100,displaySelection:'Under 2.5'},analyzedFixture())
   assert.equal(next.fixtureId,7)
   assert.ok(next.why.last5Home.length)
+  assert.ok(next.why.lastMatchesHome.length)
   assert.ok(next.reasons.length)
+})
+
+test('overall last matches and team stats match the SportyBet Stats tab',()=>{
+  const rows=sample(1,'home')
+  const last=last5Overall(rows,1)
+  assert.equal(last.length,5)
+  const stats=teamStats(last)
+  assert.equal(stats.played,5)
+  assert.equal(stats.winPct,100)
+  assert.equal(stats.over15,100)
+  assert.equal(fixtureHasStats(analyzedFixture()),true)
+  assert.equal(fixtureHasStats({home:{id:1,fixtures:[]},away:{id:2,fixtures:[]}}),false)
+  assert.equal(fixtureHasStats({statsReady:false,home:{id:1,fixtures:sample(1,'home')},away:{id:2,fixtures:sample(2,'away')}}),false)
 })
 
 test('All Picks, VAR Tips and Filter Tips open a why popup on match click',async()=>{
@@ -107,7 +121,8 @@ test('All Picks, VAR Tips and Filter Tips open a why popup on match click',async
   assert.match(filterJs,/bindWhyModal/)
   assert.match(filterHtml,/id="modal"/)
   assert.match(popup,/Why this pick was chosen/)
-  assert.match(popup,/last 5 home/)
+  assert.match(popup,/last matches/)
+  assert.match(popup,/Team stats/)
   assert.doesNotMatch(popup,/Goals Streak|first-match/)
   assert.doesNotMatch(varJs,/Goals Streak|first-match|streak window/)
 })

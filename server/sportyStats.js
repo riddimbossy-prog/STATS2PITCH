@@ -8,9 +8,9 @@ const CONCURRENCY=Math.max(1,Number(process.env.SPORTY_STATS_CONCURRENCY||3))
 const TIMEOUT=Number(process.env.SPORTY_GISMO_TIMEOUT_MS||20000)
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))
 
-let lastxCache=new Map(),seasonCache=new Map(),seasonListCache=new Map(),matchCache=new Map(),timelineCache=new Map()
+let lastxCache=new Map(),seasonCache=new Map(),seasonListCache=new Map(),matchCache=new Map(),timelineCache=new Map(),versusCache=new Map()
 export function resetSportyStatsCache(){
-  lastxCache=new Map();seasonCache=new Map();seasonListCache=new Map();matchCache=new Map();timelineCache=new Map()
+  lastxCache=new Map();seasonCache=new Map();seasonListCache=new Map();matchCache=new Map();timelineCache=new Map();versusCache=new Map()
 }
 
 export function nid(raw){
@@ -229,6 +229,41 @@ function venueCount(rows,teamId,venue){
     if(!FINISHED.has(String(f?.fixture?.status?.short||'').toUpperCase()))return false
     return venue==='home'?String(f?.teams?.home?.id)===String(teamId):String(f?.teams?.away?.id)===String(teamId)
   }).length
+}
+
+export function overallSample(rows,teamId,n=5){
+  return (rows||[])
+    .filter(f=>{
+      if(!FINISHED.has(String(f?.fixture?.status?.short||'').toUpperCase()))return false
+      const h=String(f?.teams?.home?.id??''),a=String(f?.teams?.away?.id??'')
+      const id=String(teamId??'')
+      if(!id||(h!==id&&a!==id))return false
+      return Number.isFinite(Number(f?.goals?.home))&&Number.isFinite(Number(f?.goals?.away))
+    })
+    .sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0))
+    .slice(0,n)
+}
+
+export function hasMatchStats(homeRows,homeId,awayRows,awayId){
+  return hasTeamStats(homeRows,homeId)&&hasTeamStats(awayRows,awayId)
+}
+
+export function hasTeamStats(rows,teamId){
+  return overallSample(rows,teamId,1).length>=1
+}
+
+export async function teamVersus(homeId,awayId){
+  const a=nid(homeId),b=nid(awayId)
+  if(!a||!b)return[]
+  const key=a<b?`${a}|${b}`:`${b}|${a}`
+  if(versusCache.has(key))return versusCache.get(key)
+  const pending=call(`stats_team_versus/${a}/${b}`).then(data=>matchesOf(data).map(m=>gismoToFixture(m))).catch(error=>{
+    versusCache.delete(key)
+    console.warn(`SportyBet versus ${a}/${b}: ${error?.message||error}`)
+    return[]
+  })
+  versusCache.set(key,pending)
+  return pending
 }
 
 export async function leagueFormPack(utid,country=''){

@@ -804,6 +804,12 @@ header {
 }
 .form-matches b,
 .why-h2h b { font-family: var(--mono); }
+.form-matches em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
 .form-matches small,
 .why-h2h small { color: var(--muted); white-space: nowrap; }
 .why-compare table {

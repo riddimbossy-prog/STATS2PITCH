@@ -1,5 +1,5 @@
 import {ENGINE_VERSION,FINISHED,FORM_SAMPLE} from './config.js'
-import {attachWhy,last5Form,varPublicReasons} from './pickWhy.js'
+import {attachWhy,last5Form,last5Overall,varPublicReasons,fixtureHasStats} from './pickWhy.js'
 
 
 export const ENGINE_ID='away-fav-streak-v1'
@@ -237,6 +237,8 @@ function routePick(odds,side='away'){
 
 function packPick(fixture,odds,home,away,routed,rating,side){
   const families=[odds.streak?'Streak 2+':null,'Team Goals',routed.family].filter((value,index,all)=>value&&all.indexOf(value)===index)
+  const lastMatchesHome=last5Overall(fixture?.home?.lastMatches||fixture?.home?.fixtures,fixture?.home?.id)
+  const lastMatchesAway=last5Overall(fixture?.away?.lastMatches||fixture?.away?.fixtures,fixture?.away?.id)
   const last5Home=last5Form(fixture?.home?.fixtures,fixture?.home?.id,'home')
   const last5Away=last5Form(fixture?.away?.fixtures,fixture?.away?.id,'away')
   const pick={
@@ -287,11 +289,12 @@ function packPick(fixture,odds,home,away,routed,rating,side){
     sportyEventId:fixture.sportyEventId||null
   }
   const reasons=varPublicReasons(pick,home,away)
-  return attachWhy(pick,fixture,{reasons,last5Home,last5Away,homeAvg:home,awayAvg:away,h2h:fixture.h2h||[]})
+  return attachWhy(pick,fixture,{reasons,last5Home,last5Away,lastMatchesHome,lastMatchesAway,homeAvg:home,awayAvg:away,h2h:fixture.h2h||[]})
 }
 
 
 export function diagnoseAwayFavFixture(fixture){
+  if(!fixtureHasStats(fixture))return{pick:null,skip:'no-stats'}
   const odds=extractOdds(fixture)
   const streakLive=finite(odds.streak)&&odds.streak>=RULES.streakMin&&odds.streak<=RULES.streakMax
   if(streakLive){

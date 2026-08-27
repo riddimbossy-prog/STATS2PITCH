@@ -1,5 +1,5 @@
 import {sportyFixturesByDate} from './sportyBet.js'
-import {teamLastX,leagueFormPack,matchGoalEvents,nid} from './sportyStats.js'
+import {teamLastX,leagueFormPack,matchGoalEvents,nid,overallSample,hasMatchStats,teamVersus} from './sportyStats.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard} from './engine.js'
 import {buildBankerRules,buildLeagueScoringProfile,evaluateBankerFixture} from './bankerEngine.js'
@@ -7,7 +7,7 @@ import {buildOver25Profile} from './over25.js'
 import {saveBoard,listBoards} from './store.js'
 import {buildLearningProfiles} from './learning.js'
 import {SCHEDULED,FORM_SAMPLE} from './config.js'
-import {h2hSnapshot} from './pickWhy.js'
+import {h2hSnapshot,last5Overall,teamStats} from './pickWhy.js'
 
 
 const jobs=new Map(),leagueCache=new Map(),teamCache=new Map(),splitCache=new Map(),eventCache=new Map()
@@ -112,7 +112,7 @@ export async function refreshNow(date,onProgress=()=>{}){
     onProgress({stage:'league-history',done:historyDone,total:leagueIds.length,fixtures:scheduled.length})
   })
 
-  let done=0,statsVerified=0,fallbackTeams=0,insufficientHistory=0,analysisErrors=0,transitionHydratedFixtures=0
+  let done=0,statsVerified=0,fallbackTeams=0,insufficientHistory=0,analysisErrors=0,transitionHydratedFixtures=0,skippedNoStats=0
   const analyzed=await mapLimit(scheduled,Math.max(1,Number(process.env.REFRESH_CONCURRENCY||2)),async f=>{
     try{
       const homeId=f?.teams?.home?.id,awayId=f?.teams?.away?.id,leagueId=nid(f?.league?.id),season=Number(f?.league?.season)
@@ -121,10 +121,19 @@ export async function refreshNow(date,onProgress=()=>{}){
       const currentHomeFixtures=venueSample(current,homeId,'home'),currentAwayFixtures=venueSample(current,awayId,'away')
       const earlySeasonHome=currentHomeFixtures.length>0&&currentHomeFixtures.length<FORM_SAMPLE,earlySeasonAway=currentAwayFixtures.length>0&&currentAwayFixtures.length<FORM_SAMPLE
       const bankerLeagueProfile=buildLeagueScoringProfile(mergeUnique(current,previous))
-      let history=mergeUnique(current,previous,pack.extra),homeFixtures=venueSample(history,homeId,'home'),awayFixtures=venueSample(history,awayId,'away')
-      const leagueHistoryReady=current.length+previous.length>0
-      if(homeFixtures.length<FORM_SAMPLE){history=mergeUnique(history,await getTeamHistory(homeId));fallbackTeams++;homeFixtures=venueSample(history,homeId,'home')}
-      if(awayFixtures.length<FORM_SAMPLE){history=mergeUnique(history,await getTeamHistory(awayId));fallbackTeams++;awayFixtures=venueSample(history,awayId,'away')}
+      const [homeHistory,awayHistory,versusRows]=await Promise.all([
+        getTeamHistory(homeId),
+        getTeamHistory(awayId),
+        teamVersus(homeId,awayId)
+      ])
+      let history=mergeUnique(current,previous,pack.extra,homeHistory,awayHistory)
+      const lastMatchesHome=overallSample(history,homeId,FORM_SAMPLE)
+      const lastMatchesAway=overallSample(history,awayId,FORM_SAMPLE)
+      const statsReady=hasMatchStats(lastMatchesHome,homeId,lastMatchesAway,awayId)
+      if(!statsReady)skippedNoStats++
+      let homeFixtures=venueSample(history,homeId,'home'),awayFixtures=venueSample(history,awayId,'away')
+      if(homeFixtures.length<FORM_SAMPLE)fallbackTeams++
+      if(awayFixtures.length<FORM_SAMPLE)fallbackTeams++
       const formReady=homeFixtures.length>=FORM_SAMPLE&&awayFixtures.length>=FORM_SAMPLE
       if(!formReady)insufficientHistory++
       const earlySeason=(currentHomeFixtures.length>0&&currentHomeFixtures.length<FORM_SAMPLE)||(currentAwayFixtures.length>0&&currentAwayFixtures.length<FORM_SAMPLE)
@@ -133,23 +142,33 @@ export async function refreshNow(date,onProgress=()=>{}){
       const marketOdds=verifiedMarkets({sportyMarkets:f?.sporty?.markets,fixture:f})
       if(marketOdds.length)statsVerified++
       const over25Profile=buildOver25Profile(mergeUnique(current,previous,history),homeId,awayId)
-      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,marketOdds,formReady,sportyEventId:f?.sporty?.eventId||null,feed,leagueHistoryReady,h2h:h2hSnapshot(history,homeId,awayId)}
+      const h2h=h2hSnapshot(versusRows.length?versusRows:history,homeId,awayId)
+      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures,lastMatches:lastMatchesHome},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures,lastMatches:lastMatchesAway},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,marketOdds,formReady,statsReady,sportyEventId:f?.sporty?.eventId||null,sportyGameId:f?.sporty?.gameId||null,feed,leagueHistoryReady:current.length+previous.length>0,h2h,homeStats:teamStats(last5Overall(lastMatchesHome,homeId)),awayStats:teamStats(last5Overall(lastMatchesAway,awayId))}
 
+      if(!statsReady){
+        done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures,skippedNoStats})
+        return record
+      }
       if(formReady&&needsTransitionEvidence(record)){record=await hydrateTransitionSamples(record);transitionHydratedFixtures++}
-      done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures})
+      done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures,skippedNoStats})
       return record
-    }catch(error){analysisErrors++;console.warn(`Fixture ${f?.fixture?.id||'unknown'} skipped: ${error?.message||error}`);done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures});return null}
+    }catch(error){analysisErrors++;console.warn(`Fixture ${f?.fixture?.id||'unknown'} skipped: ${error?.message||error}`);done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures,skippedNoStats});return null}
   })
 
   const fixtures=analyzed.filter(Boolean),bankerRules=buildBankerRules(fixtures)
-  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,feed,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,qualifiedTips:0,bestPicks:0,varTips:0,filterTips:0,bankerRulePicks:bankerRules.picks.length,feed}},learned)
+  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,skippedNoStats,feed,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,skippedNoStats,qualifiedTips:0,bestPicks:0,varTips:0,filterTips:0,bankerRulePicks:bankerRules.picks.length,feed}},learned)
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}
   board.meta.diagnostics.filterTips=(board.filterTips||[]).length
   board.meta.diagnostics.filterTipsSkipped=board.filterTipsMeta?.skipped||{}
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p])),eligibleIds=new Set(fixtures.map(f=>String(f.fixtureId)))
-  board.fixtures=raw.filter(f=>eligibleIds.has(String(f?.fixture?.id))).map(f=>publicFixture(f,picks.has(String(f?.fixture?.id))?'qualified':'no-qualified-pick'))
+  const statsById=new Map(fixtures.map(f=>[String(f.fixtureId),f.statsReady!==false]))
+  board.fixtures=raw.filter(f=>eligibleIds.has(String(f?.fixture?.id))).map(f=>{
+    const id=String(f?.fixture?.id)
+    const availability=picks.has(id)?'qualified':(statsById.get(id)===false?'no-stats':'no-qualified-pick')
+    return publicFixture(f,availability)
+  })
   return saveBoard(date,board)
 }
 
