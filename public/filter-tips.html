@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0b">
-  <title>Stats2Pitch</title>
+  <title>Filter Tips · Stats2Pitch</title>
   <link rel="manifest" href="/manifest.webmanifest?v=5.2.0">
   <link rel="icon" type="image/png" href="/assets/stats2pitch-favicon-v2.png">
   <link rel="apple-touch-icon" href="/assets/stats2pitch-favicon-v2.png">
@@ -13,8 +13,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/conceptD.css?v=5.2.0">
   <link rel="stylesheet" href="/mobile2026.css?v=5.2.0">
+  <link rel="stylesheet" href="/filterTips.css?v=5.2.0">
 </head>
-<body data-view="all">
+<body data-view="filter-tips">
   <div class="app">
     <header>
       <div class="header-inner">
@@ -26,8 +27,8 @@
           </div>
         </div>
         <nav class="page-tabs">
-          <a class="page-tab active" href="/">All Picks</a>
-          <a class="page-tab" href="/filter-tips.html">Filter Tips</a>
+          <a class="page-tab" href="/">All Picks</a>
+          <a class="page-tab active" href="/filter-tips.html">Filter Tips</a>
           <a class="page-tab" href="/var-tips.html">VAR Tips</a>
           <a class="page-tab" href="/bankers.html">Bankers</a>
           <a class="page-tab" href="/results.html">Results</a>
@@ -45,7 +46,11 @@
       </div>
     </header>
     <div class="wrap">
-      <section id="todayStats"></section>
+      <section class="filter-intro">
+        <strong>Filter Tips</strong>
+        <p>A dedicated board of SportyBet matches filtered for easier decision-making. Tap a match to see why it was chosen.</p>
+      </section>
+      <section id="filterStats"></section>
       <div class="controls-shell">
         <nav id="dates"></nav>
         <div class="toolbar filters">
@@ -55,35 +60,24 @@
             <option value="settled">Settled</option>
             <option value="all">All statuses</option>
           </select>
-          <select id="seasonFilter" aria-label="Season stage">
-            <option value="all">All season stages</option>
-            <option value="early">🚩 Early season</option>
-            <option value="solid">Solid season</option>
-          </select>
-          <select id="countryFilter" aria-label="Country">
-            <option value="all">All countries</option>
-          </select>
-          <select id="leagueFilter" aria-label="League">
-            <option value="all">All leagues</option>
-          </select>
-          <select id="market" aria-label="Market">
-            <option value="all">All markets</option>
-          </select>
+          <select id="countryFilter" aria-label="Country"><option value="all">All countries</option></select>
+          <select id="leagueFilter" aria-label="League"><option value="all">All leagues</option></select>
+          <select id="market" aria-label="Market"><option value="all">All markets</option></select>
           <button id="clearFilters">Clear</button>
-          <span id="status"></span>
+          <span id="status">Loading…</span>
         </div>
       </div>
       <div id="countryChips" class="country-chips" aria-label="Country shortcuts"></div>
-      <main id="cards"></main>
+      <main id="cards"><div class="empty">Loading Filter Tips…</div></main>
     </div>
   </div>
   <div id="modal" class="modal hidden"></div>
   <nav class="mobile-nav">
-    <a class="active" href="/">
+    <a href="/">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       <span>Picks</span>
     </a>
-    <a href="/filter-tips.html">
+    <a class="active" href="/filter-tips.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
       <span>Filter</span>
     </a>
@@ -102,7 +96,7 @@
   </nav>
   <script src="/runtime-config.js"></script>
   <script src="/leagueFlags.js?v=5.2.0"></script>
-  <script type="module" src="/appCrests.js?v=5.2.0"></script>
+  <script type="module" src="/filterTips.js?v=5.2.0"></script>
   <script src="/pwa.js?v=5.2.0"></script>
 </body>
 </html>

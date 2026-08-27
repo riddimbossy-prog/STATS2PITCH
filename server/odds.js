@@ -35,7 +35,7 @@ function key(raw=''){
 }
 function marketName(k){return ({
   'match-winner':'Match winner','double-chance':'Double chance','draw-no-bet':'Draw no bet','both-teams-score':'Both teams to score',
-  'first-half-winner':'First-half winner','first-half-goals':'First-half goals','home-team-goals':'Home team goals','away-team-goals':'Away team goals',
+  'both-teams-score-2':'GG/NG 2+','first-half-winner':'First-half winner','first-half-goals':'First-half goals','home-team-goals':'Home team goals','away-team-goals':'Away team goals',
   'team-goals':'Team goals','total-goals':'Total goals','goals-streak-2':'Goals Streak 2+'
 })[k]||k}
 function parseLineName(raw,line){
@@ -91,6 +91,7 @@ function sportyKey(market){
   if(id==='11'||/draw no bet/i.test(name))return'draw-no-bet'
   if(id==='19'||/^home o\/u$/i.test(name)||/home team (?:goals|total|o\/u)/i.test(name))return'home-team-goals'
   if(id==='20'||/^away o\/u$/i.test(name)||/away team (?:goals|total|o\/u)/i.test(name))return'away-team-goals'
+  if(id==='60000'||/gg\/ng\s*2/i.test(name)||/both teams.*2\+/i.test(name))return'both-teams-score-2'
   if(id==='29'||/gg\/ng/i.test(name)||/both teams/i.test(name))return'both-teams-score'
   if(id==='60010'||/2 or more goals in a row/i.test(name)||/goals? streak/i.test(name))return'goals-streak-2'
   if(id==='18'||/^over\/under$/i.test(name))return'total-goals'

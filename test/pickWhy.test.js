@@ -88,11 +88,13 @@ test('attachWhy preserves pick fields',()=>{
   assert.ok(next.reasons.length)
 })
 
-test('All Picks and VAR Tips open a why popup on match click',async()=>{
-  const [app,varJs,varHtml,popup]=await Promise.all([
+test('All Picks, VAR Tips and Filter Tips open a why popup on match click',async()=>{
+  const [app,varJs,varHtml,filterJs,filterHtml,popup]=await Promise.all([
     readFile(new URL('../public/appCrests.js',import.meta.url),'utf8'),
     readFile(new URL('../public/varTips.js',import.meta.url),'utf8'),
     readFile(new URL('../public/var-tips.html',import.meta.url),'utf8'),
+    readFile(new URL('../public/filterTips.js',import.meta.url),'utf8'),
+    readFile(new URL('../public/filter-tips.html',import.meta.url),'utf8'),
     readFile(new URL('../public/whyPopup.js',import.meta.url),'utf8')
   ])
   assert.match(app,/whySectionHtml/)
@@ -101,6 +103,9 @@ test('All Picks and VAR Tips open a why popup on match click',async()=>{
   assert.match(varJs,/whySectionHtml/)
   assert.match(varJs,/bindWhyModal/)
   assert.match(varHtml,/id="modal"/)
+  assert.match(filterJs,/whySectionHtml/)
+  assert.match(filterJs,/bindWhyModal/)
+  assert.match(filterHtml,/id="modal"/)
   assert.match(popup,/Why this pick was chosen/)
   assert.match(popup,/last 5 home/)
   assert.doesNotMatch(popup,/Goals Streak|first-match/)

@@ -3,6 +3,7 @@ import {learningAllows} from './learning.js'
 import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 import {buildAwayFavBoard} from './awayFavEngine.js'
+import {buildFilterBoard} from './filterEngine.js'
 import {attachWhy} from './pickWhy.js'
 
 
@@ -208,6 +209,7 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
   const best=[],seen=new Set()
   for(const p of all){if(seen.has(String(p.fixtureId)))continue;seen.add(String(p.fixtureId));best.push(p)}
   const varBoard=buildAwayFavBoard(fixtures,meta)
+  const filterBoard=buildFilterBoard(fixtures,meta)
   return{
     meta:{
       ...meta,
@@ -221,12 +223,16 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
       bestPicks:best.length,
       learningProfiles:learnedList.filter(x=>x?.ready).length,
       varTipsEngine:varBoard.meta?.engine||'away-fav-streak-v1',
-      varTipsCount:Array.isArray(varBoard.bestPicks)?varBoard.bestPicks.length:0
+      varTipsCount:Array.isArray(varBoard.bestPicks)?varBoard.bestPicks.length:0,
+      filterTipsEngine:filterBoard.meta?.engine||'sporty-filter-v1',
+      filterTipsCount:Array.isArray(filterBoard.bestPicks)?filterBoard.bestPicks.length:0
     },
     priority:all,
     bestPicks:best,
     availableMarkets:[...new Set(all.map(x=>x.market))].sort(),
     varTips:varBoard.bestPicks||[],
-    varTipsMeta:varBoard.meta||null
+    varTipsMeta:varBoard.meta||null,
+    filterTips:filterBoard.bestPicks||[],
+    filterTipsMeta:filterBoard.meta||null
   }
 }

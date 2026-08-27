@@ -69,7 +69,7 @@ test('preserved VAR tips inherit crests from the current fixture list',async()=>
 })
 
 test('public boards import the shared SportyBet crest helper',async()=>{
-  const files=['public/varTips.js','public/appCrests.js','public/bankerRules.js']
+  const files=['public/varTips.js','public/filterTips.js','public/appCrests.js','public/bankerRules.js']
   for(const rel of files){
     const text=await readFile(new URL(`../${rel}`,import.meta.url),'utf8')
     assert.match(text,/from '\.\/crests\.js'/)
