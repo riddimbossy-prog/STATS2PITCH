@@ -1,5 +1,6 @@
 import {ENGINE_VERSION,FINISHED,FORM_SAMPLE} from './config.js'
 import {attachWhy,last5Form,last5Overall,varPublicReasons,fixtureHasStats} from './pickWhy.js'
+import {isCupCompetition,favConflict} from './redFlags.js'
 
 
 export const ENGINE_ID='away-fav-streak-v1'
@@ -172,7 +173,7 @@ function scorePick(odds,home,away,route,published,side='away'){
   const oppLabel=side==='home'?'away':'home'
   if(finite(odds.streak)&&odds.streak>=RULES.streakSweetMin&&odds.streak<=RULES.streakSweetMax){
     score+=RULES.bonusStreakSweet
-    reasons.push(`Goals Streak 2+ sits in the sweet band at ${odds.streak.toFixed(2)}.`)
+    reasons.push(`Goals Streak 2+ sits in the sweet band at ${odds.streak.toFixed(2)}.`) 
   }else if(finite(odds.streak)&&odds.streak>=RULES.streakMin&&odds.streak<=RULES.streakMax){
     reasons.push(`Goals Streak 2+ Yes ${odds.streak.toFixed(2)} is inside the 1.10–1.49 universe.`)
   }else{
@@ -185,13 +186,13 @@ function scorePick(odds,home,away,route,published,side='away'){
   }
   if(finite(favO15)&&finite(oppO05)&&favO15<RULES.awayO15Max&&oppO05>=RULES.homeO05VeryWeak){
     score+=RULES.bonusAwayTwoPlus
-    reasons.push(`${favLabel} Over 1.5 ${favO15.toFixed(2)} against a ${oppLabel} Over 0.5 of ${oppO05.toFixed(2)}.`)
+    reasons.push(`${favLabel} Over 1.5 ${favO15.toFixed(2)} against a ${oppLabel} Over 0.5 of ${oppO05.toFixed(2)}.`) 
   }
   const favPpg=side==='home'?home.ppg:away.ppg,oppPpg=side==='home'?away.ppg:home.ppg
   const ppgGap=finite(favPpg)&&finite(oppPpg)?round2(favPpg-oppPpg):null
   if(ppgGap!==null&&ppgGap>=RULES.ppgGapBoost){
     score+=RULES.bonusPpgGap
-    reasons.push(`${favLabel} venue PPG leads by ${ppgGap.toFixed(2)}.`)
+    reasons.push(`${favLabel} venue PPG leads by ${ppgGap.toFixed(2)}.`) 
   }
   if(published<RULES.publishedCheap){
     score-=RULES.penaltyCheap
@@ -313,8 +314,14 @@ export function diagnoseAwayFavFixture(fixture){
   if(fixture?.earlySeason===true){
     return{pick:null,skip:'early-season',odds,home,away}
   }
+  if(isCupCompetition(fixture?.league)){
+    return{pick:null,skip:'cup',odds,home,away}
+  }
   if(similarForm(home,away)){
     return{pick:null,skip:'similar-form',odds,home,away}
+  }
+  if(favConflict(fixture,home,away,side)){
+    return{pick:null,skip:'fav-conflict',odds,home,away}
   }
   const routed=routePick(odds,side)
   if(routed.skip)return{pick:null,skip:routed.skip,odds,home,away}
