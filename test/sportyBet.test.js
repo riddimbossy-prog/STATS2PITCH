@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {parseSportyBet,verifiedMarkets} from '../server/odds.js'
-import {sportyEventToFixture} from '../server/sportyBet.js'
+import {applyEventIcons,eventQuery,resetSportyCache,sportyEventToFixture} from '../server/sportyBet.js'
 import {extractOdds,diagnoseAwayFavFixture} from '../server/awayFavEngine.js'
 
 const palaceMarkets=[
@@ -50,6 +50,7 @@ test('verified SportyBet odds feed VAR without API-Football',()=>{
 })
 
 test('SportyBet events keep numeric fixture ids and the raw event id',()=>{
+  resetSportyCache()
   const row=sportyEventToFixture({
     eventId:'sr:match:57891234',
     gameId:'sr:game:99',
@@ -69,4 +70,44 @@ test('SportyBet events keep numeric fixture ids and the raw event id',()=>{
   assert.ok(String(row.teams.home.logo).includes('10.png'))
   assert.equal(row.sporty.eventId,'sr:match:57891234')
   assert.equal(row.sporty.markets.length,palaceMarkets.length)
+})
+
+test('SportyBet match-details game IDs query event?gameId=',()=>{
+  assert.deepEqual(eventQuery('44203'),{gameId:'44203'})
+  assert.deepEqual(eventQuery('sr:match:73399176'),{eventId:'sr:match:73399176'})
+  assert.equal(eventQuery(''),null)
+})
+
+test('match-details crests replace sportradar placeholders and reuse the team cache',()=>{
+  resetSportyCache()
+  const base={estimateStartTime:Date.parse('2026-08-27T16:45:00Z'),status:0,matchStatus:'Not started',markets:[]}
+  const monaco=sportyEventToFixture({
+    ...base,
+    eventId:'sr:match:73399176',
+    gameId:'44203',
+    homeTeamId:'sr:competitor:1653',
+    homeTeamName:'Monaco',
+    awayTeamId:'sr:competitor:3110',
+    awayTeamName:'Gornik Zabrze'
+  },{id:'sr:tournament:540',name:'UEFA Conference League',categoryName:'International Clubs'})
+  assert.ok(String(monaco.teams.home.logo).includes('1653.png'))
+  applyEventIcons(monaco,{
+    homeTeamId:'sr:competitor:1653',
+    homeTeamIcon:'https://s.sporty.net/common/main/res/monaco.png',
+    awayTeamId:'sr:competitor:3110',
+    awayTeamIcon:'https://s.sporty.net/common/main/res/gornik.png'
+  })
+  assert.equal(monaco.teams.home.logo,'https://s.sporty.net/common/main/res/monaco.png')
+  assert.equal(monaco.teams.away.logo,'https://s.sporty.net/common/main/res/gornik.png')
+  const later=sportyEventToFixture({
+    ...base,
+    eventId:'sr:match:1',
+    gameId:'99',
+    homeTeamId:'sr:competitor:1653',
+    homeTeamName:'Monaco',
+    awayTeamId:'sr:competitor:17',
+    awayTeamName:'Man City'
+  },{name:'Friendly'})
+  assert.equal(later.teams.home.logo,'https://s.sporty.net/common/main/res/monaco.png')
+  assert.ok(String(later.teams.away.logo).includes('17.png'))
 })
