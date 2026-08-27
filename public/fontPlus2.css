@@ -1,0 +1,33 @@
+/* Site-wide +2px type bump. Loaded last so it wins over conceptD / mobile2026. */
+html, body { font-size: 19px !important; }
+.brand-text { font-size: 24px !important; }
+.brand-sub { font-size: 14px !important; }
+.brand-mark { font-size: 20px !important; }
+.page-tab { font-size: 16px !important; }
+.year-badge { font-size: 14px !important; }
+#todayStats small, #filterStats small, #varStats small, #bankerStats small { font-size: 16px !important; }
+#todayStats b, #filterStats b, #varStats b, #bankerStats b { font-size: 28px !important; }
+.date { font-size: 17px !important; }
+.toolbar select, .toolbar button, #clearFilters, #refresh, #status { font-size: 16px !important; }
+.league { font-size: 16px !important; }
+.league-flag { font-size: 19px !important; }
+.team-name { font-size: 17px !important; }
+.team-score { font-size: 24px !important; }
+.versus { font-size: 16px !important; }
+.pick strong, .pick-copy strong { font-size: 18px !important; }
+.odd, .odd-stack { font-size: 24px !important; }
+.odd-kicker, .pick-kicker { font-size: 14px !important; }
+.match-badge, .banker-badge, .var-badge, .filter-badge, .fav-badge, .early-flag { font-size: 14px !important; }
+.time, .proof-line, .early-note, .m-kick-row, .m-conf { font-size: 16px !important; }
+.details, .m-why-row { font-size: 16px !important; }
+.mobile-nav a, .mobile-nav span { font-size: 14px !important; }
+.dialog, .dialog .pick strong, .why-tip, .why-tip li, .why-block, .form-matches, .why-h2h, .why-team-stats { font-size: 16px !important; }
+.why-consensus b { font-size: 22px !important; }
+.filter-intro strong, .var-intro strong, .banker-rule-intro strong { font-size: 24px !important; }
+.filter-intro p, .var-intro p, .banker-rule-intro p { font-size: 16px !important; }
+.confidence, .m-ev, .m-ev span { font-size: 15px !important; }
+.settled-summary { font-size: 16px !important; }
+.perf-head, .perf-row, .performance-summary small { font-size: 15px !important; }
+.performance-summary b { font-size: 24px !important; }
+.empty { font-size: 16px !important; }
+.close { font-size: 16px !important; }
