@@ -2,9 +2,10 @@ import {ENGINE_VERSION,MIN_ODD,MAX_ODD,MIN_CONSENSUS,FORM_SAMPLE,FINISHED} from 
 import {learningAllows} from './learning.js'
 import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
-import {buildAwayFavBoard} from './awayFavEngine.js'
+import {buildAwayFavBoard,venueMetrics,favouriteSide,extractOdds} from './awayFavEngine.js'
 import {buildFilterBoard} from './filterEngine.js'
 import {attachWhy,fixtureHasStats} from './pickWhy.js'
+import {redFlagSkip,favConflict} from './redFlags.js'
 
 
 const finite=v=>Number.isFinite(Number(v))
@@ -159,6 +160,10 @@ function bankerSafety(f,m,o,hr,ar,price,transition=null){
 export function analyzeFixture(f,{ignoreTransition=false}={}){
   if(!fixtureHasStats(f))return[]
   if(f.home.fixtures.length<FORM_SAMPLE||f.away.fixtures.length<FORM_SAMPLE)return[]
+  const homeMetrics=venueMetrics(f?.home?.fixtures,f?.home?.id,'home')
+  const awayMetrics=venueMetrics(f?.away?.fixtures,f?.away?.id,'away')
+  const pricedFav=favouriteSide(extractOdds(f))
+  if(redFlagSkip(f,{home:homeMetrics,away:awayMetrics,favourite:pricedFav}))return[]
   const tier=tierGate(f);if(!tier.allowed)return[]
   const profiles={
     home:buildTransitionProfile(f.home.fixtures,f.home.id),
@@ -172,6 +177,10 @@ export function analyzeFixture(f,{ignoreTransition=false}={}){
     const pair=support(f,m,o);if(!pair)continue
     const [hr,ar]=pair;if(!finite(hr)||!finite(ar))continue
     if(!over25.applies&&(hr<MIN_CONSENSUS||ar<MIN_CONSENSUS))continue
+    const n=norm(o.name)
+    const picksFav=(m.marketKey==='match-winner'&&((n==='home'||n==='1')&&pricedFav==='home'||(n==='away'||n==='2')&&pricedFav==='away'))
+      ||(m.marketKey==='draw-no-bet'&&((n==='home'||n==='1')&&pricedFav==='home'||(n==='away'||n==='2')&&pricedFav==='away'))
+    if(picksFav&&favConflict(f,homeMetrics,awayMetrics,pricedFav))continue
     const consensus=Math.min(hr,ar)
     const transition=ignoreTransition?null:transitionForMarket(f,m,o,profiles)
     if(transition&&!transition.allowed){if(transition.redirectGoals)leakRedirect=transition;continue}
