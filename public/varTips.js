@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal} from './whyPopup.js'
-import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip} from './net.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
@@ -57,7 +57,20 @@ function render(){
 }
 
 function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
-function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.results=await api(`/results?date=${encodeURIComponent(state.date)}`);render()}catch{}},30000)}
+function pickRows(board){return board?.varTips||[]}
+async function hopIfEmpty(){
+  if(state.status!=='upcoming')return false
+  if(hasRemainingTips(pickRows(state.board)))return false
+  const hop=await nextDateWithTips(state.date,BOARD_VIEW,pickRows)
+  if(!hop)return false
+  state.date=hop.date
+  state.board=hop.board
+  writeBoardCache(hop.date,BOARD_VIEW,hop.board)
+  history.replaceState(null,'',`?date=${encodeURIComponent(hop.date)}`)
+  state.results=await api(`/results?date=${encodeURIComponent(hop.date)}`).catch(()=>null)
+  return true
+}
+function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.results=await api(`/results?date=${encodeURIComponent(state.date)}`);if(await hopIfEmpty()){render();startPolling();warmNeighbors(state.date,BOARD_VIEW);return}render()}catch{}},30000)}
 async function load(){
   renderDates()
   const cached=readBoardCache(state.date,BOARD_VIEW)
@@ -70,6 +83,7 @@ async function load(){
     ])
     state.board=board;state.results=res
     writeBoardCache(state.date,BOARD_VIEW,board)
+    await hopIfEmpty()
     render();startPolling();warmNeighbors(state.date,BOARD_VIEW)
   }catch(e){
     if(cached)return

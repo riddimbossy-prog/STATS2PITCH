@@ -1,4 +1,4 @@
-const cfg=window.__STATS2PITCH_CONFIG__||{}
+const cfg=(typeof window!=='undefined'&&window.__STATS2PITCH_CONFIG__)||{}
 const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
 const anon=String(cfg.supabaseAnonKey||'')
 const fn=String(cfg.functionName||'stats2pitch-api')
@@ -44,6 +44,31 @@ export function addDays(iso,n){
   return d.toISOString().slice(0,10)
 }
 
+export function isoToday(){
+  return new Date().toISOString().slice(0,10)
+}
+
+export function dateStrip(today=isoToday()){
+  return Array.from({length:13},(_,i)=>addDays(today,i-6))
+}
+
+export function hasRemainingTips(rows,now=Date.now()){
+  return(rows||[]).some(r=>{
+    const k=Date.parse(r?.kickoff||'')
+    return Number.isFinite(k)&&k>now
+  })
+}
+
+export function firstOpenDate(from,boards={},today=isoToday(),now=Date.now()){
+  if(!from||from<today)return null
+  const start=dateStrip(today).indexOf(from)
+  if(start<0)return null
+  for(const date of dateStrip(today).slice(start+1)){
+    if(hasRemainingTips(boards[date],now))return date
+  }
+  return null
+}
+
 export function prefetchBoard(date,view='all'){
   api(`/board?date=${encodeURIComponent(date)}&view=${encodeURIComponent(view)}`,{cache:'default'})
     .then(board=>{if(board)writeBoardCache(date,view,board)})
@@ -54,6 +79,25 @@ export function warmNeighbors(date,view='all'){
   const run=()=>{prefetchBoard(addDays(date,1),view);prefetchBoard(addDays(date,-1),view)}
   if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:2500})
   else setTimeout(run,400)
+}
+
+export async function nextDateWithTips(from,view,rowsOf){
+  const today=isoToday()
+  if(!from||from<today)return null
+  const start=dateStrip(today).indexOf(from)
+  if(start<0)return null
+  for(const date of dateStrip(today).slice(start+1)){
+    let board=readBoardCache(date,view)
+    if(!board){
+      try{
+        board=await api(`/board?date=${encodeURIComponent(date)}&view=${encodeURIComponent(view)}`,{cache:'default'})
+        if(board)writeBoardCache(date,view,board)
+      }catch{continue}
+    }
+    const rows=typeof rowsOf==='function'?rowsOf(board):(board?.bestPicks||[])
+    if(hasRemainingTips(rows))return{date,board}
+  }
+  return null
 }
 
 export function scrollDateStrip(host){

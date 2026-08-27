@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal} from './whyPopup.js'
-import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip} from './net.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips} from './net.js'
 import {adviceFor} from './performanceAdvice.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
@@ -54,6 +54,19 @@ function renderBoard(){renderDates();const base=state.board?.bestPicks||[];refre
 function open(r){const x=resultFor(r),score=scoreFor(r),modal=$('#modal');modal.classList.remove('hidden');modal.innerHTML=`<div class="dialog" role="dialog" aria-modal="true" aria-label="Why this pick was chosen">${leagueLine(r)}${statusBadge(r)}${matchup(r,score)}<div class="pick"><strong>${esc(marketLabel(r))}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="time"><b>Kickoff</b> · ${formatDateTime(r.kickoff)}</div>${earlyNote(r)}${x?.matchState==='settled'?`<div class="settled-summary ${esc(x.outcome||'')}">${esc((x.outcome||'settled').toUpperCase())}${score?` · ${score.home}–${score.away}`:''}</div>`:''}${explanationHtml(r)}${proofLine(r)}<button class="close" type="button">Close</button></div>`;bindCrestFallbacks(modal);bindWhyModal(modal)}
 
 function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
+function pickRows(board){return board?.bestPicks||[]}
+async function hopIfEmpty(){
+  if(view==='results'||state.status!=='upcoming')return false
+  if(hasRemainingTips(pickRows(state.board)))return false
+  const hop=await nextDateWithTips(state.date,BOARD_VIEW,pickRows)
+  if(!hop)return false
+  state.date=hop.date
+  state.board=hop.board
+  writeBoardCache(hop.date,BOARD_VIEW,hop.board)
+  history.replaceState(null,'',`?date=${encodeURIComponent(hop.date)}`)
+  state.resultData=await api(`/results?date=${encodeURIComponent(hop.date)}`).catch(()=>null)
+  return true
+}
 async function loadBoardData(){
   const cached=readBoardCache(state.date,BOARD_VIEW)
   if(cached){state.board=cached;renderBoard()}
@@ -63,9 +76,10 @@ async function loadBoardData(){
   ])
   state.board=board;state.resultData=res
   writeBoardCache(state.date,BOARD_VIEW,board)
+  await hopIfEmpty()
   renderBoard();startPolling();warmNeighbors(state.date,BOARD_VIEW)
 }
-function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`);renderBoard()}catch{}},30000)}
+function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`);if(await hopIfEmpty()){renderBoard();startPolling();warmNeighbors(state.date,BOARD_VIEW);return}renderBoard()}catch{}},30000)}
 function performanceRows(){const dimension=state.performanceGroup;return(state.performance?.groups||[]).filter(x=>x.dimension===dimension)}
 function groupTitle(value){const label=esc(String(value||'Unknown').replaceAll('-',' '));return state.performanceGroup==='country'?`${flag(value)} ${label}`:label}
 function toneLabel(tone){return({bank:'Bank on',avoid:'Avoid',steady:'Steady',watch:'Mixed',thin:'Too few'})[tone]||''}
