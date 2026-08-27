@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {analyzeFixture} from '../server/engine.js'
-import {redFlagSkip,isCupCompetition} from '../server/redFlags.js'
+import {redFlagSkip,isCupCompetition,isSrlMatch} from '../server/redFlags.js'
+import {diagnoseFilterFixture} from '../server/filterEngine.js'
+import {diagnoseAwayFavFixture} from '../server/awayFavEngine.js'
+import {diagnoseGoalsBankerFixture} from '../server/goalsBankersEngine.js'
 
 function finished(id,homeId,awayId,h,a){
   return{
@@ -39,6 +42,21 @@ function fixture(overrides={}){
 test('cup names are detected',()=>{
   assert.equal(isCupCompetition('FA Cup'),true)
   assert.equal(isCupCompetition('Premier League'),false)
+})
+
+test('SRL simulated matches are skipped on every board',()=>{
+  const league=fixture({league:'K-League 1 SRL'})
+  const sim=fixture({league:'Simulated Reality League'})
+  const team={...fixture(),home:{id:1,name:'Seoul SRL',fixtures:[]},away:{id:2,name:'Bucheon FC SRL',fixtures:[]}}
+  assert.equal(isSrlMatch(league),true)
+  assert.equal(isSrlMatch(sim),true)
+  assert.equal(isSrlMatch(team),true)
+  assert.equal(isSrlMatch(fixture({league:'Premier League'})),false)
+  assert.equal(redFlagSkip(league),'srl')
+  assert.equal(analyzeFixture(league).length,0)
+  assert.equal(diagnoseFilterFixture(league).skip,'srl')
+  assert.equal(diagnoseAwayFavFixture(league).skip,'srl')
+  assert.equal(diagnoseGoalsBankerFixture(league).skip,'srl')
 })
 
 test('All Picks skips early season, cups, top-five clashes and similar form',()=>{

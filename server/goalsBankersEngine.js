@@ -1,5 +1,6 @@
 import {ENGINE_VERSION} from './config.js'
 import {attachWhy,last5Form,last5Overall,fixtureHasStats} from './pickWhy.js'
+import {isSrlMatch} from './redFlags.js'
 
 export const ENGINE_ID='goals-bankers-v1'
 export const STREAK_MIN=1.10
@@ -261,6 +262,7 @@ function packPick(fixture,odds,decision,published){
 }
 
 export function diagnoseGoalsBankerFixture(fixture){
+  if(isSrlMatch(fixture))return{pick:null,skip:'srl'}
   if(!fixtureHasStats(fixture))return{pick:null,skip:'no-stats'}
   const odds=extractGoalsBankerOdds(fixture)
   const decision=decideGoalsBanker(odds)

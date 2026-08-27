@@ -52,6 +52,11 @@ export function dateStrip(today=isoToday()){
   return Array.from({length:13},(_,i)=>addDays(today,i-6))
 }
 
+export function isSrlPick(row){
+  const blob=[row?.league,row?.country,row?.home?.name||row?.home,row?.away?.name||row?.away,row?.match].map(v=>String(v||'')).join(' ')
+  return /\b(srl|simulated reality)\b/i.test(blob)
+}
+
 export function hasRemainingTips(rows,now=Date.now()){
   return(rows||[]).some(r=>{
     const k=Date.parse(r?.kickoff||'')

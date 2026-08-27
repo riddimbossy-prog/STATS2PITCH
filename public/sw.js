@@ -1,4 +1,4 @@
-const CACHE='stats2pitch-shell-v5.5.3'
+const CACHE='stats2pitch-shell-v5.5.4'
 const SHELL=['/','/filter-tips.html','/var-tips.html','/goals-bankers.html','/results.html','/offline.html','/conceptD.css','/mobile2026.css','/filterTips.css','/varTips.css','/goalsBankers.css','/leagueFlags.js','/appCrests.js','/filterTips.js','/varTips.js','/goalsBankers.js','/performanceAdvice.js','/net.js','/crests.js','/whyPopup.js','/pwa.js','/assets/stats2pitch-favicon-v2.png','/assets/football-real.svg']
 
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())))

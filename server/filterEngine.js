@@ -1,6 +1,7 @@
 import {ENGINE_VERSION,FINISHED,FORM_SAMPLE} from './config.js'
 import {venueMetrics} from './awayFavEngine.js'
 import {attachWhy,last5Form,last5Overall,fixtureHasStats} from './pickWhy.js'
+import {isSrlMatch} from './redFlags.js'
 
 export const ENGINE_ID='sporty-filter-v1'
 export const RULES=Object.freeze({
@@ -272,6 +273,7 @@ function packPick(fixture,odds,home,away,routed,direction){
 }
 
 export function diagnoseFilterFixture(fixture){
+  if(isSrlMatch(fixture))return{pick:null,skip:'srl'}
   if(!fixtureHasStats(fixture))return{pick:null,skip:'no-stats'}
   if(fixture?.earlySeason===true)return{pick:null,skip:'early-season'}
   if(isCupCompetition(fixture?.league))return{pick:null,skip:'cup'}

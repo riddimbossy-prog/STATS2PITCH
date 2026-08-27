@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
-import {hasRemainingTips,firstOpenDate,addDays} from '../public/net.js'
+import {hasRemainingTips,firstOpenDate,addDays,isSrlPick} from '../public/net.js'
 
 const read=p=>readFile(new URL(`../${p}`,import.meta.url),'utf8')
 const future=new Date(Date.now()+6*3600000).toISOString()
@@ -34,8 +34,15 @@ test('All Picks, Filter, VAR and Goals auto-advance empty days',async()=>{
     assert.match(src,/hopIfEmpty/)
     assert.match(src,/nextDateWithTips/)
     assert.match(src,/hasRemainingTips/)
+    assert.match(src,/isSrlPick/)
   }
   assert.match(files[0],/view==='results'/)
   assert.match(files[4],/firstOpenDate/)
   assert.match(files[4],/nextDateWithTips/)
+})
+
+test('SRL simulated picks are dropped on public boards',()=>{
+  assert.equal(isSrlPick({league:'K-League 1 SRL',home:'Seoul',away:'Bucheon'}),true)
+  assert.equal(isSrlPick({home:'Daejeon Citizen FC (Srl)',away:'Ulsan Hyundai SRL'}),true)
+  assert.equal(isSrlPick({league:'Premier League',home:'Arsenal',away:'Chelsea'}),false)
 })

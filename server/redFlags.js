@@ -12,9 +12,15 @@ const num=v=>finite(v)?Number(v):null
 const text=v=>String(v??'').trim()
 const norm=s=>text(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
 const CUP=/\b(cup|copa|coppa|pokal|fa cup|league cup|champions|europa|conference|knockout|play[- ]?offs?|qualification|qualifier|trophy|super cup|community shield|elimination)\b/i
+const SRL=/\b(srl|simulated reality)\b/i
 
 export function isCupCompetition(name){
   return CUP.test(norm(name))
+}
+
+export function isSrlMatch(fixture){
+  const blob=[fixture?.league,fixture?.country,fixture?.home?.name||fixture?.home,fixture?.away?.name||fixture?.away,fixture?.match].map(text).join(' ')
+  return SRL.test(norm(blob))||SRL.test(blob)
 }
 
 export function tableGate(homeSplit,awaySplit){
@@ -67,6 +73,7 @@ export function favConflict(fixture,home,away,side){
 }
 
 export function structuralSkip(fixture,homeMetrics=null,awayMetrics=null){
+  if(isSrlMatch(fixture))return'srl'
   if(fixture?.earlySeason===true)return'early-season'
   if(isCupCompetition(fixture?.league))return'cup'
   const table=tableGate(fixture?.homeSplit,fixture?.awaySplit)

@@ -1,6 +1,6 @@
 import {ENGINE_VERSION,FINISHED,FORM_SAMPLE} from './config.js'
 import {attachWhy,last5Form,last5Overall,varPublicReasons,fixtureHasStats} from './pickWhy.js'
-import {isCupCompetition,favConflict} from './redFlags.js'
+import {isCupCompetition,isSrlMatch,favConflict} from './redFlags.js'
 
 
 export const ENGINE_ID='away-fav-streak-v1'
@@ -295,6 +295,7 @@ function packPick(fixture,odds,home,away,routed,rating,side){
 
 
 export function diagnoseAwayFavFixture(fixture){
+  if(isSrlMatch(fixture))return{pick:null,skip:'srl'}
   if(!fixtureHasStats(fixture))return{pick:null,skip:'no-stats'}
   const odds=extractOdds(fixture)
   const streakLive=finite(odds.streak)&&odds.streak>=RULES.streakMin&&odds.streak<=RULES.streakMax

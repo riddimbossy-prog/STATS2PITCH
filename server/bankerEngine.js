@@ -1,5 +1,6 @@
 import {FINISHED,FORM_SAMPLE} from './config.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
+import {isSrlMatch} from './redFlags.js'
 
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
 const round2=v=>Math.round(Number(v)*100)/100
@@ -99,6 +100,7 @@ function passedLabels(checks){return checks.filter(x=>x.ok).map(x=>x.label)}
 function isRedirectGoal(c){return c.market==='total-goals'&&(c.selection==='Over 1.5'||c.selection==='Over 2.5')}
 
 export function evaluateBankerFixture(f,{ignoreTransition=false}={}){
+  if(isSrlMatch(f))return{pick:null,skip:'srl'}
   if(f?.statsReady===false)return{pick:null,skip:'no-stats'}
   const home=profile(f?.home?.fixtures,f?.home?.id,'home'),away=profile(f?.away?.fixtures,f?.away?.id,'away'),leagueProfile=f?.bankerLeagueProfile||{class:'insufficient'}
   if(!home.ready||!away.ready)return{pick:null,skip:'incomplete-5+5'}
