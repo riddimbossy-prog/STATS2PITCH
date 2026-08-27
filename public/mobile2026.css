@@ -8,13 +8,17 @@
 .m-footer,
 .odd-kicker,
 .filter-scrim,
-.m-why-row {
+.m-why-row,
+.m-board-tag,
+.m-fav-tag {
   display: none;
 }
 
 @media (max-width: 800px) {
   html, body {
     background: #070708;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
   }
   body {
     background-image:
@@ -84,13 +88,19 @@
 
   /* Page body */
   .wrap {
-    padding: 12px 14px 118px;
+    padding: 12px 14px calc(140px + env(safe-area-inset-bottom, 0px));
     max-width: 100%;
   }
   #todayStats,
   #countryChips,
   #status,
   .page-intro,
+  .filter-intro,
+  .var-intro,
+  .goals-intro,
+  #filterStats,
+  #varStats,
+  #goalsStats,
   .section-title p {
     display: none !important;
   }
@@ -108,6 +118,8 @@
     gap: 8px;
     padding: 0 0 2px;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
   }
   .date {
     height: 36px;
@@ -181,6 +193,11 @@
 
   .league,
   .banker-badge,
+  .filter-badge,
+  .var-badge,
+  .fav-badge,
+  .goals-badge,
+  .route-badge,
   .match-badge.upcoming,
   .confidence,
   .time,
@@ -188,6 +205,7 @@
   .early-note {
     display: none !important;
   }
+  .card.upcoming .team-score { display: none !important; }
   .match-badge.live,
   .match-badge.won,
   .match-badge.lost {
@@ -236,11 +254,54 @@
   .m-card-top .m-kick-row {
     display: inline-flex;
     align-items: center;
+    margin-left: auto;
     padding: 0;
     text-align: left;
     font-size: 14px;
+    flex: 0 0 auto;
   }
   .m-card-top .m-kick-row:before { content: none; }
+
+  .m-card-top .m-board-tag,
+  .m-card-top .m-fav-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .m-board-tag {
+    background: var(--accent);
+    color: #0a0a0b;
+  }
+  .m-board-tag.filter {
+    background: #67e8f9;
+    color: #0a0a0b;
+  }
+  .m-board-tag.goals {
+    background: #fbbf24;
+    color: #0a0a0b;
+  }
+  .m-fav-tag {
+    background: rgba(255, 255, 255, 0.06);
+    color: #c8c8d0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .m-fav-tag.home {
+    color: #67e8f9;
+    border-color: rgba(103, 232, 249, 0.28);
+    background: rgba(103, 232, 249, 0.12);
+  }
+  .m-fav-tag.away {
+    color: #93c5fd;
+    border-color: rgba(96, 165, 250, 0.28);
+    background: rgba(96, 165, 250, 0.12);
+  }
 
   .teams,
   .crest-matchup {
@@ -427,6 +488,10 @@
     -webkit-backdrop-filter: blur(18px);
     overflow: hidden;
     padding: 0 6px;
+    touch-action: manipulation;
+  }
+  html.is-scrolling .mobile-nav {
+    pointer-events: none;
   }
   .mobile-nav a {
     flex: 1;

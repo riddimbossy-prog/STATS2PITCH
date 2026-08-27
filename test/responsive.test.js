@@ -5,7 +5,7 @@ const css=fs.readFileSync(new URL('../public/conceptC.css',import.meta.url),'utf
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8')
 
 test('Concept D stylesheet is active and mobile bottom nav exists',()=>{
-  assert.match(html,/conceptD\.css\?v=5\.5\.0/)
+  assert.match(html,/conceptD\.css\?v=5\.5\.1/)
 
   assert.doesNotMatch(html,/product\.css/)
   assert.match(html,/class="mobile-nav"/)

@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal} from './whyPopup.js'
-import {api,readBoardCache,writeBoardCache,warmNeighbors} from './net.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
 const view=document.body.dataset.view||'all'
@@ -21,11 +21,11 @@ function calIcon(){return`<svg class="date-cal" viewBox="0 0 24 24" fill="none" 
 function dateLabel(d,today){return d===today?'Today':new Date(d+'T12:00:00Z').toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'})}
 function kickClock(v){const d=new Date(v);return Number.isNaN(d.getTime())?'TBC':d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
 function expectedValue(odds,conf){const o=Number(odds),p=Math.min(Math.max(Number(conf)||0,0),100)/100;if(!Number.isFinite(o)||o<=1||p<=0)return null;return p*o-1}
-function renderDates(){const host=$('#dates');if(!host)return;const ds=dates(),today=new Date().toISOString().slice(0,10);host.innerHTML=ds.map(d=>`<button class="date ${d===state.date?'active':''}" data-d="${d}">${d===state.date?calIcon():''}<span>${dateLabel(d,today)}</span></button>`).join('');$$('[data-d]').forEach(b=>b.onclick=()=>{state.date=b.dataset.d;history.replaceState(null,'',`?date=${encodeURIComponent(state.date)}`);load()});requestAnimationFrame(()=>host.querySelector('.date.active')?.scrollIntoView({inline:'center',block:'nearest'}))}
+function renderDates(){const host=$('#dates');if(!host)return;const ds=dates(),today=new Date().toISOString().slice(0,10),stamp=`${state.date}|${ds[0]}|${ds[ds.length-1]}`;if(host.dataset.stamp===stamp)return;host.dataset.stamp=stamp;host.innerHTML=ds.map(d=>`<button class="date ${d===state.date?'active':''}" data-d="${d}">${d===state.date?calIcon():''}<span>${dateLabel(d,today)}</span></button>`).join('');host.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{state.date=b.dataset.d;history.replaceState(null,'',`?date=${encodeURIComponent(state.date)}`);load()});requestAnimationFrame(()=>scrollDateStrip(host))}
 function marketLabel(r){return String(r.displaySelection||r.selection||'This tip').replace(/^1H\s*·\s*/i,'First half · ').replace(/^1H Result\s*·\s*/i,'First half result · ').replace(/^DNB\s*·\s*/i,'Draw no bet · ').replace(/^BTTS\s*·\s*/i,'Both teams to score · ').replace(/^Double Chance\s*·\s*/i,'Double chance · ').replace(/^1X2\s*·\s*/i,'Match result · ')}
 function resultFor(r){return state.resultData?.picks?.find(x=>String(x.fixtureId)===String(r.fixtureId))?.result||state.board?.results?.[String(r.fixtureId)]||null}
 function stateFor(r){const x=resultFor(r);if(x?.matchState)return x.matchState;if(x?.outcome&&x.outcome!=='pending')return'settled';return kickoffMs(r)>Date.now()?'upcoming':'pending'}
-function scoreFor(r){const x=resultFor(r);const h=x?.home?.score??x?.homeScore,a=x?.away?.score??x?.awayScore;return h!==null&&h!==undefined&&a!==null&&a!==undefined?{home:h,away:a}:null}
+function scoreFor(r){const s=stateFor(r);if(s!=='live'&&s!=='settled')return null;const x=resultFor(r);const h=x?.home?.score??x?.homeScore,a=x?.away?.score??x?.awayScore;return h!==null&&h!==undefined&&a!==null&&a!==undefined?{home:h,away:a}:null}
 function statusBadge(r){const x=resultFor(r),s=stateFor(r);if(s==='live')return`<span class="match-badge live">LIVE${x?.minute?` · ${esc(x.minute)}′`:''}</span>`;if(s==='settled'){const o=x?.outcome||'pending';return`<span class="match-badge ${esc(o)}">${o==='won'?'WON':o==='lost'?'LOST':o==='void'?'VOID':'SETTLED'}</span>`}return`<span class="match-badge upcoming">UPCOMING</span>`}
 function bankerApproved(r){if(Number(r?.homeConsensus)!==100||Number(r?.awayConsensus)!==100)return false;const checks=Array.isArray(r?.bankerChecks)?r.bankerChecks:[];const bottomThreeBlocked=checks.some(x=>x?.ok===false&&String(x?.label||'').toLowerCase().includes('not bottom three'));return !bottomThreeBlocked}
 function sortedUnique(values){return[...new Set(values.filter(Boolean).map(String))].sort((a,b)=>a.localeCompare(b))}

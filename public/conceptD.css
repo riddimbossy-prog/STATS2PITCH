@@ -512,6 +512,7 @@ header {
   line-height: 1;
   color: var(--accent);
 }
+.card.upcoming .team-score { display: none; }
 .versus {
   font-family: var(--mono);
   font-size: 14px;

@@ -55,3 +55,11 @@ export function warmNeighbors(date,view='all'){
   if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:2500})
   else setTimeout(run,400)
 }
+
+export function scrollDateStrip(host){
+  const active=host?.querySelector?.('.date.active')
+  if(!host||!active)return
+  const left=active.offsetLeft-(host.clientWidth-active.offsetWidth)/2
+  if(typeof host.scrollTo==='function')host.scrollTo({left:Math.max(0,left),behavior:'instant'})
+  else host.scrollLeft=Math.max(0,left)
+}
