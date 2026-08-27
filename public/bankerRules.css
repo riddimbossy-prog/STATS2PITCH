@@ -10,7 +10,7 @@
 }
 .banker-rule-intro strong {
   display: block;
-  font-size: 18px;
+  font-size: 20px;
   letter-spacing: -0.02em;
   color: var(--ink);
 }
@@ -28,7 +28,7 @@
   margin-top: 14px;
 }
 .banker-hard-rules b {
-  font-size: 11px;
+  font-size: 13px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   padding: 6px 10px;
@@ -57,7 +57,7 @@
 }
 #bankerStats small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--muted);
@@ -65,7 +65,7 @@
 }
 #bankerStats b {
   display: block;
-  font: 700 24px var(--mono);
+  font: 700 26px var(--mono);
   margin-top: 4px;
   color: var(--ink);
 }
@@ -98,13 +98,13 @@
   background: rgba(255, 107, 44, 0.06);
 }
 .banker-rule-top span {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--muted);
 }
 .banker-rule-top b {
-  font-size: 10px;
+  font-size: 12px;
   background: var(--banker);
   color: #fff;
   padding: 5px 9px;
@@ -122,7 +122,7 @@
 }
 .banker-rule-match > strong {
   text-align: center;
-  font: 700 11px var(--mono);
+  font: 700 13px var(--mono);
   color: var(--faint);
 }
 .banker-rule-team {
@@ -149,7 +149,7 @@
   object-fit: contain;
 }
 .banker-rule-team b {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.2;
   color: var(--ink);
   font-weight: 600;
@@ -163,14 +163,14 @@
 }
 .banker-rule-pick small {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--faint);
 }
 .banker-rule-pick b {
   display: block;
-  font-size: 17px;
+  font-size: 19px;
   color: var(--banker);
   margin-top: 3px;
 }
@@ -187,7 +187,7 @@
   border-radius: 10px;
 }
 .banker-rule-maths h4 {
-  font-size: 10px;
+  font-size: 12px;
   margin: 0 0 8px;
   text-transform: uppercase;
   color: var(--muted);
@@ -206,13 +206,13 @@
 }
 .banker-rule-maths small {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--faint);
 }
 .banker-rule-maths span b {
-  font: 700 12px var(--mono);
+  font: 700 14px var(--mono);
   color: var(--ink);
 }
 .banker-rule-league {
@@ -224,11 +224,11 @@
 }
 .banker-rule-league b {
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--accent);
 }
 .banker-rule-league span {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--muted);
 }
@@ -238,14 +238,14 @@
   color: var(--muted);
 }
 .banker-rule-card li {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   margin: 5px 0;
 }
 .banker-rule-card footer {
   border-top: 1px solid var(--border);
   padding: 10px 14px;
-  font: 600 11px var(--mono);
+  font: 600 13px var(--mono);
   background: var(--surface-2);
   color: var(--muted);
 }
