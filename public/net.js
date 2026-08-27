@@ -1,0 +1,57 @@
+const cfg=window.__STATS2PITCH_CONFIG__||{}
+const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
+const anon=String(cfg.supabaseAnonKey||'')
+const fn=String(cfg.functionName||'stats2pitch-api')
+const BOARD_CACHE_MS=12*60*1000
+
+export function endpoint(path){
+  if(!base)throw new Error('Service unavailable')
+  return `${base}/functions/v1/${fn}${path}`
+}
+
+export async function api(path,options={}){
+  const {cache='no-store',...rest}=options
+  const res=await fetch(endpoint(path),{
+    ...rest,
+    headers:{apikey:anon,Authorization:`Bearer ${anon}`,...(rest.headers||{})},
+    cache
+  })
+  const body=await res.json().catch(()=>null)
+  if(!res.ok)throw new Error('Unable to load this right now')
+  return body
+}
+
+function cacheKey(date,view){return `s2p-board:${view||'all'}:${date}`}
+
+export function readBoardCache(date,view='all'){
+  try{
+    const raw=sessionStorage.getItem(cacheKey(date,view))
+    if(!raw)return null
+    const row=JSON.parse(raw)
+    if(!row?.data||Date.now()-Number(row.at||0)>BOARD_CACHE_MS)return null
+    return row.data
+  }catch{return null}
+}
+
+export function writeBoardCache(date,view,data){
+  if(!data)return
+  try{sessionStorage.setItem(cacheKey(date,view),JSON.stringify({at:Date.now(),data}))}catch{}
+}
+
+export function addDays(iso,n){
+  const d=new Date(`${iso}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate()+n)
+  return d.toISOString().slice(0,10)
+}
+
+export function prefetchBoard(date,view='all'){
+  api(`/board?date=${encodeURIComponent(date)}&view=${encodeURIComponent(view)}`,{cache:'default'})
+    .then(board=>{if(board)writeBoardCache(date,view,board)})
+    .catch(()=>{})
+}
+
+export function warmNeighbors(date,view='all'){
+  const run=()=>{prefetchBoard(addDays(date,1),view);prefetchBoard(addDays(date,-1),view)}
+  if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:2500})
+  else setTimeout(run,400)
+}

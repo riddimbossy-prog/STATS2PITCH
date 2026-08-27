@@ -1,13 +1,11 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal} from './whyPopup.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
 const view=document.body.dataset.view||'all'
+const BOARD_VIEW=view==='results'?'all':'all'
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,resultData:null,performance:null,market:'all',country:'all',league:'all',seasonStage:'all',status:view==='results'?'settled':'upcoming',performanceGroup:'market',timer:null}
-const cfg=window.__STATS2PITCH_CONFIG__||{},base=String(cfg.supabaseUrl||'').replace(/\/+$/,''),anon=String(cfg.supabaseAnonKey||''),fn=String(cfg.functionName||'stats2pitch-api')
-
-function endpoint(path){if(!base)throw new Error('Service unavailable');return`${base}/functions/v1/${fn}${path}`}
-async function api(path,options={}){const headers={apikey:anon,Authorization:`Bearer ${anon}`,...(options.headers||{})};const res=await fetch(endpoint(path),{...options,headers,cache:'no-store'});const body=await res.json().catch(()=>null);if(!res.ok)throw new Error('Unable to load this right now');return body}
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
 function team(name,img,side,score){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${esc(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span>${score!==undefined&&score!==null?`<b class="team-score">${esc(score)}</b>`:''}</div>`}
 function matchup(r,score){const fx=fixtureCrests(state.board);return`<div class="teams crest-matchup">${team(r.home,crestSrc(r,'home',fx),'home',score?.home)}<span class="versus">${score?'–':'VS'}</span>${team(r.away,crestSrc(r,'away',fx),'away',score?.away)}</div>`}
@@ -55,11 +53,27 @@ function renderBoard(){renderDates();const base=state.board?.bestPicks||[];refre
 function open(r){const x=resultFor(r),score=scoreFor(r),modal=$('#modal');modal.classList.remove('hidden');modal.innerHTML=`<div class="dialog" role="dialog" aria-modal="true" aria-label="Why this pick was chosen">${leagueLine(r)}${statusBadge(r)}${matchup(r,score)}<div class="pick"><strong>${esc(marketLabel(r))}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="time"><b>Kickoff</b> · ${formatDateTime(r.kickoff)}</div>${earlyNote(r)}${x?.matchState==='settled'?`<div class="settled-summary ${esc(x.outcome||'')}">${esc((x.outcome||'settled').toUpperCase())}${score?` · ${score.home}–${score.away}`:''}</div>`:''}${explanationHtml(r)}${proofLine(r)}<button class="close" type="button">Close</button></div>`;bindCrestFallbacks(modal);bindWhyModal(modal)}
 
 function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
-async function loadBoardData(){const [board,res]=await Promise.all([api(`/board?date=${encodeURIComponent(state.date)}`),api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)]);state.board=board;state.resultData=res;renderBoard();startPolling()}
+async function loadBoardData(){
+  const cached=readBoardCache(state.date,BOARD_VIEW)
+  if(cached){state.board=cached;renderBoard()}
+  const [board,res]=await Promise.all([
+    api(`/board?date=${encodeURIComponent(state.date)}&view=${BOARD_VIEW}`,{cache:'default'}),
+    api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)
+  ])
+  state.board=board;state.resultData=res
+  writeBoardCache(state.date,BOARD_VIEW,board)
+  renderBoard();startPolling();warmNeighbors(state.date,BOARD_VIEW)
+}
 function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`);renderBoard()}catch{}},30000)}
 function performanceRows(){const dimension=state.performanceGroup;return(state.performance?.groups||[]).filter(x=>x.dimension===dimension)}
 function renderPerformance(){const p=state.performance||{summary:{},groups:[]},s=p.summary||{},host=$('#performanceSummary');if(host)host.innerHTML=`<div><small>Picks</small><b>${s.picks||0}</b></div><div class="win"><small>Won</small><b>${s.won||0}</b></div><div class="loss"><small>Lost</small><b>${s.lost||0}</b></div><div><small>Void</small><b>${s.void||0}</b></div><div class="rate"><small>Success</small><b>${Number(s.winRate||0).toFixed(1)}%</b></div>`;const rows=performanceRows(),table=$('#performanceTable');if(table)table.innerHTML=rows.length?`<div class="perf-head"><span>${esc(state.performanceGroup)}</span><span>Picks</span><span>Won</span><span>Lost</span><span>Success</span></div>`+rows.map(r=>`<div class="perf-row"><strong>${state.performanceGroup==='country'?`${flag(r.value)} `:''}${esc(r.value.replaceAll('-',' '))}</strong><span>${r.picks}</span><span>${r.won}</span><span>${r.lost}</span><b>${Number(r.winRate).toFixed(1)}%</b></div>`):'<div class="empty">No settled performance data yet.</div>';const g=$('#performanceGroup');if(g)g.value=state.performanceGroup}
 async function loadResultsView(){skeleton();const [perf]=await Promise.all([api('/performance?days=30')]);state.performance=perf;renderPerformance();await loadBoardData()}
 function bind(){for(const[id,key]of[['statusFilter','status'],['seasonFilter','seasonStage'],['countryFilter','country'],['leagueFilter','league'],['market','market']]){const el=$('#'+id);if(el)el.onchange=e=>{state[key]=e.target.value;if(key==='country')state.league='all';renderBoard()}};$('#clearFilters')?.addEventListener('click',()=>{state.status=view==='results'?'settled':'upcoming';state.country=state.league=state.market=state.seasonStage='all';renderBoard()});$('#performanceGroup')?.addEventListener('change',e=>{state.performanceGroup=e.target.value;renderPerformance()});$('#refresh')?.addEventListener('click',load);$('#notifyBell')?.addEventListener('click',load);$('#profileBtn')?.addEventListener('click',()=>document.body.classList.toggle('filters-open'))}
-async function load(){skeleton();try{if(view==='results')await loadResultsView();else await loadBoardData()}catch{$('#status').textContent='Unable to load picks';$('#cards').innerHTML='<div class="empty">Please try again shortly.</div>'}}
+async function load(){
+  try{
+    if(view==='results'){skeleton();await loadResultsView();return}
+    if(!readBoardCache(state.date,BOARD_VIEW))skeleton()
+    await loadBoardData()
+  }catch{$('#status').textContent='Unable to load picks';$('#cards').innerHTML='<div class="empty">Please try again shortly.</div>'}
+}
 bind();renderDates();load();window.addEventListener('beforeunload',()=>clearInterval(state.timer))

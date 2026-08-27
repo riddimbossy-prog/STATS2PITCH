@@ -1,14 +1,12 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal} from './whyPopup.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
-const cfg=window.__STATS2PITCH_CONFIG__||{},base=String(cfg.supabaseUrl||'').replace(/\/+$/,''),anon=String(cfg.supabaseAnonKey||''),fn=String(cfg.functionName||'stats2pitch-api')
 const REQUIRED_ENGINE='sporty-filter-v1'
+const BOARD_VIEW='filter'
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',timer:null}
-
-function endpoint(path){if(!base)throw new Error('Service unavailable');return`${base}/functions/v1/${fn}${path}`}
-async function api(path){const r=await fetch(endpoint(path),{headers:{apikey:anon,Authorization:`Bearer ${anon}`},cache:'no-store'}),b=await r.json().catch(()=>null);if(!r.ok)throw new Error('Unable to load this right now');return b}
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
 function team(name,img,side,score){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${esc(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span>${score!==undefined&&score!==null?`<b class="team-score">${esc(score)}</b>`:''}</div>`}
 function matchup(r,score){const fx=fixtureCrests(state.board);return`<div class="teams crest-matchup">${team(r.home,crestSrc(r,'home',fx),'home',score?.home)}<span class="versus">${score?'–':'VS'}</span>${team(r.away,crestSrc(r,'away',fx),'away',score?.away)}</div>`}
@@ -58,7 +56,24 @@ function render(){
 
 function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
 function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.results=await api(`/results?date=${encodeURIComponent(state.date)}`);render()}catch{}},30000)}
-async function load(){renderDates();skeleton();$('#status').textContent='Loading…';try{const [board,res]=await Promise.all([api(`/board?date=${encodeURIComponent(state.date)}`),api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)]);state.board=board;state.results=res;render();startPolling()}catch(e){$('#status').textContent='Unavailable';$('#cards').innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
+async function load(){
+  renderDates()
+  const cached=readBoardCache(state.date,BOARD_VIEW)
+  if(cached){state.board=cached;render()}
+  else{skeleton();$('#status').textContent='Loading…'}
+  try{
+    const [board,res]=await Promise.all([
+      api(`/board?date=${encodeURIComponent(state.date)}&view=${BOARD_VIEW}`,{cache:'default'}),
+      api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)
+    ])
+    state.board=board;state.results=res
+    writeBoardCache(state.date,BOARD_VIEW,board)
+    render();startPolling();warmNeighbors(state.date,BOARD_VIEW)
+  }catch(e){
+    if(cached)return
+    $('#status').textContent='Unavailable';$('#cards').innerHTML=`<div class="empty">${esc(e.message)}</div>`
+  }
+}
 $('#statusFilter')?.addEventListener('change',e=>{state.status=e.target.value;render()})
 $('#countryFilter')?.addEventListener('change',e=>{state.country=e.target.value;state.league='all';render()})
 $('#leagueFilter')?.addEventListener('change',e=>{state.league=e.target.value;render()})

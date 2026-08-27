@@ -10,6 +10,10 @@ Generator for Stats2Pitch boards and sporty.codes Elite.
 
 Public pages show fixture, teams, logos, league, kickoff, market, pick and odds. Engine method is not published on the site.
 
+## Refresh
+
+Boards refresh automatically every three hours, plus a 04:07 Accra run. Each run fills the public date strip (today through six days ahead, and the past six days) so upcoming dates already have picks.
+
 ## Cache behavior
 
 Supabase snapshots load only when `engineVersion` equals `stats2pitch-v5-var-tips`. A version change does not merge leftover picks from an older engine into the new All Picks or VAR Tips boards.
@@ -21,4 +25,4 @@ Required secrets:
 
 Odds, fixtures, last-5 form, H2H and league tables are read from SportyBet Ghana (`factsCenter` + Sportradar stats). No API-Football key is used.
 
-Run `npm run check` before pushing. Goals Bankers appear after the next board refresh. The snapshot version is unchanged, so live All Picks, VAR Tips, Filter Tips and Elite keep loading.
+Run `npm run check` before pushing. A refresh starts automatically after this change, so the date strip fills without waiting for the next morning.

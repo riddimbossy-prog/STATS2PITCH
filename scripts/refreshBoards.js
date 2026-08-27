@@ -1,10 +1,13 @@
 import {refreshNow} from '../server/refresh.js'
-import {accraWeek} from '../server/week.js'
+import {availabilityWindow} from '../server/week.js'
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))
 const skippable=msg=>/do not have access to this date|request limit for the day|rate.?limit/i.test(String(msg||''))
-const dates=accraWeek().dates
+const avail=availabilityWindow()
+const dates=avail.refreshDates
 let completed=0,failed=0,skipped=0
+
+console.log(`Refreshing availability ${avail.from} → ${avail.to} (${dates.length} days, today ${avail.today})`)
 
 for(let i=0;i<dates.length;i++){
   const d=dates[i]
@@ -15,8 +18,9 @@ for(let i=0;i<dates.length;i++){
     const published=board.bestPicks.length
     const varTips=board.varTips?.length||0
     const filterTips=board.filterTips?.length||0
+    const goalsBankers=board.goalsBankers?.length||0
     completed++
-    console.log(`${d}: ${published} All Picks · ${filterTips} Filter Tips · ${varTips} VAR Tips · ${board.priority.length} qualified · ${src} source fixtures`)
+    console.log(`${d}: ${published} All Picks · ${filterTips} Filter Tips · ${varTips} VAR Tips · ${goalsBankers} Goals Bankers · ${board.priority.length} qualified · ${src} source fixtures`)
     if(src===0){
       console.warn(`${d}: no upcoming fixtures for this date`)
     }
@@ -30,7 +34,7 @@ for(let i=0;i<dates.length;i++){
     failed++
     console.error(`${d}: refresh failed: ${msg}`)
   }
-  if(i<dates.length-1)await sleep(Number(process.env.BOARD_DAY_PAUSE_MS||3000))
+  if(i<dates.length-1)await sleep(Number(process.env.BOARD_DAY_PAUSE_MS||800))
 }
 
 console.log(`Refresh complete: ${completed} day(s) completed, ${skipped} skipped, ${failed} day(s) failed`)

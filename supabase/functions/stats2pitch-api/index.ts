@@ -17,7 +17,7 @@ const cors={
   'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
   'Access-Control-Max-Age':'86400'
 }
-const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}})
+const json=(body:unknown,status=200,cache='no-store')=>new Response(JSON.stringify(body),{status,headers:{...cors,'Content-Type':'application/json; charset=utf-8','Cache-Control':cache}})
 const dateOk=(v:string|null)=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))
 const finite=(v:any)=>Number.isFinite(Number(v))
 const norm=(s:any)=>String(s??'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
@@ -111,6 +111,50 @@ function attachCrests(board:any){
   return next
 }
 function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,goalsBankersCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],fixtures:[],availableMarkets:[],results:{}}}
+function slimMeta(meta:any={}){
+  return{
+    date:meta.date,
+    generatedAt:meta.generatedAt||null,
+    storedAt:meta.storedAt||null,
+    engineVersion:meta.engineVersion,
+    engine:meta.engine,
+    qualified:meta.qualified,
+    bestPicks:meta.bestPicks,
+    publishedPicks:meta.publishedPicks,
+    firstPublishedAt:meta.firstPublishedAt,
+    varTipsEngine:meta.varTipsEngine,
+    varTipsCount:meta.varTipsCount,
+    filterTipsEngine:meta.filterTipsEngine,
+    filterTipsCount:meta.filterTipsCount,
+    goalsBankersEngine:meta.goalsBankersEngine,
+    goalsBankersCount:meta.goalsBankersCount,
+    requiresRefresh:meta.requiresRefresh===true,
+    refresh:meta.refresh||null
+  }
+}
+function publicBoard(board:any={},view='all'){
+  const v=['all','var','filter','goals'].includes(String(view||''))?String(view):'all'
+  const empty:any={
+    meta:slimMeta(board?.meta||{}),
+    fixtures:Array.isArray(board?.fixtures)?board.fixtures:[],
+    availableMarkets:[],
+    results:board?.results&&typeof board.results==='object'?board.results:{},
+    bestPicks:[],
+    varTips:[],
+    filterTips:[],
+    goalsBankers:[],
+    priority:[],
+    bankers:[]
+  }
+  const markets=(rows:any[])=>[...new Set((rows||[]).map((x:any)=>x?.market).filter(Boolean))].sort()
+  if(v==='var'){empty.varTips=board?.varTips||[];empty.varTipsMeta=board?.varTipsMeta||null;empty.availableMarkets=markets(empty.varTips);return empty}
+  if(v==='filter'){empty.filterTips=board?.filterTips||[];empty.filterTipsMeta=board?.filterTipsMeta||null;empty.availableMarkets=markets(empty.filterTips);return empty}
+  if(v==='goals'){empty.goalsBankers=board?.goalsBankers||[];empty.goalsBankersMeta=board?.goalsBankersMeta||null;empty.availableMarkets=markets(empty.goalsBankers);return empty}
+  empty.bestPicks=board?.bestPicks||[]
+  empty.availableMarkets=Array.isArray(board?.availableMarkets)&&board.availableMarkets.length?board.availableMarkets:markets(empty.bestPicks)
+  return empty
+}
+function compactResultRows(rows:any[]){return (rows||[]).map((p:any)=>({fixtureId:p?.fixtureId??null,result:p?.result||null}))}
 async function snapshot(date:string){
   const rows=await rest(`/rest/v1/prediction_snapshots?select=payload,generated_at&snapshot_date=eq.${encodeURIComponent(date)}&limit=1`)
   const row=Array.isArray(rows)?rows[0]:null,payload=row?.payload||null
@@ -261,8 +305,10 @@ Deno.serve(async req=>{
     if(route==='/health')return json({ok:true,version:'4.0.0',engineVersion:ENGINE_VERSION})
     if(route==='/config')return json({version:'4.0.0',engineVersion:ENGINE_VERSION})
     if(route==='/board'&&req.method==='GET'){
-      const date=requestedDate(url),row=await snapshot(date),status=snapshotState(date,row),board=attachCrests(row?.board||emptyBoard(date))
-      return json({...board,meta:{...(board.meta||{}),date,refresh:status,requiresRefresh:status.state!=='complete'}})
+      const date=requestedDate(url),view=url.searchParams.get('view')||'all',row=await snapshot(date),status=snapshotState(date,row),board=attachCrests(row?.board||emptyBoard(date))
+      const payload=publicBoard({...board,meta:{...(board.meta||{}),date,refresh:status,requiresRefresh:status.state!=='complete'}},view)
+      const cache=payload?.meta?.generatedAt?'public, max-age=20, stale-while-revalidate=60':'no-store'
+      return json(payload,200,cache)
     }
     if((route==='/export/elite'||route==='/api/export/elite')&&req.method==='GET'){
       if(!eliteAuthorized(req))return json({error:'unauthorized'},401)
@@ -275,11 +321,11 @@ Deno.serve(async req=>{
       const date=requestedDate(url),row=await snapshot(date),board=row?.board||emptyBoard(date)
       let fixtures:any[]=[];try{fixtures=await liveScores(date)}catch{}
       const map=new Map(fixtures.map(f=>[String(f.fixtureId),f])),stored=board?.results||{}
-      const picks=(board?.bestPicks||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):stored[String(p.fixtureId)]||{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
-      const varTips=(board?.varTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
-      const filterTips=(board?.filterTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
-      const goalsBankers=(board?.goalsBankers||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
-      return json({date,picks,varTips,filterTips,goalsBankers,fixtures})
+      const picks=compactResultRows((board?.bestPicks||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):stored[String(p.fixtureId)]||{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}}))
+      const varTips=compactResultRows((board?.varTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}}))
+      const filterTips=compactResultRows((board?.filterTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}}))
+      const goalsBankers=compactResultRows((board?.goalsBankers||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}}))
+      return json({date,picks,varTips,filterTips,goalsBankers})
     }
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}
     if(route==='/performance'&&req.method==='GET'){

@@ -10,6 +10,7 @@ on:
       - '.github/workflows/refresh-board.yml'
   schedule:
     - cron: "17 */3 * * *"
+    - cron: "7 4 * * *"
 
 concurrency:
   group: stats2pitch-board-refresh
@@ -18,7 +19,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,8 +46,9 @@ jobs:
           APP_TIMEZONE: "Africa/Accra"
           REFRESH_CONCURRENCY: "3"
           SPORTYBET_COUNTRY: "gh"
-          SPORTYBET_TIMELINE: "168"
+          SPORTYBET_TIMELINE: "192"
           SPORTY_LASTX: "40"
+          BOARD_DAY_PAUSE_MS: "800"
 
       - name: Settle published picks
         run: npm run settle
