@@ -4,7 +4,7 @@ import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 import {buildAwayFavBoard} from './awayFavEngine.js'
 import {buildFilterBoard} from './filterEngine.js'
-import {attachWhy} from './pickWhy.js'
+import {attachWhy,fixtureHasStats} from './pickWhy.js'
 
 
 const finite=v=>Number.isFinite(Number(v))
@@ -157,6 +157,7 @@ function bankerSafety(f,m,o,hr,ar,price,transition=null){
 }
 
 export function analyzeFixture(f,{ignoreTransition=false}={}){
+  if(!fixtureHasStats(f))return[]
   if(f.home.fixtures.length<FORM_SAMPLE||f.away.fixtures.length<FORM_SAMPLE)return[]
   const tier=tierGate(f);if(!tier.allowed)return[]
   const profiles={

@@ -34,23 +34,31 @@ function formMatches(rows,esc){
     const score=x.hs!=null&&x.as!=null?`${x.hs}–${x.as}`:''
     const vs=x.opponent?`vs ${x.opponent}`:`${x.home} vs ${x.away}`
     const when=shortDate(x.date)
-    return`<li><b>${esc(score||'–')}</b><span>${esc(vs)}</span>${when?`<small>${esc(when)}</small>`:''}</li>`
+    const league=x.league?`<em>${esc(x.league)}</em>`:''
+    return`<li><b>${esc(score||'–')}</b><span>${esc(vs)}${league}</span>${when?`<small>${esc(when)}</small>`:''}</li>`
   }).join('')}</ul>`
 }
 
 function avgCell(v){return v==null||v===''?'—':String(v)}
+function pctCell(v){return v==null||v===''?'—':`${v}%`}
 
 function comparisonHtml(why,r,esc){
-  const home=why?.homeAvg||{},away=why?.awayAvg||{}
-  if(home.ppg==null&&away.ppg==null&&home.gf==null&&away.gf==null)return''
+  const home=why?.homeStats||why?.homeAvg||{}
+  const away=why?.awayStats||why?.awayAvg||{}
+  if(home.played==null&&away.played==null&&home.ppg==null&&away.ppg==null&&home.gf==null&&away.gf==null)return''
   return`<div class="why-compare">
-    <h4>Venue averages · last 5</h4>
+    <h4>Team stats · last matches</h4>
     <table>
       <thead><tr><th></th><th>${esc(r.home||'Home')}</th><th>${esc(r.away||'Away')}</th></tr></thead>
       <tbody>
+        <tr><th>Matches</th><td>${esc(avgCell(home.played))}</td><td>${esc(avgCell(away.played))}</td></tr>
+        <tr><th>Win %</th><td>${esc(pctCell(home.winPct))}</td><td>${esc(pctCell(away.winPct))}</td></tr>
         <tr><th>PPG</th><td>${esc(avgCell(home.ppg))}</td><td>${esc(avgCell(away.ppg))}</td></tr>
-        <tr><th>Scored</th><td>${esc(avgCell(home.gf))}</td><td>${esc(avgCell(away.gf))}</td></tr>
-        <tr><th>Conceded</th><td>${esc(avgCell(home.ga))}</td><td>${esc(avgCell(away.ga))}</td></tr>
+        <tr><th>Avg scored</th><td>${esc(avgCell(home.gf))}</td><td>${esc(avgCell(away.gf))}</td></tr>
+        <tr><th>Avg conceded</th><td>${esc(avgCell(home.ga))}</td><td>${esc(avgCell(away.ga))}</td></tr>
+        <tr><th>BTTS</th><td>${esc(pctCell(home.btts))}</td><td>${esc(pctCell(away.btts))}</td></tr>
+        <tr><th>Over 1.5</th><td>${esc(pctCell(home.over15))}</td><td>${esc(pctCell(away.over15))}</td></tr>
+        <tr><th>Over 2.5</th><td>${esc(pctCell(home.over25))}</td><td>${esc(pctCell(away.over25))}</td></tr>
       </tbody>
     </table>
   </div>`
@@ -87,14 +95,15 @@ function bankerHtml(r,esc,banker){
 export function whySectionHtml(r,esc=fallbackEsc,opts={}){
   const why=r?.why||{}
   const lines=reasonLines(r)
-  const homeForm=why.last5Home||[],awayForm=why.last5Away||[]
+  const homeForm=why.lastMatchesHome||why.last5Home||[]
+  const awayForm=why.lastMatchesAway||why.last5Away||[]
   return`<div class="why-tip">
     <h3>Why this pick was chosen</h3>
     ${consensusHtml(r,esc)}
     ${lines.length?`<ul class="why-lines">${lines.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'<p class="why-empty">The published tip is preserved. Form detail will appear after the next board refresh.</p>'}
     ${homeForm.length||awayForm.length?`<div class="why-form">
-      <section><h4>${esc(r.home||'Home')} · last 5 home</h4>${formPills(homeForm,esc)}${formMatches(homeForm,esc)}</section>
-      <section><h4>${esc(r.away||'Away')} · last 5 away</h4>${formPills(awayForm,esc)}${formMatches(awayForm,esc)}</section>
+      <section><h4>${esc(r.home||'Home')} · last matches</h4>${formPills(homeForm,esc)}${formMatches(homeForm,esc)}</section>
+      <section><h4>${esc(r.away||'Away')} · last matches</h4>${formPills(awayForm,esc)}${formMatches(awayForm,esc)}</section>
     </div>`:''}
     ${comparisonHtml(why,r,esc)}
     ${h2hHtml(why.h2h,esc)}

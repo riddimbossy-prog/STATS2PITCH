@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
-import {gismoToFixture,eventsFromComment,seasonYear} from '../server/sportyStats.js'
+import {gismoToFixture,eventsFromComment,seasonYear,overallSample,hasMatchStats,hasTeamStats} from '../server/sportyStats.js'
 
 const barcaAway={
   _id:72478492,_utid:8,_seasonid:142176,
@@ -62,4 +62,28 @@ test('refresh, settle, live API and the GitHub job no longer call API-Football',
     const text=readFileSync(new URL(rel,import.meta.url),'utf8')
     assert.equal(/apiFootball|API_FOOTBALL|api-sports\.io|x-apisports-key/.test(text),false,rel)
   }
+})
+
+function finished(id,homeId,awayId,h,a){
+  return{
+    fixture:{id,date:`2026-08-${String(id).padStart(2,'0')}T12:00:00Z`,status:{short:'FT'}},
+    teams:{home:{id:homeId,name:'Home'},away:{id:awayId,name:'Away'}},
+    goals:{home:h,away:a}
+  }
+}
+
+test('overall last-match sample is the SportyBet Stats tab last matches list',()=>{
+  const rows=[
+    finished(5,1653,99,1,0),
+    finished(4,3110,1653,2,3),
+    finished(3,80,1653,2,0),
+    {fixture:{id:2,date:'2026-08-02T12:00:00Z',status:{short:'NS'}},teams:{home:{id:1653},away:{id:1}},goals:{home:null,away:null}}
+  ]
+  const last=overallSample(rows,1653,5)
+  assert.equal(last.length,3)
+  assert.equal(last[0].fixture.id,5)
+  assert.equal(hasTeamStats(rows,1653),true)
+  assert.equal(hasTeamStats([],1653),false)
+  assert.equal(hasMatchStats(rows,1653,[finished(1,3110,4,0,1)],3110),true)
+  assert.equal(hasMatchStats(rows,1653,[],3110),false)
 })

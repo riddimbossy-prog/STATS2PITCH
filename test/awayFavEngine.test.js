@@ -54,6 +54,7 @@ function fixture(overrides={}){
     homeSplit:overrides.homeSplit||{position:12,size:20,sampleReady:true,ppg:0.4,played:5,venue:'home'},
     awaySplit:overrides.awaySplit||{position:8,size:20,sampleReady:true,ppg:2.4,played:5,venue:'away'},
     earlySeason:overrides.earlySeason===true,
+    statsReady:overrides.statsReady,
     marketOdds:overrides.marketOdds||markets({
       streak:1.22,awayO05:1.18,awayO15:1.32,homeO05:1.20,homeO15:1.80,over15:1.28,awayWin:1.70,bttsYes:1.45
     })
@@ -120,15 +121,17 @@ test('early season and similar form are skipped',()=>{
   assert.equal(similar.skip,'similar-form')
 })
 
-test('missing table or venue history does not skip a priced qualifier',()=>{
+test('matches without SportyBet last-match stats are skipped',()=>{
   const result=diagnoseAwayFavFixture(fixture({
     homeFixtures:[],
     awayFixtures:[],
     homeSplit:null,
     awaySplit:null
   }))
-  assert.equal(result.skip,null)
-  assert.equal(result.pick.route,'btts')
+  assert.equal(result.skip,'no-stats')
+  assert.equal(result.pick,null)
+  const flagged=diagnoseAwayFavFixture(fixture({statsReady:false}))
+  assert.equal(flagged.skip,'no-stats')
 })
 
 test('SportyBet 2+ in-a-row market is the streak universe',()=>{
@@ -230,8 +233,6 @@ test('missing streak market is not proxied from team-goals',()=>{
 
 test('priced favourite without streak still publishes a 1X2 route',()=>{
   const result=diagnoseAwayFavFixture(fixture({
-    homeFixtures:[],
-    awayFixtures:[],
     homeSplit:null,
     awaySplit:null,
     marketOdds:markets({awayWin:1.38,homeWin:4.20,over15:1.28,bttsYes:1.62})
@@ -246,8 +247,6 @@ test('priced favourite without streak still publishes a 1X2 route',()=>{
 
 test('home favourite without streak publishes from match-winner odds',()=>{
   const result=diagnoseAwayFavFixture(fixture({
-    homeFixtures:[],
-    awayFixtures:[],
     homeSplit:null,
     awaySplit:null,
     marketOdds:markets({homeWin:1.35,awayWin:5.10,over15:1.30,bttsYes:1.70})
