@@ -171,7 +171,7 @@ function scorePick(odds,home,away,route,published,side='away'){
   if(finite(odds.streak)&&odds.streak>=RULES.streakSweetMin&&odds.streak<=RULES.streakSweetMax){
     score+=RULES.bonusStreakSweet
     reasons.push(`Goals Streak 2+ sits in the sweet band at ${odds.streak.toFixed(2)}.`)
-  }else if(finite(odds.streak)){
+  }else if(finite(odds.streak)&&odds.streak>=RULES.streakMin&&odds.streak<=RULES.streakMax){
     reasons.push(`Goals Streak 2+ Yes ${odds.streak.toFixed(2)} is inside the 1.10–1.49 universe.`)
   }else{
     score+=RULES.bonusPricedFav
@@ -280,15 +280,16 @@ function packPick(fixture,odds,home,away,routed,rating,side){
     homeSplit:fixture.homeSplit||null,
     awaySplit:fixture.awaySplit||null,
     metrics:{home,away},
-    earlySeason:fixture.earlySeason===true
+    earlySeason:fixture.earlySeason===true,
+    sportyEventId:fixture.sportyEventId||null
   }
 }
 
 export function diagnoseAwayFavFixture(fixture){
   const odds=extractOdds(fixture)
-  if(finite(odds.streak)){
+  const streakLive=finite(odds.streak)&&odds.streak>=RULES.streakMin&&odds.streak<=RULES.streakMax
+  if(streakLive){
     if(!odds.homeO05||!odds.awayO05)return{pick:null,skip:'missing-odds',odds}
-    if(odds.streak<RULES.streakMin||odds.streak>RULES.streakMax)return{pick:null,skip:'streak-window',odds}
   }else if(!odds.homeWin&&!odds.awayWin&&!odds.bttsYes&&!odds.over15&&!odds.homeO15&&!odds.awayO15){
     return{pick:null,skip:'missing-odds',odds}
   }

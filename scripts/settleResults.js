@@ -1,4 +1,5 @@
 import {fixturesByDate} from '../server/apiFootball.js'
+import {sportyEventFixtures,sportyFixturesByDate} from '../server/sportyBet.js'
 import {listBoards,saveBoard} from '../server/store.js'
 import {settleBoard} from '../server/settlement.js'
 
@@ -9,11 +10,15 @@ const rows=await listBoards(from,to)
 let updated=0,skipped=0,failed=0
 for(const row of rows){
   const date=row.snapshot_date,board=row.payload
-  if(!board?.bestPicks?.length){skipped++;continue}
-  const fullySettled=(board.bestPicks||[]).every(p=>['won','lost','void'].includes(board?.results?.[String(p.fixtureId)]?.outcome))
+  const picks=[...(board?.bestPicks||[]),...(board?.varTips||[])]
+  if(!picks.length){skipped++;continue}
+  const fullySettled=picks.every(p=>['won','lost','void'].includes(board?.results?.[String(p.fixtureId)]?.outcome))
   if(fullySettled){skipped++;continue}
   try{
-    const fixtures=await fixturesByDate(date)
+    const eventIds=picks.map(p=>p.sportyEventId).filter(Boolean)
+    let fixtures=eventIds.length?await sportyEventFixtures(eventIds):[]
+    if(!fixtures.length)fixtures=await sportyFixturesByDate(date).catch(()=>[])
+    if(!fixtures.length)fixtures=await fixturesByDate(date)
     const settled=settleBoard(board,fixtures)
     settled.meta={...(settled.meta||{}),resultsUpdatedAt:new Date().toISOString()}
     await saveBoard(date,settled,{preservePublished:true})

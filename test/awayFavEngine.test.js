@@ -85,11 +85,13 @@ test('missing required odds fail closed',()=>{
   assert.equal(result.pick,null)
 })
 
-test('streak outside 1.10-1.49 is skipped',()=>{
+test('streak outside 1.10-1.49 falls back to a priced favourite route',()=>{
   const high=diagnoseAwayFavFixture(fixture({marketOdds:markets({streak:1.60,awayO05:1.18,awayO15:1.32,homeO05:1.20,bttsYes:1.40})}))
-  assert.equal(high.skip,'streak-window')
+  assert.equal(high.skip,null)
+  assert.equal(high.pick.route,'btts')
   const low=diagnoseAwayFavFixture(fixture({marketOdds:markets({streak:1.05,awayO05:1.18,awayO15:1.32,homeO05:1.20,bttsYes:1.40})}))
-  assert.equal(low.skip,'streak-window')
+  assert.equal(low.skip,null)
+  assert.equal(low.pick.route,'btts')
 })
 
 test('home favourite on team-goals over 1.5 now qualifies on the home path',()=>{

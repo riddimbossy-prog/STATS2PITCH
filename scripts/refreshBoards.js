@@ -16,9 +16,8 @@ for(let i=0;i<dates.length;i++){
     const varTips=board.varTips?.length||0
     completed++
     console.log(`${d}: ${published} All Picks · ${varTips} VAR Tips · ${board.priority.length} qualified · ${src} source fixtures`)
-    if(src===0&&published===0&&varTips===0){
-      failed++
-      console.error(`${d}: API-Football returned zero fixtures; board not regenerated`)
+    if(src===0){
+      console.warn(`${d}: no upcoming fixtures for this date`)
     }
   }catch(error){
     const msg=String(error?.message||error)

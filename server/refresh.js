@@ -1,4 +1,5 @@
 import {fixturesByDate,teamHistory,leagueHistory,oddsByDate,fixtureEvents} from './apiFootball.js'
+import {sportyFixturesByDate} from './sportyBet.js'
 import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard} from './engine.js'
@@ -89,11 +90,22 @@ function needsTransitionEvidence(record){
 export async function refreshNow(date,onProgress=()=>{}){
   const learned=await learningProfiles()
   onProgress({stage:'fixtures-and-odds',done:0,total:2})
-  const raw=await fixturesByDate(date);onProgress({stage:'fixtures-and-odds',done:1,total:2,fixtures:raw.length})
-  const oddsMap=raw.length?await oddsByDate(date):new Map();onProgress({stage:'fixtures-and-odds',done:2,total:2,fixtures:raw.length,oddsFixtures:oddsMap.size})
+  let raw=[],oddsMap=new Map(),feed='sportybet'
+  try{
+    raw=await sportyFixturesByDate(date)
+    historyUnavailable=true
+  }catch(error){
+    console.warn(`SportyBet feed ${date}: ${error?.message||error}`)
+    raw=await fixturesByDate(date)
+    feed='api-football'
+  }
+  onProgress({stage:'fixtures-and-odds',done:1,total:2,fixtures:raw.length,feed})
+  if(feed!=='sportybet'&&raw.length)oddsMap=await oddsByDate(date)
+  if(feed==='sportybet')historyUnavailable=true
+  onProgress({stage:'fixtures-and-odds',done:2,total:2,fixtures:raw.length,oddsFixtures:oddsMap.size,feed})
   const scheduled=raw.filter(f=>SCHEDULED.has(String(f?.fixture?.status?.short||'').toUpperCase()))
-  const leagueKeys=[...new Map(scheduled.map(f=>[leagueKey(f?.league?.id,f?.league?.season),{league:f?.league?.id,season:Number(f?.league?.season)}])).values()].filter(x=>x.league&&Number.isFinite(x.season))
-  let historyDone=0;onProgress({stage:'league-history',done:0,total:leagueKeys.length,fixtures:scheduled.length})
+  const leagueKeys=feed==='sportybet'?[]:[...new Map(scheduled.map(f=>[leagueKey(f?.league?.id,f?.league?.season),{league:f?.league?.id,season:Number(f?.league?.season)}])).values()].filter(x=>x.league&&Number.isFinite(x.season))
+  let historyDone=0;onProgress({stage:'league-history',done:0,total:leagueKeys.length,fixtures:scheduled.length,feed})
   const probes=leagueKeys.slice(0,3)
   let richHistory=0
   for(const x of probes){
@@ -127,9 +139,11 @@ export async function refreshNow(date,onProgress=()=>{}){
       const earlySeason=(currentHomeFixtures.length>0&&currentHomeFixtures.length<FORM_SAMPLE)||(currentAwayFixtures.length>0&&currentAwayFixtures.length<FORM_SAMPLE)
       const homeSplit=formReady?cachedSplitTable(leagueId,season,'home',history).get(String(homeId))||null:null
       const awaySplit=formReady?cachedSplitTable(leagueId,season,'away',history).get(String(awayId))||null:null
-      const apiOdds=oddsMap.get(String(f?.fixture?.id))||[],statsOdds=statsApiConfigured()?await getStatsOddsForFixture(f).catch(()=>null):null
-      if(statsOdds)statsVerified++;const marketOdds=verifiedMarkets({apiPayload:apiOdds,statsPayload:statsOdds,fixture:f})
-      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,homeSplit,awaySplit,marketOdds,formReady}
+      const apiOdds=oddsMap.get(String(f?.fixture?.id))||[]
+      const statsOdds=feed==='sportybet'||!statsApiConfigured()?null:await getStatsOddsForFixture(f).catch(()=>null)
+      if(statsOdds)statsVerified++
+      const marketOdds=verifiedMarkets({apiPayload:apiOdds,statsPayload:statsOdds,sportyMarkets:f?.sporty?.markets,fixture:f})
+      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,homeSplit,awaySplit,marketOdds,formReady,sportyEventId:f?.sporty?.eventId||null,feed}
       if(formReady&&needsTransitionEvidence(record)){record=await hydrateTransitionSamples(record);transitionHydratedFixtures++}
       done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures})
       return record
@@ -137,7 +151,7 @@ export async function refreshNow(date,onProgress=()=>{}){
   })
 
   const fixtures=analyzed.filter(Boolean),bankerRules=buildBankerRules(fixtures)
-  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,qualifiedTips:0,bestPicks:0,varTips:0,bankerRulePicks:bankerRules.picks.length}},learned)
+  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,feed,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,qualifiedTips:0,bestPicks:0,varTips:0,bankerRulePicks:bankerRules.picks.length,feed}},learned)
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}

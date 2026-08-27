@@ -78,6 +78,40 @@ function flattenStats(obj,fixture,rows=[],prefix='',depth=0){
   }
   return rows
 }
+function specifierTotal(market){
+  const spec=String(market?.specifier||market?.specifiers||'')
+  const m=spec.match(/total=([0-9]+(?:\.[0-9]+)?)/i)
+  return m?m[1]:null
+}
+function sportyKey(market){
+  const id=String(market?.id??'')
+  const name=market?.name||market?.desc||''
+  if(id==='1'||/^1x2$/i.test(name))return'match-winner'
+  if(id==='10'||/double chance/i.test(name))return'double-chance'
+  if(id==='11'||/draw no bet/i.test(name))return'draw-no-bet'
+  if(id==='19'||/^home o\/u$/i.test(name)||/home team (?:goals|total|o\/u)/i.test(name))return'home-team-goals'
+  if(id==='20'||/^away o\/u$/i.test(name)||/away team (?:goals|total|o\/u)/i.test(name))return'away-team-goals'
+  if(id==='29'||/gg\/ng/i.test(name)||/both teams/i.test(name))return'both-teams-score'
+  if(id==='60010'||/2 or more goals in a row/i.test(name)||/goals? streak/i.test(name))return'goals-streak-2'
+  if(id==='18'||/^over\/under$/i.test(name))return'total-goals'
+  return key(name||id)
+}
+export function parseSportyBet(markets){
+  const byKey=new Map()
+  for(const market of markets||[]){
+    const k=sportyKey(market);if(!k)continue
+    const line=specifierTotal(market)
+    if(!byKey.has(k))byKey.set(k,{marketKey:k,market:marketName(k),bookmaker:'SportyBet',source:'sportybet',outcomes:[]})
+    const row=byKey.get(k),seen=new Set(row.outcomes.map(o=>norm(o.name)))
+    for(const o of market?.outcomes||[]){
+      const price=odd(o?.odds??o?.odd??o?.price);if(!price)continue
+      const name=parseLineName(o?.desc||o?.name||o?.value,line)
+      const n=norm(name);if(!n||seen.has(n))continue
+      seen.add(n);row.outcomes.push({name,odd:price})
+    }
+  }
+  return [...byKey.values()].filter(row=>row.outcomes.length)
+}
 function choose(rows,source,keyName){
   const candidates=rows.filter(r=>r.source===source&&r.marketKey===keyName)
   if(!candidates.length)return null
@@ -86,19 +120,27 @@ function choose(rows,source,keyName){
 }
 function omap(rows){const m=new Map();for(const o of rows||[]){const n=norm(o.name),p=odd(o.odd);if(n&&p&&!m.has(n))m.set(n,{name:o.name,odd:p})}return m}
 function rel(a,b){return Math.abs(a-b)/Math.min(a,b)}
-export function verifiedMarkets({apiPayload=[],statsPayload=null,fixture}={}){
-  const rows=[...parseApiFootball(apiPayload,fixture),...flattenStats(statsPayload,fixture)]
+export function verifiedMarkets({apiPayload=[],statsPayload=null,sportyMarkets=null,fixture}={}){
+  const rows=[
+    ...parseSportyBet(sportyMarkets||fixture?.sporty?.markets),
+    ...parseApiFootball(apiPayload,fixture),
+    ...flattenStats(statsPayload,fixture)
+  ]
   const keys=new Set(rows.map(r=>r.marketKey)),out=[]
   for(const k of keys){
-    const a=choose(rows,'api-football',k),s=choose(rows,'thestatsapi',k)
-    if(!a&&!s)continue
-    if(!a||!s){
+    const s=choose(rows,'sportybet',k),a=choose(rows,'api-football',k),t=choose(rows,'thestatsapi',k)
+    if(s){
+      out.push({...s,verification:'sportybet',outcomes:s.outcomes.map(o=>({...o,verified:true,sportyOdd:o.odd}))})
+      continue
+    }
+    if(!a&&!t)continue
+    if(!a||!t){
       if(REQUIRE_CROSS_SOURCE)continue
-      const c=a||s
+      const c=a||t
       out.push({...c,verification:'single-source',outcomes:c.outcomes.map(o=>({...o,verified:false}))})
       continue
     }
-    const am=omap(a.outcomes),sm=omap(s.outcomes),merged=[]
+    const am=omap(a.outcomes),sm=omap(t.outcomes),merged=[]
     const names=new Set([...am.keys(),...sm.keys()])
     for(const n of names){
       const av=am.get(n),sv=sm.get(n)

@@ -26,11 +26,9 @@ jobs:
           node-version: 20
       - name: Validate refresh secrets
         env:
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          test -n "$API_FOOTBALL_KEY" || (echo "Missing API_FOOTBALL_KEY" && exit 1)
           test -n "$SUPABASE_URL" || (echo "Missing SUPABASE_URL" && exit 1)
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "Missing SUPABASE_SERVICE_ROLE_KEY" && exit 1)
       - name: Generate fresh Stats2Pitch boards
@@ -50,6 +48,8 @@ jobs:
           ODDS_REQUIRE_CROSS_SOURCE: "false"
           APP_TIMEZONE: "Africa/Accra"
           REFRESH_CONCURRENCY: "3"
+          SPORTYBET_COUNTRY: "gh"
+          SPORTYBET_TIMELINE: "168"
 
       - name: Settle published picks
         run: npm run settle
@@ -59,3 +59,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RESULT_LOOKBACK_DAYS: "45"
+          SPORTYBET_COUNTRY: "gh"
