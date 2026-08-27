@@ -14,8 +14,9 @@ for(let i=0;i<dates.length;i++){
     const src=Number(board?.meta?.sourceFixtures??board?.meta?.diagnostics?.sourceFixtures??0)
     const published=board.bestPicks.length
     const varTips=board.varTips?.length||0
+    const filterTips=board.filterTips?.length||0
     completed++
-    console.log(`${d}: ${published} All Picks · ${varTips} VAR Tips · ${board.priority.length} qualified · ${src} source fixtures`)
+    console.log(`${d}: ${published} All Picks · ${filterTips} Filter Tips · ${varTips} VAR Tips · ${board.priority.length} qualified · ${src} source fixtures`)
     if(src===0){
       console.warn(`${d}: no upcoming fixtures for this date`)
     }

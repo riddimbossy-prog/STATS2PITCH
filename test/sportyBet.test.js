@@ -12,6 +12,7 @@ const palaceMarkets=[
   {id:20,name:'Away O/U',specifier:'total=0.5',outcomes:[{desc:'Over 0.5',odds:'1.13'}]},
   {id:20,name:'Away O/U',specifier:'total=1.5',outcomes:[{desc:'Over 1.5',odds:'1.65'}]},
   {id:29,name:'GG/NG',outcomes:[{desc:'Yes',odds:'1.71'},{desc:'No',odds:'2.15'}]},
+  {id:60000,name:'GG/NG 2+',outcomes:[{desc:'Yes',odds:'3.20'},{desc:'No',odds:'1.45'}]},
   {id:60010,name:'',outcomes:[{desc:'Yes',odds:'1.28'},{desc:'No',odds:'3.40'}]}
 ]
 
@@ -23,6 +24,7 @@ test('SportyBet markets parse 1X2, totals, team goals, BTTS and streak',()=>{
   assert.equal(by['home-team-goals'].outcomes.find(o=>o.name==='Over 0.5').odd,1.49)
   assert.equal(by['away-team-goals'].outcomes.find(o=>o.name==='Over 1.5').odd,1.65)
   assert.equal(by['both-teams-score'].outcomes.find(o=>o.name==='Yes').odd,1.71)
+  assert.equal(by['both-teams-score-2'].outcomes.find(o=>o.name==='No').odd,1.45)
   assert.equal(by['goals-streak-2'].outcomes.find(o=>o.name==='Yes').odd,1.28)
 })
 

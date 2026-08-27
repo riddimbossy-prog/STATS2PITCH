@@ -142,10 +142,12 @@ export async function refreshNow(date,onProgress=()=>{}){
   })
 
   const fixtures=analyzed.filter(Boolean),bankerRules=buildBankerRules(fixtures)
-  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,feed,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,qualifiedTips:0,bestPicks:0,varTips:0,bankerRulePicks:bankerRules.picks.length,feed}},learned)
+  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,feed,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,qualifiedTips:0,bestPicks:0,varTips:0,filterTips:0,bankerRulePicks:bankerRules.picks.length,feed}},learned)
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}
+  board.meta.diagnostics.filterTips=(board.filterTips||[]).length
+  board.meta.diagnostics.filterTipsSkipped=board.filterTipsMeta?.skipped||{}
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p])),eligibleIds=new Set(fixtures.map(f=>String(f.fixtureId)))
   board.fixtures=raw.filter(f=>eligibleIds.has(String(f?.fixture?.id))).map(f=>publicFixture(f,picks.has(String(f?.fixture?.id))?'qualified':'no-qualified-pick'))
   return saveBoard(date,board)
@@ -155,6 +157,6 @@ export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}
 export function startRefresh(date){
   if(jobs.get(date)?.state==='running')return jobs.get(date)
   const job={state:'running',date,startedAt:new Date().toISOString(),progress:{stage:'start'}};jobs.set(date,job)
-  refreshNow(date,p=>job.progress=p).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,varTips:board.varTips?.length||0,bankers:board.bankers?.length||0,diagnostics:board.meta?.diagnostics||null}}).catch(e=>{job.state='failed';job.error=e.message;job.completedAt=new Date().toISOString()})
+  refreshNow(date,p=>job.progress=p).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,varTips:board.varTips?.length||0,filterTips:board.filterTips?.length||0,bankers:board.bankers?.length||0,diagnostics:board.meta?.diagnostics||null}}).catch(e=>{job.state='failed';job.error=e.message;job.completedAt=new Date().toISOString()})
   return job
 }

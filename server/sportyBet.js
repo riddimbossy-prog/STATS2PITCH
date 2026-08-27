@@ -3,7 +3,7 @@ import {fetchJson} from './http.js'
 const COUNTRY=String(process.env.SPORTYBET_COUNTRY||'gh').replace(/[^a-z]/gi,'').toLowerCase()||'gh'
 const BASE=String(process.env.SPORTYBET_BASE||'https://www.sportybet.com').replace(/\/+$/,'')
 const SPORT='sr:sport:1'
-const MARKETS='1,10,11,18,19,20,29,60010,60011,60012'
+const MARKETS='1,10,11,18,19,20,29,60000,60010,60011,60012'
 const PAGE=Math.max(20,Math.min(100,Number(process.env.SPORTYBET_PAGE_SIZE||100)))
 const TIMELINE=Math.max(12,Number(process.env.SPORTYBET_TIMELINE||168))
 const ZONE=process.env.APP_TIMEZONE||'Africa/Accra'

@@ -10,7 +10,7 @@ const rows=await listBoards(from,to)
 let updated=0,skipped=0,failed=0
 for(const row of rows){
   const date=row.snapshot_date,board=row.payload
-  const picks=[...(board?.bestPicks||[]),...(board?.varTips||[])]
+  const picks=[...(board?.bestPicks||[]),...(board?.varTips||[]),...(board?.filterTips||[])]
   if(!picks.length){skipped++;continue}
   const fullySettled=picks.every(p=>['won','lost','void'].includes(board?.results?.[String(p.fixtureId)]?.outcome))
   if(fullySettled){skipped++;continue}
