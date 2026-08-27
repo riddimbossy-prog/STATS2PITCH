@@ -90,8 +90,8 @@ export async function loadBoard(date,{allowVersionMismatch=false}={}){
 export async function listBoards(fromDate,toDate){
   if(!configured())return[...memory.entries()].filter(([d])=>(!fromDate||d>=fromDate)&&(!toDate||d<=toDate)).map(([snapshot_date,payload])=>({snapshot_date,payload}))
   let path='/rest/v1/prediction_snapshots?select=snapshot_date,payload,generated_at&order=snapshot_date.asc'
-  if(fromDate)path+=`&snapshot_date.gte.${encodeURIComponent(fromDate)}`
-  if(toDate)path+=`&snapshot_date.lte.${encodeURIComponent(toDate)}`
+  if(fromDate)path+=`&snapshot_date=gte.${encodeURIComponent(fromDate)}`
+  if(toDate)path+=`&snapshot_date=lte.${encodeURIComponent(toDate)}`
   return await request(path)
 }
 export async function saveBoard(date,board,{preservePublished=true}={}){
