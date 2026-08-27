@@ -25,6 +25,7 @@ function nid(raw){
   const m=String(raw??'').match(/(\d+)$/)
   return m?Number(m[1]):null
 }
+function crest(id){return id?`https://img.sportradar.com/ls/crest/big/${id}.png`:null}
 function accraDate(ms){
   if(!Number.isFinite(Number(ms)))return ''
   return new Intl.DateTimeFormat('en-CA',{timeZone:ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(Number(ms)))
@@ -69,17 +70,18 @@ export function sportyEventToFixture(ev,tournament={}){
   const homeId=nid(ev?.homeTeamId)
   const awayId=nid(ev?.awayTeamId)
   const fixtureId=nid(ev?.eventId)||nid(ev?.gameId)
+  const leagueId=nid(tour?.id)||nid(tournament?.id)||tour?.id||tournament?.id||null
   return{
     fixture:{id:fixtureId,date:kick,status:{short:status.short,long:status.long},timestamp:ev?.estimateStartTime||null},
     league:{
-      id:tour?.id||tournament?.id||null,
+      id:leagueId,
       name:tour?.name||tournament?.name||'',
       country:category?.name||tournament?.categoryName||'',
       season:kick?Number(kick.slice(0,4)):new Date().getUTCFullYear()
     },
     teams:{
-      home:{id:homeId,name:ev?.homeTeamName||'',logo:ev?.homeTeamIcon||null},
-      away:{id:awayId,name:ev?.awayTeamName||'',logo:ev?.awayTeamIcon||null}
+      home:{id:homeId,name:ev?.homeTeamName||'',logo:ev?.homeTeamIcon||crest(homeId)},
+      away:{id:awayId,name:ev?.awayTeamName||'',logo:ev?.awayTeamIcon||crest(awayId)}
     },
     goals,
     score:{fulltime:goals},

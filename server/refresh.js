@@ -1,16 +1,14 @@
-import {fixturesByDate,teamHistory,leagueHistory,oddsByDate,fixtureEvents} from './apiFootball.js'
 import {sportyFixturesByDate} from './sportyBet.js'
-import {getStatsOddsForFixture,statsApiConfigured} from './statsApi.js'
+import {teamLastX,leagueFormPack,matchGoalEvents,nid} from './sportyStats.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard} from './engine.js'
 import {buildBankerRules,buildLeagueScoringProfile,evaluateBankerFixture} from './bankerEngine.js'
+import {buildOver25Profile} from './over25.js'
 import {saveBoard,listBoards} from './store.js'
 import {buildLearningProfiles} from './learning.js'
-import {ENGINE_VERSION,SCHEDULED,FORM_SAMPLE} from './config.js'
+import {SCHEDULED,FORM_SAMPLE} from './config.js'
 
 const jobs=new Map(),leagueCache=new Map(),teamCache=new Map(),splitCache=new Map(),eventCache=new Map()
-let historyUnavailable=false
-const historyBlocked=msg=>/do not have access to this date|request limit for the day|rate.?limit/i.test(String(msg||''))
 
 async function mapLimit(items,limit,fn){
   const out=new Array(items.length);let i=0
@@ -18,30 +16,26 @@ async function mapLimit(items,limit,fn){
   await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out
 }
 function publicFixture(f,status='scheduled'){return{fixtureId:f?.fixture?.id,kickoff:f?.fixture?.date,status:f?.fixture?.status?.short||'NS',league:f?.league?.name||'',country:f?.league?.country||'',home:f?.teams?.home?.name||'',away:f?.teams?.away?.name||'',homeLogo:f?.teams?.home?.logo||null,awayLogo:f?.teams?.away?.logo||null,availability:status}}
-const leagueKey=(league,season)=>`${league}|${season}`
-async function getLeagueHistory(league,season){
-  if(historyUnavailable)return []
-  const key=leagueKey(league,season)
+async function getLeaguePack(utid,country){
+  const key=String(utid??'')
+  if(!key)return{current:[],previous:[],extra:[],currentSeasonId:null,previousSeasonId:null,teams:0}
   if(leagueCache.has(key))return leagueCache.get(key)
-  const pending=leagueHistory(league,season).catch(error=>{
-    if(historyBlocked(error?.message||error))historyUnavailable=true
+  const pending=leagueFormPack(utid,country).catch(error=>{
     leagueCache.delete(key)
-    console.warn(`league history ${key}: ${error?.message||error}`)
-    return []
+    console.warn(`league pack ${key}: ${error?.message||error}`)
+    return{current:[],previous:[],extra:[],currentSeasonId:null,previousSeasonId:null,teams:0}
   })
   leagueCache.set(key,pending)
   return pending
 }
 async function getTeamHistory(teamId){
-  if(historyUnavailable)return []
   const key=String(teamId??'')
   if(!key)return[]
   if(teamCache.has(key))return teamCache.get(key)
-  const pending=teamHistory(teamId).catch(error=>{
-    if(historyBlocked(error?.message||error))historyUnavailable=true
+  const pending=teamLastX(teamId).catch(error=>{
     teamCache.delete(key)
-    console.warn(`team history ${key}: ${error?.message||error}`)
-    return []
+    console.warn(`team last-x ${key}: ${error?.message||error}`)
+    return[]
   })
   teamCache.set(key,pending)
   return pending
@@ -55,10 +49,16 @@ async function learningProfiles(){try{const end=new Date(),start=new Date(end.ge
 
 async function enrichHistoryFixture(row){
   const id=String(row?.fixture?.id??'')
-  if(!id)return{...row,events:[],eventsComplete:false}
-  if(!eventCache.has(id))eventCache.set(id,fixtureEvents(id).then(events=>({ok:true,events})).catch(error=>({ok:false,events:[],error:error?.message||String(error)})))
+  if(!id)return{...row,events:row?.events||[],eventsComplete:row?.eventsComplete===true}
+  if(row?.eventsComplete===true)return row
+  if(!eventCache.has(id)){
+    eventCache.set(id,matchGoalEvents(id,row?.teams?.home?.id,row?.teams?.away?.id).then(events=>({ok:events.length>0,events})).catch(error=>({ok:false,events:row?.events||[],error:error?.message||String(error)})))
+  }
   const event=await eventCache.get(id)
-  return{...row,events:event.events,eventsComplete:event.ok===true}
+  const events=event.ok?event.events:(row.events||[])
+  const h=Number(row?.goals?.home),a=Number(row?.goals?.away)
+  const complete=event.ok&&(h+a===0||events.length===h+a)
+  return{...row,events,eventsComplete:complete||row?.eventsComplete===true}
 }
 
 async function hydrateTransitionSamples(record){
@@ -90,60 +90,48 @@ function needsTransitionEvidence(record){
 export async function refreshNow(date,onProgress=()=>{}){
   const learned=await learningProfiles()
   onProgress({stage:'fixtures-and-odds',done:0,total:2})
-  let raw=[],oddsMap=new Map(),feed='sportybet'
+  let raw=[]
+  const feed='sportybet'
   try{
     raw=await sportyFixturesByDate(date)
-    historyUnavailable=true
   }catch(error){
     console.warn(`SportyBet feed ${date}: ${error?.message||error}`)
-    raw=await fixturesByDate(date)
-    feed='api-football'
+    raw=[]
   }
-  onProgress({stage:'fixtures-and-odds',done:1,total:2,fixtures:raw.length,feed})
-  if(feed!=='sportybet'&&raw.length)oddsMap=await oddsByDate(date)
-  if(feed==='sportybet')historyUnavailable=true
-  onProgress({stage:'fixtures-and-odds',done:2,total:2,fixtures:raw.length,oddsFixtures:oddsMap.size,feed})
+  onProgress({stage:'fixtures-and-odds',done:2,total:2,fixtures:raw.length,oddsFixtures:raw.length,feed})
   const scheduled=raw.filter(f=>SCHEDULED.has(String(f?.fixture?.status?.short||'').toUpperCase()))
-  const leagueKeys=feed==='sportybet'?[]:[...new Map(scheduled.map(f=>[leagueKey(f?.league?.id,f?.league?.season),{league:f?.league?.id,season:Number(f?.league?.season)}])).values()].filter(x=>x.league&&Number.isFinite(x.season))
-  let historyDone=0;onProgress({stage:'league-history',done:0,total:leagueKeys.length,fixtures:scheduled.length,feed})
-  const probes=leagueKeys.slice(0,3)
-  let richHistory=0
-  for(const x of probes){
-    if(historyUnavailable)break
-    const rows=await getLeagueHistory(x.league,x.season)
-    if((rows||[]).length>=FORM_SAMPLE)richHistory++
-  }
-  if(!richHistory){
-    historyUnavailable=true
-    console.warn('league history too thin for last-5 form; skipping remaining history fetches')
-    historyDone=leagueKeys.length
-    onProgress({stage:'league-history',done:historyDone,total:leagueKeys.length,fixtures:scheduled.length,skipped:true})
-  }else{
-    await mapLimit(leagueKeys,2,async x=>{await Promise.all([getLeagueHistory(x.league,x.season),x.season>0?getLeagueHistory(x.league,x.season-1):Promise.resolve([])]);historyDone++;onProgress({stage:'league-history',done:historyDone,total:leagueKeys.length,fixtures:scheduled.length})})
-  }
+  const leagueIds=[...new Set(scheduled.map(f=>nid(f?.league?.id)).filter(Boolean))]
+  let historyDone=0
+  onProgress({stage:'league-history',done:0,total:leagueIds.length,fixtures:scheduled.length,feed})
+  await mapLimit(leagueIds,2,async utid=>{
+    const sample=scheduled.find(f=>nid(f?.league?.id)===utid)
+    await getLeaguePack(utid,sample?.league?.country||'')
+    historyDone++
+    onProgress({stage:'league-history',done:historyDone,total:leagueIds.length,fixtures:scheduled.length})
+  })
 
   let done=0,statsVerified=0,fallbackTeams=0,insufficientHistory=0,analysisErrors=0,transitionHydratedFixtures=0
   const analyzed=await mapLimit(scheduled,Math.max(1,Number(process.env.REFRESH_CONCURRENCY||2)),async f=>{
     try{
-      const homeId=f?.teams?.home?.id,awayId=f?.teams?.away?.id,leagueId=f?.league?.id,season=Number(f?.league?.season)
-      const current=Number.isFinite(season)?await getLeagueHistory(leagueId,season):[],previous=Number.isFinite(season)&&season>0?await getLeagueHistory(leagueId,season-1):[]
+      const homeId=f?.teams?.home?.id,awayId=f?.teams?.away?.id,leagueId=nid(f?.league?.id),season=Number(f?.league?.season)
+      const pack=await getLeaguePack(leagueId,f?.league?.country||'')
+      const current=pack.current||[],previous=pack.previous||[]
       const currentHomeFixtures=venueSample(current,homeId,'home'),currentAwayFixtures=venueSample(current,awayId,'away')
       const earlySeasonHome=currentHomeFixtures.length>0&&currentHomeFixtures.length<FORM_SAMPLE,earlySeasonAway=currentAwayFixtures.length>0&&currentAwayFixtures.length<FORM_SAMPLE
-      const bankerLeagueProfile=buildLeagueScoringProfile(current)
-      let history=mergeUnique(current,previous),homeFixtures=venueSample(history,homeId,'home'),awayFixtures=venueSample(history,awayId,'away')
+      const bankerLeagueProfile=buildLeagueScoringProfile(mergeUnique(current,previous))
+      let history=mergeUnique(current,previous,pack.extra),homeFixtures=venueSample(history,homeId,'home'),awayFixtures=venueSample(history,awayId,'away')
       const leagueHistoryReady=current.length+previous.length>0
-      if(leagueHistoryReady&&homeFixtures.length<FORM_SAMPLE){history=mergeUnique(history,await getTeamHistory(homeId));fallbackTeams++;homeFixtures=venueSample(history,homeId,'home')}
-      if(leagueHistoryReady&&awayFixtures.length<FORM_SAMPLE){history=mergeUnique(history,await getTeamHistory(awayId));fallbackTeams++;awayFixtures=venueSample(history,awayId,'away')}
+      if(homeFixtures.length<FORM_SAMPLE){history=mergeUnique(history,await getTeamHistory(homeId));fallbackTeams++;homeFixtures=venueSample(history,homeId,'home')}
+      if(awayFixtures.length<FORM_SAMPLE){history=mergeUnique(history,await getTeamHistory(awayId));fallbackTeams++;awayFixtures=venueSample(history,awayId,'away')}
       const formReady=homeFixtures.length>=FORM_SAMPLE&&awayFixtures.length>=FORM_SAMPLE
       if(!formReady)insufficientHistory++
       const earlySeason=(currentHomeFixtures.length>0&&currentHomeFixtures.length<FORM_SAMPLE)||(currentAwayFixtures.length>0&&currentAwayFixtures.length<FORM_SAMPLE)
       const homeSplit=formReady?cachedSplitTable(leagueId,season,'home',history).get(String(homeId))||null:null
       const awaySplit=formReady?cachedSplitTable(leagueId,season,'away',history).get(String(awayId))||null:null
-      const apiOdds=oddsMap.get(String(f?.fixture?.id))||[]
-      const statsOdds=feed==='sportybet'||!statsApiConfigured()?null:await getStatsOddsForFixture(f).catch(()=>null)
-      if(statsOdds)statsVerified++
-      const marketOdds=verifiedMarkets({apiPayload:apiOdds,statsPayload:statsOdds,sportyMarkets:f?.sporty?.markets,fixture:f})
-      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,homeSplit,awaySplit,marketOdds,formReady,sportyEventId:f?.sporty?.eventId||null,feed}
+      const marketOdds=verifiedMarkets({sportyMarkets:f?.sporty?.markets,fixture:f})
+      if(marketOdds.length)statsVerified++
+      const over25Profile=buildOver25Profile(mergeUnique(current,previous,history),homeId,awayId)
+      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,marketOdds,formReady,sportyEventId:f?.sporty?.eventId||null,feed,leagueHistoryReady}
       if(formReady&&needsTransitionEvidence(record)){record=await hydrateTransitionSamples(record);transitionHydratedFixtures++}
       done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures})
       return record

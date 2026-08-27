@@ -22,14 +22,14 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
       STATS2PITCH_ELITE_FEED_TOKEN: ${{ secrets.STATS2PITCH_ELITE_FEED_TOKEN }}
-      APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'UTC' }}
+      APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'Africa/Accra' }}
       AUTO_REFRESH_TTL_MINUTES: ${{ vars.AUTO_REFRESH_TTL_MINUTES || '45' }}
       ALLOW_PUBLIC_SIGNUP: ${{ vars.ALLOW_PUBLIC_SIGNUP || 'true' }}
       STATS2PITCH_ALLOWED_ORIGIN: https://www.stats2pitch.com
       STATS2PITCH_ADMIN_EMAILS: ${{ secrets.STATS2PITCH_ADMIN_EMAILS }}
       STATS2PITCH_GITHUB_TOKEN: ${{ secrets.STATS2PITCH_GITHUB_TOKEN }}
+      SPORTYBET_COUNTRY: ${{ vars.SPORTYBET_COUNTRY || 'gh' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,12 +42,11 @@ jobs:
           test -n "$SUPABASE_URL" || (echo "Missing GitHub secret SUPABASE_URL" && exit 1)
           test -n "$SUPABASE_ANON_KEY" || (echo "Missing GitHub secret SUPABASE_ANON_KEY" && exit 1)
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "Missing GitHub secret SUPABASE_SERVICE_ROLE_KEY" && exit 1)
-          test -n "$API_FOOTBALL_KEY" || (echo "Missing GitHub secret API_FOOTBALL_KEY" && exit 1)
       - name: Sync Edge Function secrets
         run: |
           npx --yes supabase@latest secrets set \
-            API_FOOTBALL_KEY="$API_FOOTBALL_KEY" \
             APP_TIMEZONE="$APP_TIMEZONE" \
+            SPORTYBET_COUNTRY="${SPORTYBET_COUNTRY:-gh}" \
             AUTO_REFRESH_TTL_MINUTES="$AUTO_REFRESH_TTL_MINUTES" \
             ALLOW_PUBLIC_SIGNUP="$ALLOW_PUBLIC_SIGNUP" \
             STATS2PITCH_ALLOWED_ORIGIN="$STATS2PITCH_ALLOWED_ORIGIN" \
