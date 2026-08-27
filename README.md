@@ -6,6 +6,7 @@ Generator for Stats2Pitch boards and sporty.codes Elite.
 
 - **All Picks** — consensus engine (`stats2pitch-consensus-v4-over25`). Last-5 home/away form comes from SportyBet / Sportradar stats.
 - **VAR Tips** — dedicated board (`away-fav-streak-v1`) for home and away favourites. This is the feed for sporty.codes Elite.
+- **Goals Bankers** — one pick per match from favourite win, favourite 2+, Over 2.5 or GG (`goals-bankers-v1`). Does not feed Elite.
 
 Public pages show fixture, teams, logos, league, kickoff, market, pick and odds. Engine method is not published on the site.
 
@@ -20,4 +21,4 @@ Required secrets:
 
 Odds, fixtures, last-5 form, H2H and league tables are read from SportyBet Ghana (`factsCenter` + Sportradar stats). No API-Football key is used.
 
-Run `npm run check` before pushing. After this version bump, run a board refresh so live All Picks, VAR Tips and Elite are not empty.
+Run `npm run check` before pushing. Goals Bankers appear after the next board refresh. The snapshot version is unchanged, so live All Picks, VAR Tips, Filter Tips and Elite keep loading.

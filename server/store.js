@@ -31,7 +31,7 @@ export function attachCrests(board){
     return{...row,homeLogo,awayLogo,homeId,awayId}
   }
   const next={...board}
-  for(const key of ['bestPicks','varTips','filterTips','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
 }
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
@@ -53,7 +53,7 @@ function mergeRows(oldRows,freshRows,now,existing){
   return out.sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
 }
 function countTips(board){
-  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
+  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.goalsBankers||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
 }
 function incomingFeedEmpty(board){
   const source=Number(board?.meta?.sourceFixtures??board?.meta?.diagnostics?.sourceFixtures??0)
@@ -69,15 +69,17 @@ function mergePublished(existing,incoming){
   const bestPicks=mergeRows(existing?.bestPicks,incoming?.bestPicks,now,existing)
   const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
   const filterTips=mergeRows(existing?.filterTips,incoming?.filterTips,now,existing)
+  const goalsBankers=mergeRows(existing?.goalsBankers,incoming?.goalsBankers,now,existing)
   return attachCrests({
     ...incoming,
     bestPicks,
     varTips,
     filterTips,
+    goalsBankers,
     results:{...(existing?.results||{}),...(incoming?.results||{})},
     resultSummary:incoming?.resultSummary||existing?.resultSummary||null,
     availableMarkets:[...new Set([...(incoming?.availableMarkets||[]),...bestPicks.map(x=>x.market).filter(Boolean)])].sort(),
-    meta:{...(incoming?.meta||{}),firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,publishedPicks:bestPicks.length,varTipsCount:varTips.length,filterTipsCount:filterTips.length}
+    meta:{...(incoming?.meta||{}),firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,publishedPicks:bestPicks.length,varTipsCount:varTips.length,filterTipsCount:filterTips.length,goalsBankersCount:goalsBankers.length}
   })
 }
 export async function loadBoard(date,{allowVersionMismatch=false}={}){

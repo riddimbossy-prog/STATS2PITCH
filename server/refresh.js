@@ -162,6 +162,8 @@ export async function refreshNow(date,onProgress=()=>{}){
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}
   board.meta.diagnostics.filterTips=(board.filterTips||[]).length
   board.meta.diagnostics.filterTipsSkipped=board.filterTipsMeta?.skipped||{}
+  board.meta.diagnostics.goalsBankers=(board.goalsBankers||[]).length
+  board.meta.diagnostics.goalsBankersSkipped=board.goalsBankersMeta?.skipped||{}
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p])),eligibleIds=new Set(fixtures.map(f=>String(f.fixtureId)))
   const statsById=new Map(fixtures.map(f=>[String(f.fixtureId),f.statsReady!==false]))
   board.fixtures=raw.filter(f=>eligibleIds.has(String(f?.fixture?.id))).map(f=>{
@@ -176,6 +178,6 @@ export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}
 export function startRefresh(date){
   if(jobs.get(date)?.state==='running')return jobs.get(date)
   const job={state:'running',date,startedAt:new Date().toISOString(),progress:{stage:'start'}};jobs.set(date,job)
-  refreshNow(date,p=>job.progress=p).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,varTips:board.varTips?.length||0,filterTips:board.filterTips?.length||0,bankers:board.bankers?.length||0,diagnostics:board.meta?.diagnostics||null}}).catch(e=>{job.state='failed';job.error=e.message;job.completedAt=new Date().toISOString()})
+  refreshNow(date,p=>job.progress=p).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,varTips:board.varTips?.length||0,filterTips:board.filterTips?.length||0,goalsBankers:board.goalsBankers?.length||0,bankers:board.bankers?.length||0,diagnostics:board.meta?.diagnostics||null}}).catch(e=>{job.state='failed';job.error=e.message;job.completedAt=new Date().toISOString()})
   return job
 }

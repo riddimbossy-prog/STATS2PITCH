@@ -70,7 +70,9 @@ test('board version is consensus All Picks plus VAR Tips',()=>{
   assert.ok(Array.isArray(board.bestPicks))
   assert.ok(Array.isArray(board.varTips))
   assert.ok(Array.isArray(board.filterTips))
+  assert.ok(Array.isArray(board.goalsBankers))
   assert.equal(board.meta.filterTipsEngine,'sporty-filter-v1')
+  assert.equal(board.meta.goalsBankersEngine,'goals-bankers-v1')
 })
 
 test('combined board attaches VAR Tips separately from All Picks',()=>{

@@ -4,6 +4,7 @@ import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 import {buildAwayFavBoard,venueMetrics,favouriteSide,extractOdds} from './awayFavEngine.js'
 import {buildFilterBoard} from './filterEngine.js'
+import {buildGoalsBankerBoard} from './goalsBankersEngine.js'
 import {attachWhy,fixtureHasStats} from './pickWhy.js'
 import {redFlagSkip,favConflict} from './redFlags.js'
 
@@ -220,6 +221,7 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
   for(const p of all){if(seen.has(String(p.fixtureId)))continue;seen.add(String(p.fixtureId));best.push(p)}
   const varBoard=buildAwayFavBoard(fixtures,meta)
   const filterBoard=buildFilterBoard(fixtures,meta)
+  const goalsBoard=buildGoalsBankerBoard(fixtures,meta)
   return{
     meta:{
       ...meta,
@@ -235,7 +237,9 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
       varTipsEngine:varBoard.meta?.engine||'away-fav-streak-v1',
       varTipsCount:Array.isArray(varBoard.bestPicks)?varBoard.bestPicks.length:0,
       filterTipsEngine:filterBoard.meta?.engine||'sporty-filter-v1',
-      filterTipsCount:Array.isArray(filterBoard.bestPicks)?filterBoard.bestPicks.length:0
+      filterTipsCount:Array.isArray(filterBoard.bestPicks)?filterBoard.bestPicks.length:0,
+      goalsBankersEngine:goalsBoard.meta?.engine||'goals-bankers-v1',
+      goalsBankersCount:Array.isArray(goalsBoard.bestPicks)?goalsBoard.bestPicks.length:0
     },
     priority:all,
     bestPicks:best,
@@ -243,6 +247,8 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
     varTips:varBoard.bestPicks||[],
     varTipsMeta:varBoard.meta||null,
     filterTips:filterBoard.bestPicks||[],
-    filterTipsMeta:filterBoard.meta||null
+    filterTipsMeta:filterBoard.meta||null,
+    goalsBankers:goalsBoard.bestPicks||[],
+    goalsBankersMeta:goalsBoard.meta||null
   }
 }

@@ -5,13 +5,14 @@ import {readFile} from 'node:fs/promises'
 const read=p=>readFile(new URL(`../${p}`,import.meta.url),'utf8')
 
 test('VAR Tips is a dedicated public tab with no method copy',async()=>{
-  const [html,js,css,index,results,filter,sw,manifest]=await Promise.all([
+  const [html,js,css,index,results,filter,goals,sw,manifest]=await Promise.all([
     read('public/var-tips.html'),
     read('public/varTips.js'),
     read('public/varTips.css'),
     read('public/index.html'),
     read('public/results.html'),
     read('public/filter-tips.html'),
+    read('public/goals-bankers.html'),
     read('public/sw.js'),
     read('public/manifest.webmanifest')
   ])
@@ -23,25 +24,27 @@ test('VAR Tips is a dedicated public tab with no method copy',async()=>{
   assert.doesNotMatch(html,/Away-Fav|Goals Streak|first-match|trade secret|over 0\.5|1\.10/i)
   assert.doesNotMatch(js,/Goals Streak|first-match|streak window|fav is home/i)
   assert.match(css,/\.var-intro/)
-  for(const page of [index,results,html,filter]){
+  for(const page of [index,results,html,filter,goals]){
     assert.match(page,/href="\/var-tips\.html"/)
     assert.match(page,/href="\/filter-tips\.html"/)
+    assert.match(page,/href="\/goals-bankers\.html"/)
     assert.match(page,/>All Picks</)
     assert.match(page,/>Filter Tips</)
     assert.match(page,/>VAR Tips</)
+    assert.match(page,/>Goals Bankers</)
     assert.match(page,/>Results</)
-    assert.doesNotMatch(page,/bankers\.html/)
+    assert.doesNotMatch(page,/href="\/bankers\.html"/)
     assert.doesNotMatch(page,/>Bankers</)
   }
   assert.match(sw,/\/var-tips\.html/)
   assert.match(sw,/\/filter-tips\.html/)
+  assert.match(sw,/\/goals-bankers\.html/)
   assert.match(sw,/varTips\.js/)
   assert.match(sw,/filterTips\.js/)
-  assert.doesNotMatch(sw,/bankers\.html/)
-  assert.doesNotMatch(sw,/bankerRules\.js/)
+  assert.match(sw,/goalsBankers\.js/)
   assert.match(manifest,/"url":"\/var-tips\.html"/)
   assert.match(manifest,/"url":"\/filter-tips\.html"/)
-  assert.doesNotMatch(manifest,/bankers\.html/)
+  assert.match(manifest,/"url":"\/goals-bankers\.html"/)
 })
 
 test('Filter Tips is a dedicated public tab',async()=>{
@@ -56,6 +59,26 @@ test('Filter Tips is a dedicated public tab',async()=>{
   assert.match(js,/REQUIRED_ENGINE='sporty-filter-v1'/)
   assert.match(css,/\.filter-intro/)
   assert.doesNotMatch(html,/1\.20|1\.55|GG 2\+|trade secret/i)
+})
+
+test('Goals Bankers is a dedicated public tab with slip rules and no method copy',async()=>{
+  const [html,js,css]=await Promise.all([
+    read('public/goals-bankers.html'),
+    read('public/goalsBankers.js'),
+    read('public/goalsBankers.css')
+  ])
+  assert.match(html,/data-view="goals-bankers"/)
+  assert.match(html,/goalsBankers\.js/)
+  assert.match(html,/Add up to three legs/)
+  assert.match(js,/board\.goalsBankers/)
+  assert.match(js,/REQUIRED_ENGINE='goals-bankers-v1'/)
+  assert.match(js,/canAddAccaLeg/)
+  assert.match(js,/max-1-fav-win/)
+  assert.match(js,/need-goals-leg/)
+  assert.match(css,/\.goals-intro/)
+  assert.match(css,/\.acca-slip/)
+  assert.doesNotMatch(html,/Goals Streak|first-match|1\.10|1\.40|trade secret/i)
+  assert.doesNotMatch(js,/Goals Streak|first-match|streak window|streak_yes|1\.10|1\.40/i)
 })
 
 test('All Picks no longer brand the VAR engine on the public pages',async()=>{

@@ -107,10 +107,10 @@ function attachCrests(board:any){
     return{...row,homeLogo,awayLogo}
   }
   const next={...board}
-  for(const key of ['bestPicks','varTips','filterTips','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
 }
-function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],fixtures:[],availableMarkets:[],results:{}}}
+function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,goalsBankersCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],fixtures:[],availableMarkets:[],results:{}}}
 async function snapshot(date:string){
   const rows=await rest(`/rest/v1/prediction_snapshots?select=payload,generated_at&snapshot_date=eq.${encodeURIComponent(date)}&limit=1`)
   const row=Array.isArray(rows)?rows[0]:null,payload=row?.payload||null
@@ -181,7 +181,7 @@ async function liveScores(date:string){
   }
   try{
     const row=await snapshot(date)
-    const picks=[...(row?.board?.bestPicks||[]),...(row?.board?.varTips||[]),...(row?.board?.filterTips||[])]
+    const picks=[...(row?.board?.bestPicks||[]),...(row?.board?.varTips||[]),...(row?.board?.filterTips||[]),...(row?.board?.goalsBankers||[])]
     const have=new Set(out.map(f=>String(f?.fixture?.id||'')))
     const missing=picks.map((p:any)=>p?.fixtureId).filter((id:any)=>id!=null&&!have.has(String(id)))
     for(const id of missing.slice(0,80)){
@@ -278,7 +278,8 @@ Deno.serve(async req=>{
       const picks=(board?.bestPicks||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):stored[String(p.fixtureId)]||{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
       const varTips=(board?.varTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
       const filterTips=(board?.filterTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
-      return json({date,picks,varTips,filterTips,fixtures})
+      const goalsBankers=(board?.goalsBankers||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}})
+      return json({date,picks,varTips,filterTips,goalsBankers,fixtures})
     }
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}
     if(route==='/performance'&&req.method==='GET'){

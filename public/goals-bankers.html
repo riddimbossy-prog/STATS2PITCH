@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0b">
-  <title>VAR Tips · Stats2Pitch</title>
+  <title>Goals Bankers · Stats2Pitch</title>
   <link rel="manifest" href="/manifest.webmanifest?v=5.4.0">
   <link rel="icon" type="image/png" href="/assets/stats2pitch-favicon-v2.png">
   <link rel="apple-touch-icon" href="/assets/stats2pitch-favicon-v2.png">
@@ -13,10 +13,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/conceptD.css?v=5.4.0">
   <link rel="stylesheet" href="/mobile2026.css?v=5.4.0">
-  <link rel="stylesheet" href="/varTips.css?v=5.4.0">
+  <link rel="stylesheet" href="/goalsBankers.css?v=5.4.0">
   <link rel="stylesheet" href="/fontPlus2.css?v=5.4.0">
 </head>
-<body data-view="var-tips">
+<body data-view="goals-bankers">
   <div class="app">
     <header>
       <div class="header-inner">
@@ -30,8 +30,8 @@
         <nav class="page-tabs">
           <a class="page-tab" href="/">All Picks</a>
           <a class="page-tab" href="/filter-tips.html">Filter Tips</a>
-          <a class="page-tab active" href="/var-tips.html">VAR Tips</a>
-          <a class="page-tab" href="/goals-bankers.html">Goals Bankers</a>
+          <a class="page-tab" href="/var-tips.html">VAR Tips</a>
+          <a class="page-tab active" href="/goals-bankers.html">Goals Bankers</a>
           <a class="page-tab" href="/results.html">Results</a>
         </nav>
         <div class="header-actions">
@@ -47,11 +47,11 @@
       </div>
     </header>
     <div class="wrap">
-      <section class="var-intro">
-        <strong>VAR Tips</strong>
-        <p>A dedicated board of selected football picks for home and away sides. Tap a match to see why it was chosen.</p>
+      <section class="goals-intro">
+        <strong>Goals Bankers</strong>
+        <p>One published pick per match from favourite win, favourite 2+, Over 2.5 or GG. Add up to three legs to a slip.</p>
       </section>
-      <section id="varStats"></section>
+      <section id="goalsStats"></section>
       <div class="controls-shell">
         <nav id="dates"></nav>
         <div class="toolbar filters">
@@ -69,9 +69,19 @@
         </div>
       </div>
       <div id="countryChips" class="country-chips" aria-label="Country shortcuts"></div>
-      <main id="cards"><div class="empty">Loading VAR Tips…</div></main>
+      <main id="cards"><div class="empty">Loading Goals Bankers…</div></main>
     </div>
   </div>
+  <aside id="accaSlip" class="acca-slip" hidden>
+    <header>
+      <strong>Slip</strong>
+      <span id="accaMeta">0 legs</span>
+      <button type="button" id="accaClear">Clear</button>
+    </header>
+    <ul id="accaLegs"></ul>
+    <p id="accaNote" class="acca-note"></p>
+    <div class="acca-total"><small>Combined</small><b id="accaOdds">—</b></div>
+  </aside>
   <div id="modal" class="modal hidden"></div>
   <nav class="mobile-nav">
     <a href="/">
@@ -82,11 +92,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
       <span>Filter</span>
     </a>
-    <a class="active" href="/var-tips.html">
+    <a href="/var-tips.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
       <span>VAR</span>
     </a>
-    <a href="/goals-bankers.html">
+    <a class="active" href="/goals-bankers.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
       <span>Goals</span>
     </a>
@@ -97,7 +107,7 @@
   </nav>
   <script src="/runtime-config.js"></script>
   <script src="/leagueFlags.js?v=5.4.0"></script>
-  <script type="module" src="/varTips.js?v=5.4.0"></script>
+  <script type="module" src="/goalsBankers.js?v=5.4.0"></script>
   <script src="/pwa.js?v=5.4.0"></script>
 </body>
 </html>
