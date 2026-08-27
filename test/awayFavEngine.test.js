@@ -98,7 +98,11 @@ test('streak outside 1.10-1.49 falls back to a priced favourite route',()=>{
 })
 
 test('home favourite on team-goals over 1.5 now qualifies on the home path',()=>{
-  const result=diagnoseAwayFavFixture(fixture({marketOdds:markets({streak:1.22,awayO05:1.18,awayO15:1.40,homeO05:1.20,homeO15:1.25,bttsYes:1.40})}))
+  const result=diagnoseAwayFavFixture(fixture({
+    homeFixtures:venueRows(1,'home',strongAway),
+    awayFixtures:venueRows(2,'away',weakHome),
+    marketOdds:markets({streak:1.22,awayO05:1.18,awayO15:1.40,homeO05:1.20,homeO15:1.25,bttsYes:1.40})
+  }))
   assert.equal(result.skip,null)
   assert.equal(result.pick.favourite,'home')
   assert.equal(result.pick.route,'btts')
@@ -215,6 +219,8 @@ test('home team goals over 1.5 is used when the home win is not short enough',()
 
 test('home-fav open game with a scoring away side becomes total over 1.5',()=>{
   const result=diagnoseAwayFavFixture(fixture({
+    homeFixtures:venueRows(1,'home',strongAway),
+    awayFixtures:venueRows(2,'away',weakHome),
     marketOdds:markets({streak:1.28,homeO05:1.40,homeO15:1.38,awayO05:1.50,awayO15:1.90,over15:1.33,homeWin:1.55,awayWin:4.10,bttsYes:1.70})
   }))
   assert.equal(result.pick.favourite,'home')
@@ -247,6 +253,8 @@ test('priced favourite without streak still publishes a 1X2 route',()=>{
 
 test('home favourite without streak publishes from match-winner odds',()=>{
   const result=diagnoseAwayFavFixture(fixture({
+    homeFixtures:venueRows(1,'home',strongAway),
+    awayFixtures:venueRows(2,'away',weakHome),
     homeSplit:null,
     awaySplit:null,
     marketOdds:markets({homeWin:1.35,awayWin:5.10,over15:1.30,bttsYes:1.70})
