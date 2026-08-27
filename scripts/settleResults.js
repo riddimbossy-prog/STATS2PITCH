@@ -1,5 +1,5 @@
-import {fixturesByDate} from '../server/apiFootball.js'
 import {sportyEventFixtures,sportyFixturesByDate} from '../server/sportyBet.js'
+import {gismoMatches} from '../server/sportyStats.js'
 import {listBoards,saveBoard} from '../server/store.js'
 import {settleBoard} from '../server/settlement.js'
 
@@ -16,9 +16,15 @@ for(const row of rows){
   if(fullySettled){skipped++;continue}
   try{
     const eventIds=picks.map(p=>p.sportyEventId).filter(Boolean)
+    const fixtureIds=picks.map(p=>p.fixtureId).filter(Boolean)
     let fixtures=eventIds.length?await sportyEventFixtures(eventIds):[]
     if(!fixtures.length)fixtures=await sportyFixturesByDate(date).catch(()=>[])
-    if(!fixtures.length)fixtures=await fixturesByDate(date)
+    const have=new Set(fixtures.map(f=>String(f?.fixture?.id||'')))
+    const missing=fixtureIds.filter(id=>!have.has(String(id)))
+    if(missing.length){
+      const extra=await gismoMatches(missing)
+      fixtures=[...fixtures,...extra]
+    }
     const settled=settleBoard(board,fixtures)
     settled.meta={...(settled.meta||{}),resultsUpdatedAt:new Date().toISOString()}
     await saveBoard(date,settled,{preservePublished:true})
@@ -26,7 +32,6 @@ for(const row of rows){
     console.log(`${date}: results updated`,settled.resultSummary)
   }catch(error){
     const msg=String(error?.message||error)
-    if(/do not have access to this date|request limit for the day|rate.?limit/i.test(msg)){skipped++;console.warn(`${date}: skipped — football data plan cannot read this date`);continue}
     failed++;console.error(`${date}: settlement failed`,msg)
   }
 }

@@ -4,7 +4,8 @@ import {join,extname,normalize} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {loadBoard,listBoards,clearBoard} from './store.js'
 import {startRefresh,refreshStatus} from './refresh.js'
-import {fixturesByDate} from './apiFootball.js'
+import {sportyEventFixtures,sportyFixturesByDate} from './sportyBet.js'
+import {gismoMatches} from './sportyStats.js'
 import {normalizeFixtureStatus,settlePick} from './settlement.js'
 import {buildLearningProfiles} from './learning.js'
 import {ENGINE_VERSION} from './config.js'
@@ -20,8 +21,14 @@ async function json(req){let s='';for await(const c of req)s+=c;return s?JSON.pa
 function performance(boards){const summary={picks:0,won:0,lost:0,void:0,pending:0,winRate:0},groups=new Map();for(const b of boards)for(const p of b?.bestPicks||[]){const r=b?.results?.[String(p.fixtureId)],o=r?.outcome||'pending';summary.picks++;if(o==='won')summary.won++;else if(o==='lost')summary.lost++;else if(o==='void')summary.void++;else summary.pending++;if(!['won','lost'].includes(o))continue;for(const dimension of ['market','country','league','confidence']){const value=dimension==='confidence'?(Number(p?.consensus)===100?'100%':`${Number(p?.consensus)||0}%`):String(p?.[dimension]||'Unknown'),k=`${dimension}|${value}`,g=groups.get(k)||{dimension,value,picks:0,won:0,lost:0};g.picks++;if(o==='won')g.won++;else g.lost++;groups.set(k,g)}}const decided=summary.won+summary.lost;summary.winRate=decided?Math.round(summary.won*1000/decided)/10:0;return{summary,groups:[...groups.values()].map(g=>({...g,winRate:Math.round(g.won*1000/g.picks)/10})).sort((a,b)=>b.picks-a.picks)}}
 async function resultPayload(date){
   const board=await loadBoard(date)||{bestPicks:[],varTips:[],results:{}}
+  const published=[...(board.bestPicks||[]),...(board.varTips||[])]
+  const eventIds=published.map(p=>p.sportyEventId).filter(Boolean)
   let fixtures=[]
-  try{fixtures=await fixturesByDate(date)}catch{}
+  try{if(eventIds.length)fixtures=await sportyEventFixtures(eventIds)}catch{}
+  if(!fixtures.length){try{fixtures=await sportyFixturesByDate(date)}catch{}}
+  const have=new Set(fixtures.map(f=>String(f?.fixture?.id||'')))
+  const missing=published.map(p=>p.fixtureId).filter(id=>id!=null&&!have.has(String(id)))
+  if(missing.length){try{fixtures=fixtures.concat(await gismoMatches(missing))}catch{}}
   const map=new Map(fixtures.map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]}))
   const pending=p=>({outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'})
   const withResult=(p,stored)=>{

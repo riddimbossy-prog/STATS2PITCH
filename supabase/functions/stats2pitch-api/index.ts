@@ -3,9 +3,9 @@ const ENGINE_VERSION='stats2pitch-v5-var-tips'
 const SUPABASE_URL=(Deno.env.get('SUPABASE_URL')||'').replace(/\/$/,'')
 const SUPABASE_ANON_KEY=Deno.env.get('SUPABASE_ANON_KEY')||''
 const SUPABASE_SERVICE_ROLE_KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||''
-const API_FOOTBALL_KEY=Deno.env.get('API_FOOTBALL_KEY')||''
-const API_FOOTBALL_BASE=(Deno.env.get('API_FOOTBALL_BASE')||'https://v3.football.api-sports.io').replace(/\/$/,'')
 const APP_TIMEZONE=Deno.env.get('APP_TIMEZONE')||'UTC'
+const SPORTYBET_COUNTRY=(Deno.env.get('SPORTYBET_COUNTRY')||'gh').replace(/[^a-z]/gi,'').toLowerCase()||'gh'
+const SPORTYBET_BASE=(Deno.env.get('SPORTYBET_BASE')||'https://www.sportybet.com').replace(/\/$/,'')
 const TTL_MS=Math.max(15,Number(Deno.env.get('AUTO_REFRESH_TTL_MINUTES')||45))*60_000
 const ADMIN_EMAILS=(Deno.env.get('STATS2PITCH_ADMIN_EMAILS')||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean)
 const GITHUB_TOKEN=Deno.env.get('STATS2PITCH_GITHUB_TOKEN')||''
@@ -113,12 +113,80 @@ function normalizeFixture(x:any){
     finished,live,cancelled,matchState:finished?'settled':live?'live':cancelled?'settled':'upcoming'
   }
 }
+function nid(raw:any){const m=String(raw??'').match(/(\d+)$/);return m?Number(m[1]):null}
+function crest(id:any){return id?`https://img.sportradar.com/ls/crest/big/${id}.png`:null}
+function sportyStatus(ev:any){
+  const raw=String(ev?.matchStatus||'').toLowerCase(),code=Number(ev?.status)
+  if(/cancel|abandon|postpon/.test(raw))return{short:'CANC',long:ev.matchStatus||'Cancelled'}
+  if(/not[\s_-]*start|upcoming|ns\b/.test(raw)||code===0)return{short:'NS',long:ev.matchStatus||'Not started'}
+  if(/end|finish|close|complete|\bft\b/.test(raw)||code===3)return{short:'FT',long:ev.matchStatus||'Match Finished'}
+  if(/live|1st|2nd|half|\bht\b|pause|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
+  return{short:'NS',long:ev.matchStatus||'Not started'}
+}
+function sportyScore(ev:any){
+  const pairs=[[ev?.homeScore,ev?.awayScore],[ev?.setScore?.home,ev?.setScore?.away],[ev?.score?.home,ev?.score?.away]]
+  for(const [h,a] of pairs){const home=Number(h),away=Number(a);if(Number.isFinite(home)&&Number.isFinite(away))return{home,away}}
+  return{home:null,away:null}
+}
+function accraDate(ms:any){
+  if(!Number.isFinite(Number(ms)))return ''
+  return new Intl.DateTimeFormat('en-CA',{timeZone:APP_TIMEZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(Number(ms)))
+}
+function sportyToFixture(ev:any,tournament:any={}){
+  const sport=ev?.sport||{},category=sport?.category||{},tour=category?.tournament||tournament||{}
+  const status=sportyStatus(ev),goals=sportyScore(ev),kick=Number.isFinite(Number(ev?.estimateStartTime))?new Date(Number(ev.estimateStartTime)).toISOString():null
+  const homeId=nid(ev?.homeTeamId),awayId=nid(ev?.awayTeamId)
+  return{
+    fixture:{id:nid(ev?.eventId)||nid(ev?.gameId),date:kick,status:{short:status.short,long:status.long},timestamp:ev?.estimateStartTime||null},
+    league:{id:nid(tour?.id)||tour?.id||null,name:tour?.name||'',country:category?.name||tournament?.categoryName||''},
+    teams:{home:{id:homeId,name:ev?.homeTeamName||'',logo:ev?.homeTeamIcon||crest(homeId)},away:{id:awayId,name:ev?.awayTeamName||'',logo:ev?.awayTeamIcon||crest(awayId)}},
+    goals,score:{fulltime:goals,halftime:{}}
+  }
+}
 async function liveScores(date:string){
-  if(!API_FOOTBALL_KEY)throw new Error('Live scores are temporarily unavailable')
-  const url=new URL(`${API_FOOTBALL_BASE}/fixtures`);url.searchParams.set('date',date);url.searchParams.set('timezone',APP_TIMEZONE)
-  const response=await fetch(url,{headers:{'x-apisports-key':API_FOOTBALL_KEY}}),body=await response.json().catch(()=>null)
-  if(!response.ok)throw new Error('Live scores are temporarily unavailable')
-  return(Array.isArray(body?.response)?body.response:[]).map(normalizeFixture)
+  const headers={Accept:'application/json, text/plain, */*',Origin:SPORTYBET_BASE,Referer:`${SPORTYBET_BASE}/${SPORTYBET_COUNTRY}/sport/football/today`,Clientid:'web',Platform:'web','User-Agent':'Mozilla/5.0'}
+  const out:any[]=[]
+  let page=1,total=1
+  while(page<=total&&page<=20){
+    const url=new URL(`${SPORTYBET_BASE}/api/${SPORTYBET_COUNTRY}/factsCenter/pcUpcomingEvents`)
+    url.searchParams.set('sportId','sr:sport:1');url.searchParams.set('marketId','1');url.searchParams.set('pageSize','100');url.searchParams.set('pageNum',String(page));url.searchParams.set('timeline','48')
+    const response=await fetch(url,{headers}),body=await response.json().catch(()=>null)
+    if(!response.ok||body?.bizCode!==10000)break
+    const data=body?.data||{}
+    total=Math.max(1,Math.ceil(Number(data.totalNum||0)/100))
+    for(const tour of data.tournaments||[])for(const ev of tour.events||[]){
+      if(accraDate(ev?.estimateStartTime)===date)out.push(sportyToFixture(ev,tour))
+    }
+    page++
+  }
+  try{
+    const row=await snapshot(date)
+    const picks=[...(row?.board?.bestPicks||[]),...(row?.board?.varTips||[])]
+    const have=new Set(out.map(f=>String(f?.fixture?.id||'')))
+    const missing=picks.map((p:any)=>p?.fixtureId).filter((id:any)=>id!=null&&!have.has(String(id)))
+    for(const id of missing.slice(0,80)){
+      const n=nid(id);if(!n)continue
+      try{
+        const res=await fetch(`https://stats.fn.sportradar.com/common/en/Etc:UTC/gismo/stats_match_get/${n}`,{headers:{Accept:'application/json','User-Agent':'Mozilla/5.0',Referer:'https://www.sportybet.com/'}})
+        const body=await res.json().catch(()=>null)
+        const data=body?.doc?.[0]?.event==='exception'?null:body?.doc?.[0]?.data
+        if(!data)continue
+        const home=data?.teams?.home||{},away=data?.teams?.away||{}
+        const homeId=nid(home.uid||home._id),awayId=nid(away.uid||away._id)
+        const ftH=data?.result?.home??data?.periods?.ft?.home,ftA=data?.result?.away??data?.periods?.ft?.away
+        const finished=Number.isFinite(Number(ftH))&&Number.isFinite(Number(ftA))
+        const uts=Number(data?.time?.uts)
+        out.push({
+          fixture:{id:n,date:Number.isFinite(uts)?new Date(uts*1000).toISOString():null,status:{short:finished?'FT':'NS',long:finished?'Match Finished':'Not started'}},
+          league:{id:nid(data?._utid),name:data?.tournament?.name||'',country:data?.realcategory?.name||''},
+          teams:{home:{id:homeId,name:home.mediumname||home.name||'',logo:crest(homeId)},away:{id:awayId,name:away.mediumname||away.name||'',logo:crest(awayId)}},
+          goals:{home:finished?Number(ftH):null,away:finished?Number(ftA):null},
+          score:{fulltime:{home:finished?Number(ftH):null,away:finished?Number(ftA):null},halftime:{home:finite(data?.periods?.p1?.home)?Number(data.periods.p1.home):null,away:finite(data?.periods?.p1?.away)?Number(data.periods.p1.away):null}}
+        })
+      }catch{}
+    }
+  }catch{}
+  return out.map(normalizeFixture)
 }
 function ou(s:any){const m=String(s||'').match(/\b(over|under)\s*([0-9]+(?:\.[0-9]+)?)/i);return m?{side:m[1].toLowerCase(),line:Number(m[2])}:null}
 function settle(p:any,f:any){
@@ -202,7 +270,7 @@ Deno.serve(async req=>{
       const admin=await verifyAdmin(req);if(!admin)return json({error:'Admin access required'},403)
       const rows=await boardRows(30),boards=(rows||[]).map((x:any)=>x.payload).filter(Boolean),performance=performanceFromBoards(boards),learning=learningFromBoards(boards)
       const latest=(rows||[])[0]||null,meta=latest?.payload?.meta||{},latestPicks=(latest?.payload?.bestPicks||[]).slice(0,25)
-      return json({user:{email:admin.email||''},snapshots:rows.length,performance,learning,latest,health:{footballData:Boolean(API_FOOTBALL_KEY),sourceFixtures:meta.sourceFixtures||0,scheduledFixtures:meta.scheduledFixtures||0,analyzedFixtures:meta.analyzedFixtures||0,statsVerifiedFixtures:meta.statsVerifiedFixtures||0,historyFallbackTeams:meta.historyFallbackTeams||0},latestPicks})
+      return json({user:{email:admin.email||''},snapshots:rows.length,performance,learning,latest,health:{footballData:true,sourceFixtures:meta.sourceFixtures||0,scheduledFixtures:meta.scheduledFixtures||0,analyzedFixtures:meta.analyzedFixtures||0,statsVerifiedFixtures:meta.statsVerifiedFixtures||0,historyFallbackTeams:meta.historyFallbackTeams||0},latestPicks})
     }
     if(route==='/admin/refresh'&&req.method==='POST'){
       const admin=await verifyAdmin(req);if(!admin)return json({error:'Admin access required'},403);await dispatchRefresh();return json({ok:true,message:'Refresh requested.'},202)

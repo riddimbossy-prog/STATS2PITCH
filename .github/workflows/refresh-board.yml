@@ -34,10 +34,6 @@ jobs:
       - name: Generate fresh Stats2Pitch boards
         run: npm run refresh
         env:
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-          API_FOOTBALL_BASE: ${{ secrets.API_FOOTBALL_BASE }}
-          STATS_API_KEY: ${{ secrets.STATS_API_KEY }}
-          STATS_API_BASE_URL: ${{ secrets.STATS_API_BASE_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ENGINE_FORM_SAMPLE: "5"
@@ -50,12 +46,11 @@ jobs:
           REFRESH_CONCURRENCY: "3"
           SPORTYBET_COUNTRY: "gh"
           SPORTYBET_TIMELINE: "168"
+          SPORTY_LASTX: "40"
 
       - name: Settle published picks
         run: npm run settle
         env:
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-          API_FOOTBALL_BASE: ${{ secrets.API_FOOTBALL_BASE }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RESULT_LOOKBACK_DAYS: "45"
