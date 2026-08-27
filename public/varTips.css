@@ -10,7 +10,7 @@
 }
 .var-intro strong {
   display: block;
-  font-size: 18px;
+  font-size: 20px;
   letter-spacing: -0.02em;
   color: var(--ink);
 }
@@ -46,7 +46,7 @@
 }
 #varStats small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--muted);
@@ -54,7 +54,7 @@
 }
 #varStats b {
   display: block;
-  font: 700 24px var(--mono);
+  font: 700 26px var(--mono);
   margin-top: 4px;
   color: var(--ink);
 }
@@ -63,7 +63,7 @@
   position: absolute;
   top: 34px;
   right: 10px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -77,8 +77,8 @@
 .fav-badge {
   position: absolute;
   top: 34px;
-  right: 58px;
-  font-size: 10px;
+  right: 78px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
