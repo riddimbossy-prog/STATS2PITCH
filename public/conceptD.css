@@ -734,6 +734,98 @@ header {
 }
 .why-tip ul { margin: 0; padding-left: 18px; color: var(--muted); }
 .why-tip li { margin: 0 0 7px; }
+.why-lines { margin: 0 0 16px; }
+.why-empty { margin: 0 0 12px; color: var(--muted); }
+.why-consensus {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.why-consensus span {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.why-consensus small {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.why-consensus b { font: 700 18px var(--mono); color: var(--accent); }
+.why-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 4px 0 16px;
+}
+.why-form h4,
+.why-compare h4,
+.why-h2h h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.form-pills { display: flex; gap: 6px; margin-bottom: 8px; }
+.form-pill {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+.form-pill.W { background: rgba(34, 197, 94, 0.16); color: #4ade80; }
+.form-pill.D { background: rgba(161, 161, 170, 0.16); color: #d4d4d8; }
+.form-pill.L { background: rgba(239, 68, 68, 0.16); color: #f87171; }
+.form-matches,
+.why-h2h ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.form-matches li,
+.why-h2h li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink);
+  margin: 0;
+}
+.form-matches b,
+.why-h2h b { font-family: var(--mono); }
+.form-matches small,
+.why-h2h small { color: var(--muted); white-space: nowrap; }
+.why-compare table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.why-compare th,
+.why-compare td {
+  padding: 8px 6px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.why-compare tbody th { text-align: left; color: var(--muted); font-weight: 600; }
+.why-h2h { margin-top: 14px; }
+.m-why-row { display: none; }
+.card { cursor: pointer; }
+body.modal-open { overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .dialog { animation: none !important; }
+}
+
 .banker-safety {
   margin-top: 14px;
   border: 1px solid rgba(255, 107, 44, 0.35);
@@ -941,6 +1033,8 @@ header {
   .dialog { padding: 16px; }
   .dialog .match-badge { top: 24px; right: 24px; }
   .dialog .banker-badge { top: 48px; right: 24px; }
+  .why-form { grid-template-columns: 1fr; }
+
 }
 @media (max-width: 390px) {
   .brand-text { font-size: 15px; }

@@ -3,6 +3,8 @@ import {learningAllows} from './learning.js'
 import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 import {buildAwayFavBoard} from './awayFavEngine.js'
+import {attachWhy} from './pickWhy.js'
+
 
 const finite=v=>Number.isFinite(Number(v))
 const pct=(h,t)=>t?Math.round(h*100/t):null
@@ -172,7 +174,7 @@ export function analyzeFixture(f,{ignoreTransition=false}={}){
     const transition=ignoreTransition?null:transitionForMarket(f,m,o,profiles)
     if(transition&&!transition.allowed){if(transition.redirectGoals)leakRedirect=transition;continue}
     const banker=bankerSafety(f,m,o,hr,ar,price,transition)
-    out.push({
+    const pick={
       fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
       home:f.home.name,away:f.away.name,homeId:f.home?.id??null,awayId:f.away?.id??null,homeLogo:f.home.logo,awayLogo:f.away.logo,
       market:m.marketKey,marketName:m.market,selection:o.name,displaySelection:display(m,o),
@@ -185,9 +187,10 @@ export function analyzeFixture(f,{ignoreTransition=false}={}){
         checks:over25.profile?.checks||[],metrics:over25.profile?.metrics||{}
       }:null,
       bankerCandidate:Number(hr)===100&&Number(ar)===100,bankerApproved:banker.approved,bankerChecks:banker.checks,
-      oddsVerified:o.verified===true,apiOdd:o.apiOdd??null,statsOdd:o.statsOdd??null,
-      reason:over25.applies?`Strict Over 2.5 filter passed (${over25.profile?.grade||'strong'}). ${m.market}: ${o.name} @ ${price.toFixed(2)}.`:`${m.market}: ${o.name} @ ${price.toFixed(2)}. Home split ${hr}%; away split ${ar}%.`
-    })
+      oddsVerified:o.verified===true,apiOdd:o.apiOdd??null,statsOdd:o.statsOdd??null
+    }
+    out.push(attachWhy(pick,f))
+
   }
   const pool=!ignoreTransition&&leakRedirect?out.filter(redirectGoalMarket):out
   return pool.sort((a,b)=>b.consensus-a.consensus||Number(b.oddsVerified)-Number(a.oddsVerified)||a.odds-b.odds).map(p=>leakRedirect&&!ignoreTransition?{...p,transitionRedirect:{reason:leakRedirect.reason,stronger:leakRedirect.stronger,weaker:leakRedirect.weaker}}:p)

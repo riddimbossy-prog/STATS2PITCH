@@ -7,6 +7,8 @@ import {buildOver25Profile} from './over25.js'
 import {saveBoard,listBoards} from './store.js'
 import {buildLearningProfiles} from './learning.js'
 import {SCHEDULED,FORM_SAMPLE} from './config.js'
+import {h2hSnapshot} from './pickWhy.js'
+
 
 const jobs=new Map(),leagueCache=new Map(),teamCache=new Map(),splitCache=new Map(),eventCache=new Map()
 
@@ -131,7 +133,8 @@ export async function refreshNow(date,onProgress=()=>{}){
       const marketOdds=verifiedMarkets({sportyMarkets:f?.sporty?.markets,fixture:f})
       if(marketOdds.length)statsVerified++
       const over25Profile=buildOver25Profile(mergeUnique(current,previous,history),homeId,awayId)
-      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,marketOdds,formReady,sportyEventId:f?.sporty?.eventId||null,feed,leagueHistoryReady}
+      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,marketOdds,formReady,sportyEventId:f?.sporty?.eventId||null,feed,leagueHistoryReady,h2h:h2hSnapshot(history,homeId,awayId)}
+
       if(formReady&&needsTransitionEvidence(record)){record=await hydrateTransitionSamples(record);transitionHydratedFixtures++}
       done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures})
       return record
