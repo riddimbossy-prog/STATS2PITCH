@@ -15,7 +15,7 @@ async function mapLimit(items,limit,fn){
   async function worker(){while(true){const x=i++;if(x>=items.length)return;out[x]=await fn(items[x],x)}}
   await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out
 }
-function publicFixture(f,status='scheduled'){return{fixtureId:f?.fixture?.id,kickoff:f?.fixture?.date,status:f?.fixture?.status?.short||'NS',league:f?.league?.name||'',country:f?.league?.country||'',home:f?.teams?.home?.name||'',away:f?.teams?.away?.name||'',homeLogo:f?.teams?.home?.logo||null,awayLogo:f?.teams?.away?.logo||null,availability:status}}
+function publicFixture(f,status='scheduled'){return{fixtureId:f?.fixture?.id,kickoff:f?.fixture?.date,status:f?.fixture?.status?.short||'NS',league:f?.league?.name||'',country:f?.league?.country||'',home:f?.teams?.home?.name||'',away:f?.teams?.away?.name||'',homeId:f?.teams?.home?.id??null,awayId:f?.teams?.away?.id??null,homeLogo:f?.teams?.home?.logo||null,awayLogo:f?.teams?.away?.logo||null,availability:status}}
 async function getLeaguePack(utid,country){
   const key=String(utid??'')
   if(!key)return{current:[],previous:[],extra:[],currentSeasonId:null,previousSeasonId:null,teams:0}

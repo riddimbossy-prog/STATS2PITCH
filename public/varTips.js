@@ -1,16 +1,15 @@
+import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
 const cfg=window.__STATS2PITCH_CONFIG__||{},base=String(cfg.supabaseUrl||'').replace(/\/+$/,''),anon=String(cfg.supabaseAnonKey||''),fn=String(cfg.functionName||'stats2pitch-api')
 const REQUIRED_ENGINE='away-fav-streak-v1'
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',timer:null}
-const fallback='/assets/football-real.svg'
 
 function endpoint(path){if(!base)throw new Error('Service unavailable');return`${base}/functions/v1/${fn}${path}`}
 async function api(path){const r=await fetch(endpoint(path),{headers:{apikey:anon,Authorization:`Bearer ${anon}`},cache:'no-store'}),b=await r.json().catch(()=>null);if(!r.ok)throw new Error('Unable to load this right now');return b}
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
-function logo(v){const s=String(v||'').trim();return /^https?:\/\//i.test(s)||s.startsWith('/')?esc(s):fallback}
-function team(name,img,side,score){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${logo(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span>${score!==undefined&&score!==null?`<b class="team-score">${esc(score)}</b>`:''}</div>`}
-function matchup(r,score){return`<div class="teams crest-matchup">${team(r.home,r.homeLogo,'home',score?.home)}<span class="versus">${score?'–':'VS'}</span>${team(r.away,r.awayLogo,'away',score?.away)}</div>`}
+function team(name,img,side,score){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${esc(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span>${score!==undefined&&score!==null?`<b class="team-score">${esc(score)}</b>`:''}</div>`}
+function matchup(r,score){const fx=fixtureCrests(state.board);return`<div class="teams crest-matchup">${team(r.home,crestSrc(r,'home',fx),'home',score?.home)}<span class="versus">${score?'–':'VS'}</span>${team(r.away,crestSrc(r,'away',fx),'away',score?.away)}</div>`}
 function kickoffMs(r){const n=Date.parse(r?.kickoff||'');return Number.isFinite(n)?n:Number.MAX_SAFE_INTEGER}
 function formatDateTime(v){const d=new Date(v);return Number.isNaN(d.getTime())?'TBC':d.toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
 function dates(){const a=[];for(let i=-6;i<=6;i++){const d=new Date();d.setUTCDate(d.getUTCDate()+i);a.push(d.toISOString().slice(0,10))}return a}
@@ -49,6 +48,7 @@ function render(){
   }
   $('#status').textContent=`${rows.length} VAR tip${rows.length===1?'':'s'}`
   $('#cards').innerHTML=rows.length?rows.map(card).join(''):'<div class="empty">No VAR Tips match these filters yet.</div>'
+  bindCrestFallbacks($('#cards'))
 }
 function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
 function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.results=await api(`/results?date=${encodeURIComponent(state.date)}`);render()}catch{}},30000)}

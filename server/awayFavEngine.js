@@ -242,6 +242,8 @@ function packPick(fixture,odds,home,away,routed,rating,side){
     kickoff:fixture.kickoff,
     home:fixture.home?.name,
     away:fixture.away?.name,
+    homeId:fixture.home?.id??null,
+    awayId:fixture.away?.id??null,
     homeLogo:fixture.home?.logo||null,
     awayLogo:fixture.away?.logo||null,
     market:routed.market,

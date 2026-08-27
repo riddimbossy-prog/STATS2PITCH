@@ -174,7 +174,7 @@ export function analyzeFixture(f,{ignoreTransition=false}={}){
     const banker=bankerSafety(f,m,o,hr,ar,price,transition)
     out.push({
       fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
-      home:f.home.name,away:f.away.name,homeLogo:f.home.logo,awayLogo:f.away.logo,
+      home:f.home.name,away:f.away.name,homeId:f.home?.id??null,awayId:f.away?.id??null,homeLogo:f.home.logo,awayLogo:f.away.logo,
       market:m.marketKey,marketName:m.market,selection:o.name,displaySelection:display(m,o),
       odds:+price.toFixed(2),homeConsensus:hr,awayConsensus:ar,consensus,
       earlySeason:f.earlySeason===true,earlySeasonHome:f.earlySeasonHome===true,earlySeasonAway:f.earlySeasonAway===true,currentVenueSamples:f.currentVenueSamples||null,

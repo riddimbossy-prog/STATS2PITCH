@@ -12,11 +12,42 @@ async function request(path,{method='GET',body,token=SERVICE,headers={}}={}){
   if(!res.ok)throw new Error(`Supabase ${res.status}`)
   return data
 }
+function isLogo(v){const s=String(v||'').trim();return /^https?:\/\//i.test(s)||s.startsWith('/')}
+function preferLogo(...values){
+  const urls=values.map(v=>String(v||'').trim()).filter(isLogo)
+  return urls.find(u=>/s\.sporty\.net\//i.test(u))||urls[0]||null
+}
+export function attachCrests(board){
+  if(!board)return board
+  const fx=new Map((board.fixtures||[]).map(f=>[String(f.fixtureId),f]))
+  const patch=row=>{
+    if(!row)return row
+    const f=fx.get(String(row.fixtureId))||{}
+    const homeLogo=preferLogo(row.homeLogo,f.homeLogo)
+    const awayLogo=preferLogo(row.awayLogo,f.awayLogo)
+    const homeId=row.homeId??f.homeId??null
+    const awayId=row.awayId??f.awayId??null
+    if(homeLogo===row.homeLogo&&awayLogo===row.awayLogo&&homeId===row.homeId&&awayId===row.awayId)return row
+    return{...row,homeLogo,awayLogo,homeId,awayId}
+  }
+  const next={...board}
+  for(const key of ['bestPicks','varTips','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  return next
+}
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
 function stampPick(p,at){return{...p,publishedAt:p?.publishedAt||at,proofKey:p?.proofKey||proofKey(p)}}
 function mergeRows(oldRows,freshRows,now,existing){
   const map=new Map((Array.isArray(oldRows)?oldRows:[]).map(p=>[String(p.fixtureId),stampPick(p,p.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)]))
-  for(const p of Array.isArray(freshRows)?freshRows:[])if(!map.has(String(p.fixtureId)))map.set(String(p.fixtureId),stampPick(p,now))
+  for(const p of Array.isArray(freshRows)?freshRows:[]){
+    const id=String(p.fixtureId)
+    if(!map.has(id)){map.set(id,stampPick(p,now));continue}
+    const old=map.get(id)
+    const homeLogo=preferLogo(old.homeLogo,p.homeLogo)
+    const awayLogo=preferLogo(old.awayLogo,p.awayLogo)
+    const homeId=old.homeId??p.homeId??null
+    const awayId=old.awayId??p.awayId??null
+    if(homeLogo!==old.homeLogo||awayLogo!==old.awayLogo||homeId!==old.homeId||awayId!==old.awayId)map.set(id,{...old,homeLogo,awayLogo,homeId,awayId})
+  }
   return[...map.values()].sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
 }
 function countTips(board){
@@ -35,7 +66,7 @@ function mergePublished(existing,incoming){
   if(!sameEngine)return countTips(incoming)>0?incoming:existing
   const bestPicks=mergeRows(existing?.bestPicks,incoming?.bestPicks,now,existing)
   const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
-  return{
+  return attachCrests({
     ...incoming,
     bestPicks,
     varTips,
@@ -43,7 +74,7 @@ function mergePublished(existing,incoming){
     resultSummary:incoming?.resultSummary||existing?.resultSummary||null,
     availableMarkets:[...new Set([...(incoming?.availableMarkets||[]),...bestPicks.map(x=>x.market).filter(Boolean)])].sort(),
     meta:{...(incoming?.meta||{}),firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,publishedPicks:bestPicks.length,varTipsCount:varTips.length}
-  }
+  })
 }
 export async function loadBoard(date,{allowVersionMismatch=false}={}){
   if(!configured()){const b=memory.get(date)||null;return allowVersionMismatch?b:(b?.meta?.engineVersion===ENGINE_VERSION?b:null)}
@@ -74,7 +105,7 @@ export async function saveBoard(date,board,{preservePublished=true}={}){
     if(configured())await request('/rest/v1/prediction_snapshots?on_conflict=snapshot_date',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:{snapshot_date:date,generated_at:new Date().toISOString(),payload:kept}})
     return kept
   }
-  const finalBoard=preservePublished?mergePublished(existing,board):board
+  const finalBoard=attachCrests(preservePublished?mergePublished(existing,board):board)
   memory.set(date,finalBoard)
   if(configured())await request('/rest/v1/prediction_snapshots?on_conflict=snapshot_date',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:{snapshot_date:date,generated_at:new Date().toISOString(),payload:finalBoard}})
   return finalBoard
