@@ -1,4 +1,5 @@
 import {FINISHED,FORM_SAMPLE,MIN_ODD,MAX_ODD} from './config.js'
+import {assessHardGate} from './redFlags.js'
 
 const finite=v=>Number.isFinite(Number(v))
 const done=f=>FINISHED.has(String(f?.fixture?.status?.short||'').toUpperCase())
@@ -162,11 +163,16 @@ export function buildWhy(f,extra={}){
 export function attachWhy(pick,f,extra={}){
   const why=buildWhy(f,extra)
   const reasons=Array.isArray(extra.reasons)&&extra.reasons.length?extra.reasons:consensusReasons(pick)
+  const gate=assessHardGate(f,{home:extra.homeAvg||extra.home||null,away:extra.awayAvg||extra.away||null,favourite:pick?.favourite||null})
   return{
     ...pick,
     reasons,
     shortReason:reasons[0]||pick.shortReason||null,
     reason:reasons.join(' • '),
-    why
+    why,
+    redFlags:Array.isArray(pick?.redFlags)&&pick.redFlags.length?pick.redFlags:gate.flags,
+    hardGated:gate.blocked,
+    statsMismatch:gate.statsMismatch,
+    earlySeason:pick?.earlySeason===true||gate.earlySeason
   }
 }

@@ -74,3 +74,38 @@ test('All Picks skips early season, cups, top-five clashes and similar form',()=
     away:{ppg:1.2,gf:1.1,ga:1.0}
   }),'similar-form')
 })
+
+test('fewer than 5 current venue rounds is an early-season hard gate',()=>{
+  const short=fixture({earlySeason:false})
+  short.earlySeason=false
+  short.currentVenueSamples={home:3,away:4}
+  assert.equal(redFlagSkip(short),'early-season')
+  assert.equal(diagnoseGoalsBankerFixture({...short,marketOdds:[]}).skip,'early-season')
+})
+
+test('split top-five and bottom-three clashes hard-gate Goals Bankers',()=>{
+  const top=fixture({
+    homeSplit:{position:1,size:20,sampleReady:true,ppg:2.4},
+    awaySplit:{position:4,size:20,sampleReady:true,ppg:2.1}
+  })
+  const bottom=fixture({
+    homeSplit:{position:18,size:20,sampleReady:true,ppg:0.4},
+    awaySplit:{position:20,size:20,sampleReady:true,ppg:0.2}
+  })
+  assert.equal(redFlagSkip(top),'both-top-five')
+  assert.equal(redFlagSkip(bottom),'both-bottom-three')
+  assert.equal(diagnoseGoalsBankerFixture(top).skip,'both-top-five')
+  assert.equal(diagnoseGoalsBankerFixture(bottom).skip,'both-bottom-three')
+})
+
+test('overall stats that contradict home/away split are a stats-mismatch hard gate',()=>{
+  const clash=fixture()
+  clash.homeStats={played:5,ppg:2.40,gf:2.2,ga:0.6}
+  clash.awayStats={played:5,ppg:0.60,gf:0.6,ga:2.0}
+  clash.homeSplit={position:12,size:20,sampleReady:true,ppg:0.80,played:5}
+  clash.awaySplit={position:6,size:20,sampleReady:true,ppg:1.80,played:5}
+  assert.equal(redFlagSkip(clash,{
+    home:{ppg:0.80,gf:0.8,ga:1.6},
+    away:{ppg:1.80,gf:1.6,ga:0.8}
+  }),'stats-mismatch')
+})
