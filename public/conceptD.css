@@ -19,6 +19,7 @@
   --won: #22c55e;
   --lost: #ef4444;
   --void: #6b7280;
+  --postponed: #f59e0b;
   --border: rgba(255, 255, 255, 0.07);
   --border-strong: rgba(255, 255, 255, 0.12);
   --font: 'Space Grotesk', system-ui, sans-serif;
@@ -525,6 +526,11 @@ header {
   color: var(--void);
   border-color: rgba(107, 114, 128, 0.4);
 }
+.match-badge.postponed {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--postponed);
+  border-color: rgba(245, 158, 11, 0.45);
+}
 .match-badge.upcoming {
   background: var(--surface-3);
   color: var(--muted);
@@ -645,6 +651,11 @@ header {
 .card.lost .match-mid-score {
   background: rgba(239, 68, 68, 0.32);
 }
+.card.postponed .match-mid-score,
+.match-mid-score.postponed {
+  background: rgba(245, 158, 11, 0.38);
+  color: #fff7ed;
+}
 .dialog .crest-matchup { margin: 8px 0 14px; }
 
 .pick {
@@ -676,6 +687,52 @@ header {
   letter-spacing: 0.08em;
   color: var(--faint);
   margin-bottom: 2px;
+}
+.pick-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pick-result,
+.m-result {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pick-result.won,
+.m-result.won,
+.match-badge.won {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--won);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+.pick-result.lost,
+.m-result.lost,
+.match-badge.lost {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--lost);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.pick-result.void,
+.m-result.void {
+  background: rgba(107, 114, 128, 0.2);
+  color: var(--void);
+  border-color: rgba(107, 114, 128, 0.4);
+}
+.pick-result.postponed,
+.m-result.postponed {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--postponed);
+  border-color: rgba(245, 158, 11, 0.45);
 }
 .odd {
   font-family: var(--mono);
@@ -1029,7 +1086,12 @@ body.modal-open { overflow: hidden; }
   padding: 10px 12px;
   margin: 10px 0;
   border-radius: 8px;
+  text-align: center;
 }
+.settled-summary.won { color: var(--won); border-color: rgba(34, 197, 94, 0.35); }
+.settled-summary.lost { color: var(--lost); border-color: rgba(239, 68, 68, 0.35); }
+.settled-summary.void { color: var(--void); }
+.settled-summary.postponed { color: var(--postponed); border-color: rgba(245, 158, 11, 0.4); }
 .close {
   height: 40px;
   margin-top: 18px;

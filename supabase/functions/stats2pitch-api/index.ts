@@ -166,22 +166,25 @@ function snapshotState(date:string,row:{board:any,generatedAt:string}|null){
   return{state:isFresh?'complete':row?'stale':'idle',date,generatedAt:raw||null,stale:!isFresh}
 }
 function normalizeFixture(x:any){
-  const status=String(x?.fixture?.status?.short||'').toUpperCase(),finished=FINISHED.has(status),live=['1H','HT','2H','ET','BT','P','INT','LIVE'].includes(status),cancelled=['CANC','PST','ABD','AWD','WO'].includes(status)
+  const status=String(x?.fixture?.status?.short||x?.status||'').toUpperCase(),finished=FINISHED.has(status),live=['1H','HT','2H','ET','BT','P','INT','LIVE'].includes(status),cancelled=['CANC','ABD','AWD','WO'].includes(status),postponed=status==='PST'
   const full=x?.score?.fulltime||{},half=x?.score?.halftime||{}
   return{
-    fixtureId:x?.fixture?.id,status,statusLong:x?.fixture?.status?.long||'',minute:x?.fixture?.status?.elapsed??null,kickoff:x?.fixture?.date,
+    fixtureId:x?.fixture?.id??x?.fixtureId,status,statusLong:x?.fixture?.status?.long||x?.statusLong||'',minute:x?.fixture?.status?.elapsed??x?.minute??null,kickoff:x?.fixture?.date||x?.kickoff,
     league:x?.league?.name||'',country:x?.league?.country||'',
-    home:{id:x?.teams?.home?.id,name:x?.teams?.home?.name||'',logo:x?.teams?.home?.logo||null,score:finite(full?.home)?Number(full.home):finite(x?.goals?.home)?Number(x.goals.home):null},
-    away:{id:x?.teams?.away?.id,name:x?.teams?.away?.name||'',logo:x?.teams?.away?.logo||null,score:finite(full?.away)?Number(full.away):finite(x?.goals?.away)?Number(x.goals.away):null},
-    halftime:{home:finite(half?.home)?Number(half.home):null,away:finite(half?.away)?Number(half.away):null},
-    finished,live,cancelled,matchState:finished?'settled':live?'live':cancelled?'settled':'upcoming'
+    home:{id:x?.teams?.home?.id,name:x?.teams?.home?.name||'',logo:x?.teams?.home?.logo||null,score:finite(full?.home)?Number(full.home):finite(x?.goals?.home)?Number(x.goals.home):finite(x?.home?.score)?Number(x.home.score):finite(x?.homeScore)?Number(x.homeScore):null},
+    away:{id:x?.teams?.away?.id,name:x?.teams?.away?.name||'',logo:x?.teams?.away?.logo||null,score:finite(full?.away)?Number(full.away):finite(x?.goals?.away)?Number(x.goals.away):finite(x?.away?.score)?Number(x.away.score):finite(x?.awayScore)?Number(x.awayScore):null},
+    halftime:{home:finite(half?.home)?Number(half.home):finite(x?.htHome)?Number(x.htHome):null,away:finite(half?.away)?Number(half.away):finite(x?.htAway)?Number(x.htAway):null},
+    finished,live,cancelled,postponed,matchState:finished?'settled':live?'live':(cancelled||postponed)?'settled':'upcoming'
   }
 }
 function nid(raw:any){const m=String(raw??'').match(/(\d+)$/);return m?Number(m[1]):null}
 function crest(id:any){return id?`https://img.sportradar.com/ls/crest/big/${id}.png`:null}
 function sportyStatus(ev:any){
   const raw=String(ev?.matchStatus||'').toLowerCase(),code=Number(ev?.status)
-  if(/cancel|abandon|postpon/.test(raw))return{short:'CANC',long:ev.matchStatus||'Cancelled'}
+  if(/postpon/.test(raw))return{short:'PST',long:ev.matchStatus||'Postponed'}
+  if(/cancel/.test(raw))return{short:'CANC',long:ev.matchStatus||'Cancelled'}
+  if(/abandon/.test(raw))return{short:'ABD',long:ev.matchStatus||'Abandoned'}
+  if(/walkover/.test(raw))return{short:'WO',long:ev.matchStatus||'Walkover'}
   if(/not[\s_-]*start|upcoming|ns\b/.test(raw)||code===0)return{short:'NS',long:ev.matchStatus||'Not started'}
   if(/end|finish|close|complete|\bft\b/.test(raw)||code===3)return{short:'FT',long:ev.matchStatus||'Match Finished'}
   if(/live|1st|2nd|half|\bht\b|pause|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
@@ -240,8 +243,10 @@ async function liveScores(date:string){
         const ftH=data?.result?.home??data?.periods?.ft?.home,ftA=data?.result?.away??data?.periods?.ft?.away
         const finished=Number.isFinite(Number(ftH))&&Number.isFinite(Number(ftA))
         const uts=Number(data?.time?.uts)
+        const short=data?.canceled||data?.cancelled?'CANC':data?.postponed?'PST':data?.walkover?'WO':finished?'FT':'NS'
+        const long=short==='CANC'?'Cancelled':short==='PST'?'Postponed':short==='WO'?'Walkover':finished?'Match Finished':'Not started'
         out.push({
-          fixture:{id:n,date:Number.isFinite(uts)?new Date(uts*1000).toISOString():null,status:{short:finished?'FT':'NS',long:finished?'Match Finished':'Not started'}},
+          fixture:{id:n,date:Number.isFinite(uts)?new Date(uts*1000).toISOString():null,status:{short,long}},
           league:{id:nid(data?._utid),name:data?.tournament?.name||'',country:data?.realcategory?.name||''},
           teams:{home:{id:homeId,name:home.mediumname||home.name||'',logo:crest(homeId)},away:{id:awayId,name:away.mediumname||away.name||'',logo:crest(awayId)}},
           goals:{home:finished?Number(ftH):null,away:finished?Number(ftA):null},
@@ -255,6 +260,7 @@ async function liveScores(date:string){
 function ou(s:any){const m=String(s||'').match(/\b(over|under)\s*([0-9]+(?:\.[0-9]+)?)/i);return m?{side:m[1].toLowerCase(),line:Number(m[2])}:null}
 function settle(p:any,f:any){
   if(!f)return{outcome:'pending',matchState:'upcoming'}
+  if(f.postponed||String(f.status||'').toUpperCase()==='PST')return{outcome:'postponed',matchState:'settled',...f}
   if(f.cancelled)return{outcome:'void',matchState:'settled',...f}
   if(!f.finished)return{outcome:'pending',matchState:f.matchState,...f}
   const h=Number(f.home?.score),a=Number(f.away?.score),market=String(p?.market||''),sel=norm(p?.selection)
@@ -271,10 +277,18 @@ function settle(p:any,f:any){
   else if(market==='first-half-winner'&&finite(f.halftime?.home)&&finite(f.halftime?.away)){const x=Number(f.halftime.home),y=Number(f.halftime.away);if(sel==='home'||sel==='1')outcome=win(x>y);else if(sel==='away'||sel==='2')outcome=win(y>x);else if(sel==='draw'||sel==='x')outcome=win(x===y)}
   return{outcome,matchState:'settled',...f}
 }
+function decidedOutcome(o:any){return ['won','lost','void','postponed'].includes(String(o||''))}
+function attachResult(p:any,current:any,stored:any){
+  const live=current?settle(p,current):null
+  if(live&&decidedOutcome(live.outcome))return live
+  if(live&&live.matchState==='live')return live
+  if(stored&&decidedOutcome(stored.outcome))return stored
+  return live||stored||{outcome:'pending',matchState:Date.parse(p?.kickoff)>Date.now()?'upcoming':'pending'}
+}
 function performanceFromBoards(boards:any[]){
   const groups=new Map<string,any>(),summary={picks:0,won:0,lost:0,void:0,pending:0,winRate:0}
   for(const b of boards)for(const p of b?.bestPicks||[]){
-    const r=b?.results?.[String(p.fixtureId)],outcome=r?.outcome||'pending';summary.picks++;if(outcome==='won')summary.won++;else if(outcome==='lost')summary.lost++;else if(outcome==='void')summary.void++;else summary.pending++
+    const r=b?.results?.[String(p.fixtureId)],outcome=r?.outcome||'pending';summary.picks++;if(outcome==='won')summary.won++;else if(outcome==='lost')summary.lost++;else if(outcome==='void'||outcome==='postponed')summary.void++;else summary.pending++
     if(!['won','lost'].includes(outcome))continue
     for(const dimension of ['market','country','league','confidence']){
       const value=dimension==='confidence'?(Number(p?.consensus)===100?'100%':`${Number(p?.consensus)||0}%`):String(p?.[dimension]||'Unknown'),k=`${dimension}|${value}`,g=groups.get(k)||{dimension,value,picks:0,won:0,lost:0}
@@ -321,10 +335,11 @@ Deno.serve(async req=>{
       const date=requestedDate(url),row=await snapshot(date),board=row?.board||emptyBoard(date)
       let fixtures:any[]=[];try{fixtures=await liveScores(date)}catch{}
       const map=new Map(fixtures.map(f=>[String(f.fixtureId),f])),stored=board?.results||{}
-      const picks=compactResultRows((board?.bestPicks||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):stored[String(p.fixtureId)]||{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}}))
-      const varTips=compactResultRows((board?.varTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}}))
-      const filterTips=compactResultRows((board?.filterTips||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}}))
-      const goalsBankers=compactResultRows((board?.goalsBankers||[]).map((p:any)=>{const current=map.get(String(p.fixtureId));const result=current?settle(p,current):{outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'};return{...p,result}}))
+      const withResult=(rows:any[])=>compactResultRows((rows||[]).map((p:any)=>({...p,result:attachResult(p,map.get(String(p.fixtureId)),stored[String(p.fixtureId)])})))
+      const picks=withResult(board?.bestPicks)
+      const varTips=withResult(board?.varTips)
+      const filterTips=withResult(board?.filterTips)
+      const goalsBankers=withResult(board?.goalsBankers)
       return json({date,picks,varTips,filterTips,goalsBankers})
     }
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}

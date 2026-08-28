@@ -6,7 +6,7 @@ import {loadBoard,listBoards,clearBoard} from './store.js'
 import {startRefresh,refreshStatus} from './refresh.js'
 import {sportyEventFixtures,sportyFixturesByDate} from './sportyBet.js'
 import {gismoMatches} from './sportyStats.js'
-import {normalizeFixtureStatus,settlePick} from './settlement.js'
+import {normalizeFixtureStatus,resolveResult} from './settlement.js'
 import {buildLearningProfiles} from './learning.js'
 import {ENGINE_VERSION} from './config.js'
 import {eliteFeedAuthorized,buildEliteFeed} from './eliteExport.js'
@@ -19,7 +19,7 @@ const today=()=>new Date().toISOString().slice(0,10)
 const addDays=(date,n)=>{const d=new Date(`${date}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 const send=(res,status,body,cache='no-store')=>{const s=typeof body==='string'?body:JSON.stringify(body);res.writeHead(status,{'Content-Type':typeof body==='string'?'text/plain; charset=utf-8':'application/json; charset=utf-8','Cache-Control':cache});res.end(s)}
 async function json(req){let s='';for await(const c of req)s+=c;return s?JSON.parse(s):{}}
-function performance(boards){const summary={picks:0,won:0,lost:0,void:0,pending:0,winRate:0},groups=new Map();for(const b of boards)for(const p of b?.bestPicks||[]){const r=b?.results?.[String(p.fixtureId)],o=r?.outcome||'pending';summary.picks++;if(o==='won')summary.won++;else if(o==='lost')summary.lost++;else if(o==='void')summary.void++;else summary.pending++;if(!['won','lost'].includes(o))continue;for(const dimension of ['market','country','league','confidence']){const value=dimension==='confidence'?(Number(p?.consensus)===100?'100%':`${Number(p?.consensus)||0}%`):String(p?.[dimension]||'Unknown'),k=`${dimension}|${value}`,g=groups.get(k)||{dimension,value,picks:0,won:0,lost:0};g.picks++;if(o==='won')g.won++;else g.lost++;groups.set(k,g)}}const decided=summary.won+summary.lost;summary.winRate=decided?Math.round(summary.won*1000/decided)/10:0;return{summary,groups:[...groups.values()].map(g=>({...g,winRate:Math.round(g.won*1000/g.picks)/10})).sort((a,b)=>b.picks-a.picks)}}
+function performance(boards){const summary={picks:0,won:0,lost:0,void:0,pending:0,winRate:0},groups=new Map();for(const b of boards)for(const p of b?.bestPicks||[]){const r=b?.results?.[String(p.fixtureId)],o=r?.outcome||'pending';summary.picks++;if(o==='won')summary.won++;else if(o==='lost')summary.lost++;else if(o==='void'||o==='postponed')summary.void++;else summary.pending++;if(!['won','lost'].includes(o))continue;for(const dimension of ['market','country','league','confidence']){const value=dimension==='confidence'?(Number(p?.consensus)===100?'100%':`${Number(p?.consensus)||0}%`):String(p?.[dimension]||'Unknown'),k=`${dimension}|${value}`,g=groups.get(k)||{dimension,value,picks:0,won:0,lost:0};g.picks++;if(o==='won')g.won++;else g.lost++;groups.set(k,g)}}const decided=summary.won+summary.lost;summary.winRate=decided?Math.round(summary.won*1000/decided)/10:0;return{summary,groups:[...groups.values()].map(g=>({...g,winRate:Math.round(g.won*1000/g.picks)/10})).sort((a,b)=>b.picks-a.picks)}}
 async function resultPayload(date){
   const board=await loadBoard(date)||{bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],results:{}}
   const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[])]
@@ -31,15 +31,13 @@ async function resultPayload(date){
   const missing=published.map(p=>p.fixtureId).filter(id=>id!=null&&!have.has(String(id)))
   if(missing.length){try{fixtures=fixtures.concat(await gismoMatches(missing))}catch{}}
   const map=new Map(fixtures.map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]}))
+  const stored=board.results||{}
   const pending=p=>({outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'})
-  const withResult=(p,stored)=>{
-    if(map.has(String(p.fixtureId)))return{...p,result:settlePick(p,map.get(String(p.fixtureId)))}
-    return{...p,result:stored||pending(p)}
-  }
-  const picks=compactResultRows((board.bestPicks||[]).map(p=>withResult(p,board.results?.[String(p.fixtureId)])))
-  const varTips=compactResultRows((board.varTips||[]).map(p=>withResult(p,null)))
-  const filterTips=compactResultRows((board.filterTips||[]).map(p=>withResult(p,null)))
-  const goalsBankers=compactResultRows((board.goalsBankers||[]).map(p=>withResult(p,null)))
+  const withResult=p=>({...p,result:resolveResult(p,map.get(String(p.fixtureId)),stored[String(p.fixtureId)])||pending(p)})
+  const picks=compactResultRows((board.bestPicks||[]).map(withResult))
+  const varTips=compactResultRows((board.varTips||[]).map(withResult))
+  const filterTips=compactResultRows((board.filterTips||[]).map(withResult))
+  const goalsBankers=compactResultRows((board.goalsBankers||[]).map(withResult))
   return{date,picks,varTips,filterTips,goalsBankers,fixtures:[...map.values()]}
 }
 async function api(req,res,url){

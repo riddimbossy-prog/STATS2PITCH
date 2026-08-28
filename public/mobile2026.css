@@ -208,7 +208,9 @@
   .card.upcoming .team-score { display: none !important; }
   .match-badge.live,
   .match-badge.won,
-  .match-badge.lost {
+  .match-badge.lost,
+  .match-badge.void,
+  .match-badge.postponed {
     top: 12px;
     right: 12px;
     z-index: 3;

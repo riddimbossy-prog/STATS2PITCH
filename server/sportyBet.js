@@ -83,10 +83,15 @@ function iso(ms){return Number.isFinite(Number(ms))?new Date(Number(ms)).toISOSt
 function statusOf(ev){
   const raw=String(ev?.matchStatus||'').toLowerCase()
   const code=Number(ev?.status)
-  if(/cancel|abandon|postpon/.test(raw))return{short:'CANC',long:ev.matchStatus||'Cancelled'}
+  if(/postpon/.test(raw))return{short:'PST',long:ev.matchStatus||'Postponed'}
+  if(/cancel/.test(raw))return{short:'CANC',long:ev.matchStatus||'Cancelled'}
+  if(/abandon/.test(raw))return{short:'ABD',long:ev.matchStatus||'Abandoned'}
+  if(/walkover/.test(raw))return{short:'WO',long:ev.matchStatus||'Walkover'}
   if(/not[\s_-]*start|upcoming|ns\b/.test(raw)||code===0)return{short:'NS',long:ev.matchStatus||'Not started'}
   if(/end|finish|close|complete|\bft\b/.test(raw)||code===3)return{short:'FT',long:ev.matchStatus||'Match Finished'}
   if(/live|1st|2nd|half|\bht\b|pause|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
+  const goals=scoreOf(ev)
+  if(Number.isFinite(Number(goals?.home))&&Number.isFinite(Number(goals?.away))&&code>=3)return{short:'FT',long:ev.matchStatus||'Match Finished'}
   return{short:'NS',long:ev.matchStatus||'Not started'}
 }
 

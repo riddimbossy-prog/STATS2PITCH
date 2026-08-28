@@ -97,6 +97,22 @@ test('SportyBet events keep numeric fixture ids and the raw event id',()=>{
   assert.equal(row.sporty.markets.length,palaceMarkets.length)
 })
 
+test('SportyBet postponed events keep PST instead of cancelled',()=>{
+  resetSportyCache()
+  const row=sportyEventToFixture({
+    eventId:'sr:match:11',
+    estimateStartTime:Date.parse('2026-08-27T18:00:00Z'),
+    status:4,
+    matchStatus:'Postponed',
+    homeTeamId:'sr:competitor:10',
+    homeTeamName:'Home FC',
+    awayTeamId:'sr:competitor:20',
+    awayTeamName:'Away FC',
+    markets:[]
+  },{id:'sr:tournament:17',name:'Premier League',categoryName:'England'})
+  assert.equal(row.fixture.status.short,'PST')
+})
+
 test('SportyBet match-details game IDs query event?gameId=',()=>{
   assert.deepEqual(eventQuery('44203'),{gameId:'44203'})
   assert.deepEqual(eventQuery('sr:match:73399176'),{eventId:'sr:match:73399176'})

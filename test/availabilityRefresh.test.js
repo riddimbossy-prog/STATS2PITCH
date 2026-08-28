@@ -50,6 +50,16 @@ test('result rows compact to fixture id and outcome only',()=>{
 test('settle job includes Goals Bankers',async()=>{
   const src=await read('scripts/settleResults.js')
   assert.match(src,/goalsBankers/)
+  assert.match(src,/postponed/)
+})
+
+test('public boards show won lost void and postponed',async()=>{
+  const files=await Promise.all(['public/appCrests.js','public/varTips.js','public/filterTips.js','public/goalsBankers.js'].map(read))
+  for(const src of files){
+    assert.match(src,/POSTPONED/)
+    assert.match(src,/pick-result/)
+    assert.match(src,/outcomeLabel/)
+  }
 })
 
 test('public clients request a slim board view and reuse a cached board',async()=>{
@@ -61,6 +71,6 @@ test('public clients request a slim board view and reuse a cached board',async()
     assert.match(src,/warmNeighbors/)
   }
   assert.match(files[4],/sessionStorage/)
-  assert.match(files[5],/stats2pitch-shell-v5\.5\.10/)
+  assert.match(files[5],/stats2pitch-shell-v5\.5\.11/)
   assert.match(files[5],/\/net\.js/)
 })

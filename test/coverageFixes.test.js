@@ -21,6 +21,31 @@ test('board settlement produces summary',()=>{
   assert.equal(settleBoard(board,[raw]).resultSummary.won,1)
 })
 
+test('postponed matches settle as postponed, cancelled as void',()=>{
+  const pst={fixture:{id:11,status:{short:'PST',long:'Postponed'}},teams:{home:{name:'A'},away:{name:'B'}},goals:{home:null,away:null}}
+  const canc={fixture:{id:12,status:{short:'CANC'}},teams:{home:{name:'A'},away:{name:'B'}},goals:{home:null,away:null}}
+  assert.equal(settlePick({market:'match-winner',selection:'Home'},pst).outcome,'postponed')
+  assert.equal(settlePick({market:'both-teams-score',selection:'Yes'},canc).outcome,'void')
+})
+
+test('settlement keeps a stored win if live feed is still pending',()=>{
+  const board={
+    bestPicks:[{fixtureId:10,market:'match-winner',selection:'Home'}],
+    results:{10:{outcome:'won',matchState:'settled',homeScore:2,awayScore:0}}
+  }
+  const raw={fixture:{id:10,status:{short:'NS'}},teams:{home:{name:'A'},away:{name:'B'}},goals:{home:null,away:null},score:{fulltime:{home:null,away:null}}}
+  const next=settleBoard(board,[raw])
+  assert.equal(next.results['10'].outcome,'won')
+})
+
+test('postponed fixtures count separately on the board',()=>{
+  const board={bestPicks:[{fixtureId:13,market:'total-goals',selection:'Over 2.5'}]}
+  const raw={fixture:{id:13,status:{short:'PST',long:'Postponed'}},teams:{home:{name:'A'},away:{name:'B'}},goals:{home:null,away:null}}
+  const next=settleBoard(board,[raw])
+  assert.equal(next.results['13'].outcome,'postponed')
+  assert.equal(next.resultSummary.postponed,1)
+})
+
 test('learning only tightens after meaningful samples',()=>{
   const picks=Array.from({length:20},(_,i)=>({fixtureId:i,country:'Ghana',league:'Premier',market:'total-goals'}))
   const board={bestPicks:picks,results:Object.fromEntries(picks.map((p,i)=>[String(p.fixtureId),{outcome:i<10?'won':'lost'}]))}
