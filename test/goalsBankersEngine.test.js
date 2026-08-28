@@ -171,13 +171,15 @@ test('Why copy explains the published market against the other three',()=>{
   assert.match(twoBlob,/Over 2\.5/)
   assert.match(twoBlob,/GG/)
   assert.match(twoBlob,/passed over/i)
+  assert.match(twoBlob,/one-sided favourite/)
+  assert.match(twoBlob,/ahead of the win/)
   assert.doesNotMatch(twoBlob,/streak|first-match|2-in-a-row|MISMATCH|BALANCED/i)
 
   const win=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.30,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.60,awayO15:2.20}})).pick
   assert.equal(win.route,'FAV_WIN')
   const winBlob=win.reasons.join(' ')
-  assert.match(winBlob,/Favourite win|short-priced favourite/i)
-  assert.match(winBlob,/Favourite 2\+|2\+ is not/)
+  assert.match(winBlob,/to win|Favourite win|short-priced favourite/i)
+  assert.match(winBlob,/Favourite 2\+|2\+ did not qualify/)
   assert.match(winBlob,/Over 2\.5/)
   assert.match(winBlob,/GG/)
   assert.match(winBlob,/passed over/i)
@@ -199,6 +201,14 @@ test('Why copy explains the published market against the other three',()=>{
   assert.match(ggBlob,/2\+/)
   assert.match(ggBlob,/Over 2\.5/)
   assert.match(ggBlob,/passed over/i)
+  assert.match(ggBlob,/even match/)
+  assert.match(ggBlob,/not used/)
+
+  const replaced=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.35,awayWin:8.00,over25:1.60,bttsYes:1.62,homeO15:1.60}})).pick
+  assert.equal(replaced.route,'OVER_2.5')
+  assert.match(replaced.reasons.join(' '),/replaced the win/i)
+  assert.match(replaced.marketWhy.headline,/replaced the win/)
+  assert.doesNotMatch(replaced.reasons.join(' '),/V2|first-match|streak|MISMATCH/i)
 })
 
 test('fixture packs favourite 2+ as team Over 1.5, never the streak price',()=>{
