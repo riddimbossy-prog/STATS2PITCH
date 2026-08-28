@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Stats2Pitch">
+  <rect width="512" height="512" fill="#070d0a"/>
+  <g fill="none" stroke="#f4f7f5" stroke-width="10" stroke-linejoin="miter">
+    <rect x="64" y="64" width="384" height="384"/>
+    <line x1="256" y1="64" x2="256" y2="448"/>
+    <rect x="64" y="147" width="86" height="218"/>
+    <rect x="64" y="196" width="38" height="120"/>
+    <circle cx="256" cy="256" r="66"/>
+  </g>
+  <text x="256" y="274" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-weight="800" font-size="96" fill="#159447">2</text>
+</svg>
