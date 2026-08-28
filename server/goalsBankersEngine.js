@@ -255,6 +255,8 @@ function packPick(fixture,odds,decision,published){
     earlySeason:fixture.earlySeason===true,
     sportyEventId:fixture.sportyEventId||null
   }
+  const marketWhy=goalsMarketWhy(pick)
+  if(marketWhy)pick.marketWhy=marketWhy
   return attachWhy(pick,fixture,{reasons:publicReasons(pick),last5Home,last5Away,lastMatchesHome,lastMatchesAway})
 }
 

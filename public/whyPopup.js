@@ -96,55 +96,78 @@ function bankerHtml(r,esc,banker){
 
 function px(v){const n=Number(v);return Number.isFinite(n)?n.toFixed(2):null}
 function vs(a,b){if(a&&b)return` (${a} vs ${b})`;return a?` (${a})`:''}
+function goalsType(pick){
+  const t=String(pick?.classification||pick?.why?.classification||'')
+  return t==='MISMATCH'||t==='STRONG'||t==='LEAN'||t==='BALANCED'?t:null
+}
+function shapeLine(type){
+  if(type==='MISMATCH')return'a one-sided favourite'
+  if(type==='STRONG')return'a clear favourite'
+  if(type==='LEAN')return'a slight favourite'
+  if(type==='BALANCED')return'an even match'
+  return'this matchup'
+}
 
-function chosenHeadline(route,fav,price){
-  if(route==='FAV_WIN')return`${fav} is the short-priced favourite${price?` at ${price}`:''}. Favourite win is the published Goals Banker because this matchup is one-sided enough to take the win instead of a goals market.`
-  if(route==='FAV_2PLUS')return`${fav} 2+${price?` at ${price}`:''} is the published Goals Banker. They are the favourite and priced to score at least twice, which is a stronger favourite-side call than the straight win or a shared goals market.`
-  if(route==='OVER_2.5')return`Over 2.5${price?` at ${price}`:''} is the published Goals Banker. The game is priced as a goals match, so the total is the cleaner market than a favourite win or favourite 2+.`
-  if(route==='GG')return`Both teams to score${price?` at ${price}`:''} is the published Goals Banker. Both sides are priced to get on the scoresheet, so GG beats a favourite-side call.`
+function chosenHeadline(route,fav,price,type){
+  const at=price?` at ${price}`:''
+  const shape=shapeLine(type)
+  if(route==='FAV_2PLUS')return`${fav} 2+${at} is the published Goals Banker. This is ${shape}, and the favourite is priced to score at least twice — so 2+ is taken instead of the win, Over 2.5 or GG.`
+  if(route==='FAV_WIN')return`${fav} to win${at} is the published Goals Banker. This is ${shape}. Favourite 2+ did not qualify, and a goals market is not the replacement for the win.`
+  if(route==='OVER_2.5'){
+    if(type==='BALANCED'||type==='LEAN')return`Over 2.5${at} is the published Goals Banker. This is ${shape}, so favourite win and favourite 2+ are not used. The total is the goals market that qualified.`
+    if(type==='MISMATCH'||type==='STRONG')return`Over 2.5${at} is the published Goals Banker. Goals overtook the favourite-side markets in ${shape}.`
+    return`Over 2.5${at} is the published Goals Banker. The game is priced as a goals match, so the total is the cleaner market than a favourite win or favourite 2+.`
+  }
+  if(route==='GG'){
+    if(type==='BALANCED'||type==='LEAN')return`Both teams to score${at} is the published Goals Banker. This is ${shape}, so favourite win and favourite 2+ are not used. GG is the both-teams market that qualified.`
+    return`Both teams to score${at} is the published Goals Banker. Both sides are priced to get on the scoresheet, so GG beats a favourite-side call.`
+  }
   return''
 }
 
-function passedReason(chosen,other,fav,prices){
+function passedReason(chosen,other,fav,prices,type){
   const a=prices[chosen],b=prices[other]
-  if(!b)return`${GOAL_LABELS[other]} was not clearly priced, so it could not beat the published market.`
+  const even=type==='BALANCED'||type==='LEAN'
+  const oneSided=type==='MISMATCH'||type==='STRONG'
   if(other==='FAV_WIN'){
-    if(chosen==='FAV_2PLUS')return`${fav}'s 2+ is the stronger favourite-side market than the straight win${vs(a,b)}.`
-    return`This is not a one-sided win call. The published market is a goals pick, not ${fav} to win at ${b}.`
+    if(even)return`Favourite win is not used in ${shapeLine(type)}. This pick is a goals market.`
+    if(chosen==='FAV_2PLUS')return`${fav} is priced to score twice, so 2+ is published instead of the straight win${vs(a,b)}.`
+    if(chosen==='OVER_2.5')return`Over 2.5 replaced the favourite win — the total is the goals market that qualified${vs(a,b)}.`
+    return`Favourite win is not used here. The published market is a goals pick, not ${fav} to win${b?` at ${b}`:''}.`
   }
   if(other==='FAV_2PLUS'){
-    if(chosen==='FAV_WIN')return`${fav} 2+ is not the sharper favourite-side price${vs(a,b)}. The extra goal is not required for this call.`
-    return`This pick is not about ${fav} running up 2+ at ${b}. The published market is the shared goals side of the match.`
+    if(even)return`Favourite 2+ is not used in ${shapeLine(type)}. This pick is a shared goals market.`
+    if(chosen==='FAV_WIN')return`${fav} 2+ did not qualify — the extra goal is not priced tightly enough to beat the win${vs(a,b)}.`
+    if(chosen==='OVER_2.5')return`Favourite 2+ did not qualify ahead of the total. Over 2.5 is the published goals market${vs(a,b)}.`
+    return`This is not ${fav} running up 2+${b?` at ${b}`:''}. GG is the published both-teams market.`
   }
   if(other==='OVER_2.5'){
-    if(chosen==='GG'){
-      if(a&&Number(a)<=Number(b))return`GG is the sharper open-game price than Over 2.5${vs(a,b)}.`
-      return`Over 2.5 is available at ${b}, but GG is the published goals market because both sides are in this game.`
-    }
-    if(chosen==='FAV_WIN')return`Over 2.5 is not short enough to take goals instead of the favourite win${vs(a,b)}.`
-    return`Over 2.5 at ${b} was passed over — this pick is ${fav} scoring twice, not a high match total.`
+    if(!b)return`Over 2.5 was not clearly priced, so it could not beat the published market.`
+    if(chosen==='GG')return`GG qualified as the both-teams market. Over 2.5 is the other goals option and was not taken${vs(a,b)}.`
+    if(chosen==='FAV_WIN')return`Over 2.5 is not short enough to replace the favourite win${vs(a,b)}.`
+    return`A shared total is not the call — this pick is ${fav} scoring twice, not Over 2.5 at ${b}.`
   }
-  if(chosen==='OVER_2.5'){
-    if(a&&Number(a)<=Number(b))return`Over 2.5 is the sharper goals price than GG${vs(a,b)}.`
-    return`GG is available at ${b}, but the game total is the published Goals Banker.`
-  }
-  if(chosen==='FAV_WIN')return`GG is not the call — this matchup is built around ${fav}, not both sides scoring (${b}).`
-  return`GG is not the call — the opponent is not the scoring side this pick is built on (${b}).`
+  if(!b)return`GG was not clearly priced, so it could not beat the published market.`
+  if(oneSided)return`GG is not used in ${shapeLine(type)} — the opponent is not the scoring side this pick is built on (${b}).`
+  if(chosen==='OVER_2.5')return`Over 2.5 qualified as the goals market. GG is the other goals option and was not taken${vs(a,b)}.`
+  return`GG is not the published market (${b}).`
 }
 
 export function goalsMarketWhy(pick){
   const route=String(pick?.route||'')
   if(!GOAL_ROUTES.includes(route))return null
   if(pick?.engine&&pick.engine!=='goals-bankers-v1')return null
+  if(pick?.marketWhy?.headline&&Array.isArray(pick.marketWhy.passed))return pick.marketWhy
   const book=pick?.oddsBook||{}
   const prices={FAV_WIN:px(book.fav_odds),FAV_2PLUS:px(book.fav_2plus),'OVER_2.5':px(book.over25),GG:px(book.btts_yes)}
   const fav=pick?.favourite==='home'?pick.home:pick?.favourite==='away'?pick.away:(pick?.home||'the favourite')
+  const type=goalsType(pick)
   return{
     route,
     chosen:GOAL_LABELS[route],
     price:prices[route],
-    headline:chosenHeadline(route,fav,prices[route]),
-    passed:GOAL_ROUTES.filter(id=>id!==route).map(id=>({id,label:GOAL_LABELS[id],price:prices[id],reason:passedReason(route,id,fav,prices)}))
+    headline:chosenHeadline(route,fav,prices[route],type),
+    passed:GOAL_ROUTES.filter(id=>id!==route).map(id=>({id,label:GOAL_LABELS[id],price:prices[id],reason:passedReason(route,id,fav,prices,type)}))
   }
 }
 

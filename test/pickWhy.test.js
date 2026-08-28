@@ -86,21 +86,40 @@ test('Goals Bankers why explains the chosen market over the other three',()=>{
   const pick={
     engine:'goals-bankers-v1',
     route:'FAV_2PLUS',
+    classification:'MISMATCH',
     home:'Home FC',
     away:'Away FC',
     favourite:'home',
-    oddsBook:{fav_odds:1.28,fav_2plus:1.32,over25:1.90,btts_yes:1.90}
+    oddsBook:{fav_odds:1.28,fav_2plus:1.32,over25:1.90,btts_yes:1.90,opp_odds:8.00}
   }
   const why=goalsMarketWhy(pick)
   assert.equal(why.chosen,'Favourite 2+')
   assert.equal(why.passed.length,3)
   assert.deepEqual(why.passed.map(x=>x.label),['Favourite win','Over 2.5','GG'])
+  assert.match(why.headline,/one-sided favourite/)
+  assert.match(why.passed.find(x=>x.id==='FAV_WIN').reason,/score twice|straight win/)
+  assert.match(why.passed.find(x=>x.id==='GG').reason,/not used/)
   const html=whySectionHtml(pick)
   assert.match(html,/Why not the other markets/)
   assert.match(html,/Favourite win/)
   assert.match(html,/Over 2\.5/)
   assert.match(html,/>GG/)
-  assert.doesNotMatch(html,/Goals Streak|first-match|2-in-a-row|1\.10/)
+  assert.doesNotMatch(html,/Goals Streak|first-match|2-in-a-row|1\.10|MISMATCH|LEAN|BALANCED/)
+
+  const even={
+    engine:'goals-bankers-v1',
+    route:'OVER_2.5',
+    classification:'BALANCED',
+    home:'Home FC',
+    away:'Away FC',
+    favourite:'home',
+    oddsBook:{fav_odds:1.90,fav_2plus:1.80,over25:1.55,btts_yes:1.85,opp_odds:3.40}
+  }
+  const evenWhy=goalsMarketWhy(even)
+  assert.match(evenWhy.headline,/even match/)
+  assert.match(evenWhy.passed.find(x=>x.id==='FAV_WIN').reason,/not used/)
+  assert.match(evenWhy.passed.find(x=>x.id==='FAV_2PLUS').reason,/not used/)
+  assert.doesNotMatch(evenWhy.headline,/BALANCED|first-match/)
   assert.equal(goalsMarketWhy({route:'over-25',engine:'sporty-filter-v1'}),null)
 })
 
