@@ -162,6 +162,45 @@ test('threshold card shortcuts hold on the full pipeline',()=>{
   assert.equal(decide({fav_odds:1.70,opp_odds:5.50,over25:1.90,btts_yes:1.60,fav_2plus:1.70}).route,'SKIP')
 })
 
+test('Why copy explains the published market against the other three',()=>{
+  const two=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.28,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.32,awayO15:2.10}})).pick
+  assert.equal(two.route,'FAV_2PLUS')
+  const twoBlob=two.reasons.join(' ')
+  assert.match(twoBlob,/2\+/)
+  assert.match(twoBlob,/Favourite win|straight win/i)
+  assert.match(twoBlob,/Over 2\.5/)
+  assert.match(twoBlob,/GG/)
+  assert.match(twoBlob,/passed over/i)
+  assert.doesNotMatch(twoBlob,/streak|first-match|2-in-a-row|MISMATCH|BALANCED/i)
+
+  const win=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.30,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.60,awayO15:2.20}})).pick
+  assert.equal(win.route,'FAV_WIN')
+  const winBlob=win.reasons.join(' ')
+  assert.match(winBlob,/Favourite win|short-priced favourite/i)
+  assert.match(winBlob,/Favourite 2\+|2\+ is not/)
+  assert.match(winBlob,/Over 2\.5/)
+  assert.match(winBlob,/GG/)
+  assert.match(winBlob,/passed over/i)
+
+  const over=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.50,awayWin:4.00,draw:4.20,over25:1.52,bttsYes:1.75,homeO15:1.55,awayO15:2.00}})).pick
+  assert.equal(over.route,'OVER_2.5')
+  const overBlob=over.reasons.join(' ')
+  assert.match(overBlob,/Over 2\.5/)
+  assert.match(overBlob,/Favourite win/i)
+  assert.match(overBlob,/Favourite 2\+|2\+/)
+  assert.match(overBlob,/GG/)
+  assert.match(overBlob,/passed over/i)
+
+  const gg=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.81,awayWin:3.50,draw:3.40,over25:1.71,bttsYes:1.65,homeO15:1.80,awayO15:1.90}})).pick
+  assert.equal(gg.route,'GG')
+  const ggBlob=gg.reasons.join(' ')
+  assert.match(ggBlob,/Both teams to score|GG/)
+  assert.match(ggBlob,/Favourite win/i)
+  assert.match(ggBlob,/2\+/)
+  assert.match(ggBlob,/Over 2\.5/)
+  assert.match(ggBlob,/passed over/i)
+})
+
 test('fixture packs favourite 2+ as team Over 1.5, never the streak price',()=>{
   const home=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.28,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.32,awayO15:2.10}})).pick
   assert.equal(home.route,'FAV_2PLUS')

@@ -864,6 +864,48 @@ header {
 .why-tip li { margin: 0 0 7px; }
 .why-lines { margin: 0 0 16px; }
 .why-empty { margin: 0 0 12px; color: var(--muted); }
+.why-market { margin: 0 0 16px; }
+.why-market-chosen {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.45;
+}
+.why-market h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.why-passed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.why-passed li {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+.why-passed-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fbbf24;
+}
 .why-consensus {
   display: grid;
   grid-template-columns: 1fr 1fr;

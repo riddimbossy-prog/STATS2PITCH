@@ -1,6 +1,7 @@
 import {ENGINE_VERSION} from './config.js'
 import {attachWhy,last5Form,last5Overall,fixtureHasStats} from './pickWhy.js'
 import {isSrlMatch} from './redFlags.js'
+import {goalsMarketWhy} from '../public/whyPopup.js'
 
 export const ENGINE_ID='goals-bankers-v1'
 export const STREAK_MIN=1.10
@@ -207,13 +208,9 @@ function publishedFor(route,odds){
 }
 
 function publicReasons(pick){
-  const fav=pick.favourite==='home'?pick.home:pick.away
-  const price=Number(pick.odds).toFixed(2)
-  if(pick.route==='FAV_WIN')return[`${fav} is the priced favourite at ${price}.`]
-  if(pick.route==='FAV_2PLUS')return[`${fav} 2+ is the published Goals Banker at ${price}.`]
-  if(pick.route==='OVER_2.5')return[`Over 2.5 at ${price} is the Goals Banker for this match.`]
-  if(pick.route==='GG')return[`Both teams to score at ${price} is the Goals Banker.`]
-  return['No Goals Banker for this match.']
+  const why=goalsMarketWhy(pick)
+  if(!why)return['No Goals Banker for this match.']
+  return[why.headline,...why.passed.map(row=>`${row.label} was passed over: ${row.reason}`)]
 }
 
 function packPick(fixture,odds,decision,published){

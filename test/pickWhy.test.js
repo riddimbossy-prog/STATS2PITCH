@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {last5Form,last5Overall,h2hSnapshot,consensusReasons,varPublicReasons,attachWhy,fixtureHasStats,teamStats} from '../server/pickWhy.js'
 import {analyzeFixture} from '../server/engine.js'
 import {diagnoseAwayFavFixture} from '../server/awayFavEngine.js'
+import {goalsMarketWhy,whySectionHtml} from '../public/whyPopup.js'
 import {readFile} from 'node:fs/promises'
 
 const finished=(id,homeId,awayId,h,a,home='Home FC',away='Away FC')=>({
@@ -81,6 +82,28 @@ test('public why lines stay human readable',()=>{
   assert.ok(varLines.some(x=>/Leeds is the priced favourite/.test(x)))
 })
 
+test('Goals Bankers why explains the chosen market over the other three',()=>{
+  const pick={
+    engine:'goals-bankers-v1',
+    route:'FAV_2PLUS',
+    home:'Home FC',
+    away:'Away FC',
+    favourite:'home',
+    oddsBook:{fav_odds:1.28,fav_2plus:1.32,over25:1.90,btts_yes:1.90}
+  }
+  const why=goalsMarketWhy(pick)
+  assert.equal(why.chosen,'Favourite 2+')
+  assert.equal(why.passed.length,3)
+  assert.deepEqual(why.passed.map(x=>x.label),['Favourite win','Over 2.5','GG'])
+  const html=whySectionHtml(pick)
+  assert.match(html,/Why not the other markets/)
+  assert.match(html,/Favourite win/)
+  assert.match(html,/Over 2\.5/)
+  assert.match(html,/>GG/)
+  assert.doesNotMatch(html,/Goals Streak|first-match|2-in-a-row|1\.10/)
+  assert.equal(goalsMarketWhy({route:'over-25',engine:'sporty-filter-v1'}),null)
+})
+
 test('attachWhy preserves pick fields',()=>{
   const next=attachWhy({fixtureId:7,home:'A',away:'B',odds:1.3,homeConsensus:100,awayConsensus:100,displaySelection:'Under 2.5'},analyzedFixture())
   assert.equal(next.fixtureId,7)
@@ -126,6 +149,8 @@ test('All Picks, VAR Tips, Filter Tips and Goals Bankers open a why popup on mat
   assert.match(goalsJs,/bindWhyModal/)
   assert.match(goalsHtml,/id="modal"/)
   assert.match(popup,/Why this pick was chosen/)
+  assert.match(popup,/Why not the other markets/)
+  assert.match(popup,/goalsMarketWhy/)
   assert.match(popup,/last matches/)
   assert.match(popup,/Team stats/)
   assert.doesNotMatch(popup,/Goals Streak|first-match/)
