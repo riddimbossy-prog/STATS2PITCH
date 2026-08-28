@@ -92,12 +92,13 @@ test('All Picks no longer brand the VAR engine on the public pages',async()=>{
 })
 
 test('Filter, VAR and Goals mobile cards do not yank the page or overlay crests',async()=>{
-  const [filterJs,varJs,goalsJs,app,css,pwa]=await Promise.all([
+  const [filterJs,varJs,goalsJs,app,css,concept,pwa]=await Promise.all([
     read('public/filterTips.js'),
     read('public/varTips.js'),
     read('public/goalsBankers.js'),
     read('public/appCrests.js'),
     read('public/mobile2026.css'),
+    read('public/conceptD.css'),
     read('public/pwa.js')
   ])
   for(const src of [filterJs,varJs,goalsJs,app]){
@@ -106,11 +107,18 @@ test('Filter, VAR and Goals mobile cards do not yank the page or overlay crests'
     assert.match(src,/m-card-top/)
     assert.match(src,/odd-stack/)
     assert.match(src,/s!=='live'&&s!=='settled'/)
+    assert.match(src,/match-mid/)
+    assert.match(src,/crest-matchup/)
+    assert.match(src,/padStart\(2,'0'\)/)
   }
   assert.match(css,/html\.is-scrolling \.mobile-nav/)
   assert.match(css,/\.filter-badge/)
   assert.match(css,/\.var-badge/)
   assert.match(css,/\.m-board-tag/)
+  assert.match(css,/border-radius:\s*999px/)
+  assert.match(concept,/--peanut/)
+  assert.match(concept,/preserveAspectRatio/)
+  assert.match(concept,/mask:/)
   assert.match(pwa,/is-scrolling/)
   assert.match(pwa,/mobile-nav/)
 })
