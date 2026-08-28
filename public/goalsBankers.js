@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal} from './whyPopup.js'
-import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick} from './net.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick,bootDone} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
@@ -127,7 +127,7 @@ function startPolling(){clearInterval(state.timer);const today=new Date().toISOS
 async function load(){
   renderDates()
   const cached=readBoardCache(state.date,BOARD_VIEW)
-  if(cached){state.board=cached;render()}
+  if(cached){state.board=cached;render();bootDone()}
   else{skeleton();$('#status').textContent='Loading…'}
   try{
     const [board,res]=await Promise.all([
@@ -138,9 +138,11 @@ async function load(){
     writeBoardCache(state.date,BOARD_VIEW,board)
     await hopIfEmpty()
     render();startPolling();warmNeighbors(state.date,BOARD_VIEW)
+    bootDone()
   }catch(e){
     if(cached)return
     $('#status').textContent='Unavailable';$('#cards').innerHTML=`<div class="empty">${esc(e.message)}</div>`
+    bootDone()
   }
 }
 $('#statusFilter')?.addEventListener('change',e=>{state.status=e.target.value;render()})

@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="s2p-booting">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0b">
   <title>Stats2Pitch</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=5.5.5">
+  <link rel="manifest" href="/manifest.webmanifest?v=5.5.6">
   <link rel="icon" type="image/png" href="/assets/stats2pitch-favicon-v2.png">
   <link rel="apple-touch-icon" href="/assets/stats2pitch-favicon-v2.png">
   <link rel="preconnect" href="https://s.sporty.net" crossorigin>
@@ -13,11 +13,57 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/conceptD.css?v=5.5.5">
-  <link rel="stylesheet" href="/mobile2026.css?v=5.5.5">
-  <link rel="stylesheet" href="/fontPlus2.css?v=5.5.5">
+  <link rel="stylesheet" href="/conceptD.css?v=5.5.6">
+  <link rel="stylesheet" href="/mobile2026.css?v=5.5.6">
+  <link rel="stylesheet" href="/fontPlus2.css?v=5.5.6">
+<style>html.s2p-booting{background:#050806}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#050806}</style>
 </head>
 <body data-view="all">
+  <div id="boot" class="s2p-boot" role="status" aria-live="polite" aria-label="Loading Stats2Pitch">
+    <div class="s2p-boot-fallback" aria-hidden="true">
+      <svg viewBox="0 0 220 150">
+        <rect x="18" y="12" width="184" height="126" rx="2"/>
+        <line x1="18" y1="75" x2="202" y2="75"/>
+        <circle cx="110" cy="75" r="22"/>
+        <rect x="18" y="42" width="32" height="66"/>
+        <rect x="18" y="54" width="16" height="42"/>
+        <rect x="170" y="42" width="32" height="66"/>
+        <rect x="186" y="54" width="16" height="42"/>
+      </svg>
+      <b>2</b>
+    </div>
+    <video class="s2p-boot-video" autoplay muted loop playsinline preload="auto" poster="/assets/s2p-boot.jpg?v=5.5.6">
+      <source src="/assets/s2p-boot.mp4?v=5.5.6" type="video/mp4">
+    </video>
+  </div>
+  <script>
+    (function(){
+      var b=document.getElementById('boot');
+      if(!b)return;
+      var v=b.querySelector('video'), shown=Date.now(), done=false;
+      if(v){
+        v.addEventListener('playing',function(){v.classList.add('is-on')});
+        var p=v.play();
+        if(p&&p.catch)p.catch(function(){});
+      }
+      window.s2pBootDone=function(){
+        if(done)return;
+        done=true;
+        var wait=Math.max(0,800-(Date.now()-shown));
+        setTimeout(function(){
+          b.classList.add('is-done');
+          document.documentElement.classList.remove('s2p-booting');
+          setTimeout(function(){
+            try{
+              if(v){v.pause();v.removeAttribute('src');v.load()}
+              b.remove();
+            }catch(e){}
+          },520);
+        },wait);
+      };
+      setTimeout(function(){window.s2pBootDone()},14000);
+    })();
+  </script>
   <div class="app">
     <header>
       <div class="header-inner">
@@ -104,10 +150,10 @@
     </a>
   </nav>
   <script src="/runtime-config.js"></script>
-  <link rel="modulepreload" href="/net.js?v=5.5.5">
-  <link rel="modulepreload" href="/appCrests.js?v=5.5.5">
-  <script src="/leagueFlags.js?v=5.5.5"></script>
-  <script type="module" src="/appCrests.js?v=5.5.5"></script>
-  <script src="/pwa.js?v=5.5.5"></script>
+  <link rel="modulepreload" href="/net.js?v=5.5.6">
+  <link rel="modulepreload" href="/appCrests.js?v=5.5.6">
+  <script src="/leagueFlags.js?v=5.5.6"></script>
+  <script type="module" src="/appCrests.js?v=5.5.6"></script>
+  <script src="/pwa.js?v=5.5.6"></script>
 </body>
 </html>

@@ -36,6 +36,70 @@ html, body {
   background: var(--bg);
   color: var(--ink);
 }
+html.s2p-booting,
+html.s2p-booting body { overflow: hidden; }
+.s2p-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: #050806;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+.s2p-boot.is-done {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.s2p-boot-fallback {
+  position: relative;
+  width: min(72vw, 280px);
+  aspect-ratio: 11 / 8;
+  display: grid;
+  place-items: center;
+  z-index: 0;
+}
+.s2p-boot-fallback svg {
+  width: 100%;
+  height: 100%;
+  stroke: #fff;
+  fill: none;
+  stroke-width: 3;
+}
+.s2p-boot-fallback b {
+  position: absolute;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  display: grid;
+  place-items: center;
+  color: #16c45a;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  animation: s2pBootPulse 1.6s ease-in-out infinite;
+}
+.s2p-boot-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #050806;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.s2p-boot-video.is-on { opacity: 1; }
+@keyframes s2pBootPulse {
+  50% { transform: scale(1.06); box-shadow: 0 0 28px rgba(22, 196, 90, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .s2p-boot-video { display: none; }
+  .s2p-boot-fallback b { animation: none; }
+}
 body {
   font-family: var(--font);
   font-size: 17px;

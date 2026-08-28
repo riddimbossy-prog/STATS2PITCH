@@ -112,3 +112,5 @@ export function scrollDateStrip(host){
   if(typeof host.scrollTo==='function')host.scrollTo({left:Math.max(0,left),behavior:'instant'})
   else host.scrollLeft=Math.max(0,left)
 }
+
+export function bootDone(){try{window.s2pBootDone?.()}catch{}}

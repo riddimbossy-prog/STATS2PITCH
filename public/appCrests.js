@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal} from './whyPopup.js'
-import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick} from './net.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick,bootDone} from './net.js'
 import {adviceFor} from './performanceAdvice.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
@@ -70,7 +70,7 @@ async function hopIfEmpty(){
 }
 async function loadBoardData(){
   const cached=readBoardCache(state.date,BOARD_VIEW)
-  if(cached){state.board=cached;renderBoard()}
+  if(cached){state.board=cached;renderBoard();bootDone()}
   const [board,res]=await Promise.all([
     api(`/board?date=${encodeURIComponent(state.date)}&view=${BOARD_VIEW}`,{cache:'default'}),
     api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)
@@ -110,9 +110,10 @@ async function loadResultsView(){skeleton();const [perf]=await Promise.all([api(
 function bind(){for(const[id,key]of[['statusFilter','status'],['seasonFilter','seasonStage'],['countryFilter','country'],['leagueFilter','league'],['market','market']]){const el=$('#'+id);if(el)el.onchange=e=>{state[key]=e.target.value;if(key==='country')state.league='all';renderBoard()}};$('#clearFilters')?.addEventListener('click',()=>{state.status=view==='results'?'settled':'upcoming';state.country=state.league=state.market=state.seasonStage='all';renderBoard()});$('#performanceGroup')?.addEventListener('change',e=>{state.performanceGroup=e.target.value;renderPerformance()});$('#refresh')?.addEventListener('click',load);$('#notifyBell')?.addEventListener('click',load);$('#profileBtn')?.addEventListener('click',()=>document.body.classList.toggle('filters-open'))}
 async function load(){
   try{
-    if(view==='results'){skeleton();await loadResultsView();return}
+    if(view==='results'){skeleton();await loadResultsView();bootDone();return}
     if(!readBoardCache(state.date,BOARD_VIEW))skeleton()
     await loadBoardData()
-  }catch{$('#status').textContent='Unable to load picks';$('#cards').innerHTML='<div class="empty">Please try again shortly.</div>'}
+    bootDone()
+  }catch{$('#status').textContent='Unable to load picks';$('#cards').innerHTML='<div class="empty">Please try again shortly.</div>';bootDone()}
 }
 bind();renderDates();load();window.addEventListener('beforeunload',()=>clearInterval(state.timer))
