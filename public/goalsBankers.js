@@ -8,7 +8,8 @@ const REQUIRED_ENGINE='goals-bankers-v1'
 const BOARD_VIEW='goals'
 const SLIP_KEY='s2p-goals-slip'
 const PUBLISHED_ROUTES=new Set(['FAV_WIN','FAV_2PLUS','OVER_2.5','GG'])
-const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',slip:loadSlip(),timer:null,note:''}
+const MARKET_CHIPS=[{id:'all',label:'All'},{id:'FAV_WIN',label:'Win'},{id:'FAV_2PLUS',label:'2+'},{id:'OVER_2.5',label:'Over 2.5'},{id:'GG',label:'GG'}]
+const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',route:'all',slip:loadSlip(),timer:null,note:''}
 
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
 function team(name,img,side){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${esc(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span></div>`}
@@ -31,7 +32,15 @@ function routeLabel(r){return({FAV_WIN:'WIN',FAV_2PLUS:'2+','OVER_2.5':'O2.5',GG
 function uniq(xs){return[...new Set(xs.filter(Boolean).map(String))].sort((a,b)=>a.localeCompare(b))}
 function options(el,values,current,label,fmt=v=>v){if(!el)return'all';const valid=current==='all'||values.includes(current)?current:'all';el.innerHTML=`<option value="all">${esc(label)}</option>`+values.map(v=>`<option value="${esc(v)}" ${v===valid?'selected':''}>${fmt(v)}</option>`).join('');return valid}
 function allRows(){return boardReady(state.board)?(state.board.goalsBankers||[]).filter(r=>!isSrlPick(r)):[]}
-function filtered(rows){return rows.filter(r=>{const s=stateFor(r);if(state.status!=='all'&&s!==state.status)return false;if(state.country!=='all'&&String(r.country)!==state.country)return false;if(state.league!=='all'&&String(r.league)!==state.league)return false;if(state.market!=='all'&&String(r.market)!==state.market)return false;return true}).sort((a,b)=>kickoffMs(a)-kickoffMs(b)||String(a.league).localeCompare(String(b.league)))}
+function filtered(rows){return rows.filter(r=>{const s=stateFor(r);if(state.status!=='all'&&s!==state.status)return false;if(state.country!=='all'&&String(r.country)!==state.country)return false;if(state.league!=='all'&&String(r.league)!==state.league)return false;if(state.market!=='all'&&String(r.market)!==state.market)return false;if(state.route!=='all'&&String(r.route)!==state.route)return false;return true}).sort((a,b)=>kickoffMs(a)-kickoffMs(b)||String(a.league).localeCompare(String(b.league)))}
+function renderHero(rows){const el=$('#goalsHeroCount');if(el)el.textContent=String(rows.length)}
+function renderMarkets(rows){
+  const host=$('#goalsMarkets');if(!host)return
+  const counts={all:rows.length,FAV_WIN:0,FAV_2PLUS:0,'OVER_2.5':0,GG:0}
+  for(const r of rows){if(counts[r.route]!==undefined)counts[r.route]++}
+  host.innerHTML=MARKET_CHIPS.map(chip=>`<button type="button" class="goals-market ${state.route===chip.id?'active':''}" data-route="${esc(chip.id)}">${esc(chip.label)}<b>${counts[chip.id]||0}</b></button>`).join('')
+  host.querySelectorAll('[data-route]').forEach(b=>b.onclick=()=>{state.route=b.dataset.route;state.market='all';if($('#market'))$('#market').value='all';render()})
+}
 function renderCountryChips(rows){const host=$('#countryChips');if(!host)return;const countries=uniq(rows.map(r=>r.country));host.innerHTML=`<button class="country-chip ${state.country==='all'?'active':''}" data-country="all" title="All countries">🌍</button>`+countries.map(c=>`<button class="country-chip ${state.country===c?'active':''}" data-country="${esc(c)}" title="${esc(c)}" aria-label="${esc(c)}">${flag(c)}</button>`).join('');$$('[data-country]').forEach(b=>b.onclick=()=>{state.country=b.dataset.country;state.league='all';render()})}
 function renderStats(rows){const host=$('#goalsStats');if(!host)return;const counts={upcoming:0,live:0,settled:0,total:rows.length};for(const r of rows){const s=stateFor(r);if(counts[s]!==undefined)counts[s]++}host.innerHTML=`<button data-stat="all"><small>Goals Bankers</small><b>${counts.total}</b></button><button data-stat="upcoming"><small>Upcoming</small><b>${counts.upcoming}</b></button><button data-stat="live"><small>Live</small><b>${counts.live}</b></button><button data-stat="settled"><small>Settled</small><b>${counts.settled}</b></button>`;$$('[data-stat]').forEach(b=>b.onclick=()=>{state.status=b.dataset.stat;if($('#statusFilter'))$('#statusFilter').value=state.status;render()})}
 
@@ -93,6 +102,8 @@ function render(){
   state.market=options($('#market'),markets,state.market,'All markets',m=>esc(marketName({market:m})))
   if($('#statusFilter'))$('#statusFilter').value=state.status
   renderCountryChips(base)
+  renderHero(base)
+  renderMarkets(base)
   renderStats(base)
   renderSlip()
   const rows=filtered(base)
@@ -149,7 +160,7 @@ $('#statusFilter')?.addEventListener('change',e=>{state.status=e.target.value;re
 $('#countryFilter')?.addEventListener('change',e=>{state.country=e.target.value;state.league='all';render()})
 $('#leagueFilter')?.addEventListener('change',e=>{state.league=e.target.value;render()})
 $('#market')?.addEventListener('change',e=>{state.market=e.target.value;render()})
-$('#clearFilters')?.addEventListener('click',()=>{state.status='upcoming';state.country=state.league=state.market='all';render()})
+$('#clearFilters')?.addEventListener('click',()=>{state.status='upcoming';state.country=state.league=state.market=state.route='all';render()})
 $('#accaClear')?.addEventListener('click',()=>{state.slip=[];state.note='';saveSlip();render()})
 $('#refresh')?.addEventListener('click',load)
 $('#notifyBell')?.addEventListener('click',load)

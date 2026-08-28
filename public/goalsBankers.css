@@ -1,26 +1,107 @@
 /* Stats2Pitch Goals Bankers — dedicated board chrome */
 
-.goals-intro {
-  margin: 0 0 20px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+.goals-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: linear-gradient(160deg, rgba(251, 191, 36, 0.12), var(--surface));
   border-radius: var(--radius);
-  padding: 18px 20px;
   box-shadow: var(--shadow);
 }
-.goals-intro strong {
+.goals-hero-num {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  background: #fbbf24;
+  color: #0a0a0b;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.28);
+}
+.goals-hero-num b {
+  font: 800 28px var(--mono);
+  line-height: 1;
+}
+.goals-hero-num small {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.goals-hero-copy {
+  min-width: 0;
+}
+.goals-hero strong {
   display: block;
   font-size: 20px;
   letter-spacing: -0.02em;
   color: var(--ink);
 }
-.goals-intro p {
-  margin: 8px 0 0;
+.goals-hero p {
+  margin: 6px 0 0;
   color: var(--muted);
   font-weight: 500;
   max-width: 850px;
   line-height: 1.5;
 }
+
+.goals-markets {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.goals-markets::-webkit-scrollbar { display: none; }
+.goals-market {
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.15s;
+}
+.goals-market:hover { border-color: rgba(251, 191, 36, 0.45); background: var(--surface-2); }
+.goals-market b {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  font: 700 12px var(--mono);
+}
+.goals-market.active {
+  background: #fbbf24;
+  color: #0a0a0b;
+  border-color: transparent;
+}
+.goals-market.active b {
+  background: rgba(10, 10, 11, 0.16);
+  color: #0a0a0b;
+}
+
+body[data-view="goals-bankers"] #market { display: none; }
 
 #goalsStats {
   display: grid;
@@ -170,6 +251,23 @@
 body[data-view="goals-bankers"] .wrap { padding-bottom: 180px; }
 
 @media (max-width: 800px) {
+  body[data-view="goals-bankers"] .goals-hero {
+    display: flex !important;
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    gap: 12px;
+  }
+  body[data-view="goals-bankers"] .goals-hero p { display: none; }
+  body[data-view="goals-bankers"] .goals-hero-num {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+  }
+  body[data-view="goals-bankers"] .goals-hero-num b { font-size: 22px; }
+  body[data-view="goals-bankers"] .goals-markets {
+    display: flex !important;
+    margin: 0 0 12px;
+  }
   #goalsStats { grid-template-columns: 1fr 1fr; }
   .acca-slip {
     left: 12px;
