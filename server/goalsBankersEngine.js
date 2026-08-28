@@ -1,6 +1,8 @@
 import {ENGINE_VERSION} from './config.js'
 import {attachWhy,last5Form,last5Overall,fixtureHasStats} from './pickWhy.js'
-import {isSrlMatch} from './redFlags.js'
+import {isSrlMatch,redFlagSkip} from './redFlags.js'
+import {last5VenueRates,goalsFormGate} from './goalsFormGate.js'
+export {last5VenueRates,goalsFormGate} from './goalsFormGate.js'
 
 export const ENGINE_ID='goals-bankers-v1'
 export const STREAK_MIN=1.10
@@ -90,20 +92,7 @@ export function extractGoalsBankerOdds(fixture){
   const fav_odds=favourite==='home'?homeWin:favourite==='away'?awayWin:null
   const opp_odds=favourite==='home'?awayWin:favourite==='away'?homeWin:null
   const fav_2plus=favourite==='home'?homeO15:favourite==='away'?awayO15:null
-  return{
-    favourite,
-    homeWin,
-    awayWin,
-    fav_odds,
-    opp_odds,
-    draw_odds:draw,
-    over25,
-    btts_yes:bttsYes,
-    fav_2plus,
-    streak_yes:streak,
-    homeO15,
-    awayO15
-  }
+  return{favourite,homeWin,awayWin,fav_odds,opp_odds,draw_odds:draw,over25,btts_yes:bttsYes,fav_2plus,streak_yes:streak,homeO15,awayO15}
 }
 
 export function classifyMatch(odds){
@@ -118,18 +107,14 @@ export function classifyMatch(odds){
   return type
 }
 
-export function pickMarket(type,odds){
-  return pickMarketDecision(type,odds).route
-}
+export function pickMarket(type,odds){return pickMarketDecision(type,odds).route}
 
 export function pickMarketDecision(type,odds){
   if(type==='BALANCED'){
     if(lte(odds.over25,1.60)&&gt(odds.btts_yes,1.80))return{route:'OVER_2.5',rule:'balanced-over-not-gg'}
     if(lte(odds.btts_yes,1.72)&&gt(odds.over25,1.70))return{route:'GG',rule:'balanced-gg-not-over'}
     if(lte(odds.over25,1.65)&&lte(odds.btts_yes,1.75)){
-      return lte(odds.over25,odds.btts_yes)
-        ?{route:'OVER_2.5',rule:'balanced-both-on-cheaper-over'}
-        :{route:'GG',rule:'balanced-both-on-cheaper-gg'}
+      return lte(odds.over25,odds.btts_yes)?{route:'OVER_2.5',rule:'balanced-both-on-cheaper-over'}:{route:'GG',rule:'balanced-both-on-cheaper-gg'}
     }
     return{route:'SKIP',rule:'balanced-no-goals'}
   }
@@ -156,19 +141,14 @@ export function pickMarketDecision(type,odds){
   return{route:'SKIP',rule:'unclassified'}
 }
 
-export function applyVetoes(pick,type,odds){
-  return applyVetoesDecision(pick,type,odds).route
-}
+export function applyVetoes(pick,type,odds){return applyVetoesDecision(pick,type,odds).route}
 
 export function applyVetoesDecision(pick,type,odds){
   let next=pick
   const vetoes=[]
   if(next==='FAV_WIN'&&(type==='BALANCED'||type==='LEAN')){next='SKIP';vetoes.push('V1')}
   if(next==='FAV_WIN'&&lte(odds.btts_yes,1.62)&&lte(odds.over25,1.60)){next='OVER_2.5';vetoes.push('V2')}
-  if(next==='FAV_2PLUS'&&gte(odds.fav_2plus,1.55)){
-    next=type==='MISMATCH'&&lte(odds.fav_odds,1.33)?'FAV_WIN':'SKIP'
-    vetoes.push('V3')
-  }
+  if(next==='FAV_2PLUS'&&gte(odds.fav_2plus,1.55)){next=type==='MISMATCH'&&lte(odds.fav_odds,1.33)?'FAV_WIN':'SKIP';vetoes.push('V3')}
   if(next==='GG'&&type==='MISMATCH'){next='SKIP';vetoes.push('V4')}
   if(next==='GG'&&gte(odds.opp_odds,5.50)){next='SKIP';vetoes.push('V5')}
   if(next==='OVER_2.5'&&gte(odds.over25,1.80)){next='SKIP';vetoes.push('V6')}
@@ -178,68 +158,38 @@ export function applyVetoesDecision(pick,type,odds){
 
 export function decideGoalsBanker(odds){
   const streak=num(odds?.streak_yes)
-  if(!finite(streak)||lt(streak,STREAK_MIN)||gt(streak,STREAK_MAX)){
-    return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'streak-gate',odds}
-  }
-  if(!finite(odds?.fav_odds)||!odds?.favourite){
-    return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'fav-unclear',odds}
-  }
+  if(!finite(streak)||lt(streak,STREAK_MIN)||gt(streak,STREAK_MAX))return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'streak-gate',odds}
+  if(!finite(odds?.fav_odds)||!odds?.favourite)return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'fav-unclear',odds}
   const type=classifyMatch(odds)
   if(!type)return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'unclassified',odds}
   const picked=pickMarketDecision(type,odds)
   const vetoed=applyVetoesDecision(picked.route,type,odds)
-  return{
-    route:vetoed.route,
-    type,
-    raw:picked.route,
-    rule:picked.rule,
-    vetoes:vetoed.vetoes,
-    skip:vetoed.route==='SKIP'?'veto-or-no-route':null,
-    odds
-  }
+  return{route:vetoed.route,type,raw:picked.route,rule:picked.rule,vetoes:vetoed.vetoes,skip:vetoed.route==='SKIP'?'veto-or-no-route':null,odds}
 }
 
 function publishedFor(route,odds){
   const side=odds.favourite
   if(route==='FAV_WIN'){
-    const price=num(odds.fav_odds)
-    if(!price)return null
-    return side==='home'
-      ?{market:'match-winner',selection:'Home',displaySelection:'1X2 · Home',odds:price,family:'1X2'}
-      :{market:'match-winner',selection:'Away',displaySelection:'1X2 · Away',odds:price,family:'1X2'}
+    const price=num(odds.fav_odds);if(!price)return null
+    return side==='home'?{market:'match-winner',selection:'Home',displaySelection:'1X2 · Home',odds:price,family:'1X2'}:{market:'match-winner',selection:'Away',displaySelection:'1X2 · Away',odds:price,family:'1X2'}
   }
   if(route==='FAV_2PLUS'){
-    const price=num(odds.fav_2plus)
-    if(!price)return null
-    return side==='home'
-      ?{market:'home-team-goals',selection:'Over 1.5',displaySelection:'Home Team · 2+',odds:price,family:'Team Goals'}
-      :{market:'away-team-goals',selection:'Over 1.5',displaySelection:'Away Team · 2+',odds:price,family:'Team Goals'}
+    const price=num(odds.fav_2plus);if(!price)return null
+    return side==='home'?{market:'home-team-goals',selection:'Over 1.5',displaySelection:'Home Team · 2+',odds:price,family:'Team Goals'}:{market:'away-team-goals',selection:'Over 1.5',displaySelection:'Away Team · 2+',odds:price,family:'Team Goals'}
   }
   if(route==='OVER_2.5'){
-    const price=num(odds.over25)
-    if(!price)return null
+    const price=num(odds.over25);if(!price)return null
     return{market:'total-goals',selection:'Over 2.5',displaySelection:'Over 2.5',odds:price,family:'Goals'}
   }
   if(route==='GG'){
-    const price=num(odds.btts_yes)
-    if(!price)return null
+    const price=num(odds.btts_yes);if(!price)return null
     return{market:'both-teams-score',selection:'Yes',displaySelection:'BTTS · Yes',odds:price,family:'BTTS'}
   }
   return null
 }
 
 function publicReasons(pick){
-  const why=pick?.marketWhy||explainGoalsDecision({
-    type:pick.classification,
-    route:pick.route,
-    raw:pick.route,
-    rule:null,
-    vetoes:[],
-    odds:pick.oddsBook||{},
-    home:pick.home,
-    away:pick.away,
-    favourite:pick.favourite
-  })
+  const why=pick?.marketWhy||explainGoalsDecision({type:pick.classification,route:pick.route,raw:pick.route,rule:null,vetoes:[],odds:pick.oddsBook||{},home:pick.home,away:pick.away,favourite:pick.favourite})
   if(!why)return['No Goals Banker for this match.']
   return[why.headline,...why.passed.map(row=>`${row.label} was passed over: ${row.reason}`)]
 }
@@ -252,12 +202,8 @@ const whyShape=type=>type==='MISMATCH'?'a one-sided favourite':type==='STRONG'?'
 
 function whyHeadline({type,rule,route,vetoes,fav,prices}){
   const p=prices[route]
-  if((vetoes||[]).includes('V2')&&route==='OVER_2.5'){
-    return`Over 2.5${whyAt(p)} is the published Goals Banker. ${fav} to win was the favourite-side call, but both the total and both-teams prices were on, so Over 2.5 replaced the win.`
-  }
-  if((vetoes||[]).includes('V3')&&route==='FAV_WIN'){
-    return`${fav} to win${whyAt(p)} is the published Goals Banker. Favourite 2+ was in front, but 2+ is too high, so the win is published instead.`
-  }
+  if((vetoes||[]).includes('V2')&&route==='OVER_2.5')return`Over 2.5${whyAt(p)} is the published Goals Banker. ${fav} to win was the favourite-side call, but both the total and both-teams prices were on, so Over 2.5 replaced the win.`
+  if((vetoes||[]).includes('V3')&&route==='FAV_WIN')return`${fav} to win${whyAt(p)} is the published Goals Banker. Favourite 2+ was in front, but 2+ is too high, so the win is published instead.`
   if(rule==='balanced-over-not-gg')return`Over 2.5${whyAt(p)} is the published Goals Banker. This is an even match: the total is on and GG is not, so Over 2.5 is taken. Favourite win and favourite 2+ are not used.`
   if(rule==='balanced-gg-not-over')return`Both teams to score${whyAt(p)} is the published Goals Banker. This is an even match: GG is on and Over 2.5 is not, so GG is taken. Favourite win and favourite 2+ are not used.`
   if(rule==='balanced-both-on-cheaper-over')return`Over 2.5${whyAt(p)} is the published Goals Banker. This is an even match and both goals markets are on — Over 2.5 is the shorter price, so it beats GG. Favourite win and favourite 2+ are not used.`
@@ -323,13 +269,7 @@ export function explainGoalsDecision({type,rule,raw,route,vetoes,odds,home,away,
   const fav=favourite==='home'?home:favourite==='away'?away:(home||'the favourite')
   const prices={FAV_WIN:whyPx(odds?.fav_odds),FAV_2PLUS:whyPx(odds?.fav_2plus),'OVER_2.5':whyPx(odds?.over25),GG:whyPx(odds?.btts_yes)}
   const ctx={type,rule,raw,route,vetoes:vetoes||[],fav,prices}
-  return{
-    route,
-    chosen:WHY_LABELS[route],
-    price:prices[route],
-    headline:whyHeadline(ctx),
-    passed:WHY_ROUTES.filter(id=>id!==route).map(id=>({id,label:WHY_LABELS[id],price:prices[id],reason:whyPassed({...ctx,other:id})}))
-  }
+  return{route,chosen:WHY_LABELS[route],price:prices[route],headline:whyHeadline(ctx),passed:WHY_ROUTES.filter(id=>id!==route).map(id=>({id,label:WHY_LABELS[id],price:prices[id],reason:whyPassed({...ctx,other:id})}))}
 }
 
 function packPick(fixture,odds,decision,published){
@@ -337,54 +277,8 @@ function packPick(fixture,odds,decision,published){
   const lastMatchesAway=last5Overall(fixture?.away?.lastMatches||fixture?.away?.fixtures,fixture?.away?.id)
   const last5Home=last5Form(fixture?.home?.fixtures,fixture?.home?.id,'home')
   const last5Away=last5Form(fixture?.away?.fixtures,fixture?.away?.id,'away')
-  const pick={
-    fixtureId:fixture.fixtureId,
-    league:fixture.league,
-    country:fixture.country,
-    kickoff:fixture.kickoff,
-    home:fixture.home?.name,
-    away:fixture.away?.name,
-    homeId:fixture.home?.id??null,
-    awayId:fixture.away?.id??null,
-    homeLogo:fixture.home?.logo||null,
-    awayLogo:fixture.away?.logo||null,
-    market:published.market,
-    marketName:published.displaySelection,
-    selection:published.selection,
-    displaySelection:published.displaySelection,
-    pick:published.displaySelection,
-    odds:+Number(published.odds).toFixed(2),
-    engine:ENGINE_ID,
-    engineVersion:ENGINE_VERSION,
-    route:decision.route,
-    classification:decision.type,
-    borderline:decision.type==='LEAN',
-    favourite:odds.favourite,
-    family:published.family,
-    oddsBook:{
-      fav_odds:odds.fav_odds,
-      opp_odds:odds.opp_odds,
-      draw_odds:odds.draw_odds,
-      over25:odds.over25,
-      btts_yes:odds.btts_yes,
-      fav_2plus:odds.fav_2plus
-    },
-    homeSplit:fixture.homeSplit||null,
-    awaySplit:fixture.awaySplit||null,
-    earlySeason:fixture.earlySeason===true,
-    sportyEventId:fixture.sportyEventId||null
-  }
-  const marketWhy=explainGoalsDecision({
-    type:decision.type,
-    rule:decision.rule,
-    raw:decision.raw,
-    route:decision.route,
-    vetoes:decision.vetoes,
-    odds,
-    home:pick.home,
-    away:pick.away,
-    favourite:odds.favourite
-  })
+  const pick={fixtureId:fixture.fixtureId,league:fixture.league,country:fixture.country,kickoff:fixture.kickoff,home:fixture.home?.name,away:fixture.away?.name,homeId:fixture.home?.id??null,awayId:fixture.away?.id??null,homeLogo:fixture.home?.logo||null,awayLogo:fixture.away?.logo||null,market:published.market,marketName:published.displaySelection,selection:published.selection,displaySelection:published.displaySelection,pick:published.displaySelection,odds:+Number(published.odds).toFixed(2),engine:ENGINE_ID,engineVersion:ENGINE_VERSION,route:decision.route,classification:decision.type,borderline:decision.type==='LEAN',favourite:odds.favourite,family:published.family,oddsBook:{fav_odds:odds.fav_odds,opp_odds:odds.opp_odds,draw_odds:odds.draw_odds,over25:odds.over25,btts_yes:odds.btts_yes,fav_2plus:odds.fav_2plus},homeSplit:fixture.homeSplit||null,awaySplit:fixture.awaySplit||null,earlySeason:fixture.earlySeason===true,sportyEventId:fixture.sportyEventId||null}
+  const marketWhy=explainGoalsDecision({type:decision.type,rule:decision.rule,raw:decision.raw,route:decision.route,vetoes:decision.vetoes,odds,home:pick.home,away:pick.away,favourite:odds.favourite})
   if(marketWhy)pick.marketWhy=marketWhy
   return attachWhy(pick,fixture,{reasons:publicReasons(pick),last5Home,last5Away,lastMatchesHome,lastMatchesAway})
 }
@@ -392,17 +286,23 @@ function packPick(fixture,odds,decision,published){
 export function diagnoseGoalsBankerFixture(fixture){
   if(isSrlMatch(fixture))return{pick:null,skip:'srl'}
   if(!fixtureHasStats(fixture))return{pick:null,skip:'no-stats'}
+  const hard=redFlagSkip(fixture)
+  if(hard)return{pick:null,skip:hard}
   const odds=extractGoalsBankerOdds(fixture)
   const decision=decideGoalsBanker(odds)
   if(decision.route==='SKIP')return{pick:null,skip:decision.skip||'skip',odds,type:decision.type}
+  const homeForm=last5VenueRates(fixture?.home?.fixtures,fixture?.home?.id,'home')
+  const awayForm=last5VenueRates(fixture?.away?.fixtures,fixture?.away?.id,'away')
+  const form=goalsFormGate(decision.route,odds.favourite,homeForm,awayForm)
+  if(!form.ok)return{pick:null,skip:form.skip,odds,type:decision.type,route:decision.route,homeForm,awayForm}
   const published=publishedFor(decision.route,odds)
   if(!published)return{pick:null,skip:'missing-published-odds',odds,type:decision.type,route:decision.route}
-  return{pick:packPick(fixture,odds,decision,published),skip:null,odds,type:decision.type,route:decision.route}
+  const pick=packPick(fixture,odds,decision,published)
+  pick.formGate={home:homeForm,away:awayForm,route:decision.route}
+  return{pick,skip:null,odds,type:decision.type,route:decision.route,homeForm,awayForm}
 }
 
-export function evaluateGoalsBankerFixture(fixture){
-  return diagnoseGoalsBankerFixture(fixture).pick
-}
+export function evaluateGoalsBankerFixture(fixture){return diagnoseGoalsBankerFixture(fixture).pick}
 
 export function canAddAccaLeg(slip,pick){
   const legs=Array.isArray(slip)?slip:[]
@@ -414,33 +314,13 @@ export function canAddAccaLeg(slip,pick){
   if(next.filter(row=>row.route==='FAV_WIN').length>1)return{ok:false,reason:'max-1-fav-win'}
   if(next.length===3&&!next.some(row=>row.route==='OVER_2.5'||row.route==='GG'))return{ok:false,reason:'need-goals-leg'}
   const hasLean=legs.some(row=>row.classification==='LEAN'||row.borderline===true)
-  if(hasLean&&(pick.classification==='LEAN'||pick.borderline===true||pick.classification==='STRONG')){
-    return{ok:false,reason:'borderline-lean'}
-  }
+  if(hasLean&&(pick.classification==='LEAN'||pick.borderline===true||pick.classification==='STRONG'))return{ok:false,reason:'borderline-lean'}
   return{ok:true,reason:null,legs:next}
 }
 
 export function buildGoalsBankerBoard(fixtures,meta={}){
   const diagnosed=(fixtures||[]).map(fixture=>({fixture,result:diagnoseGoalsBankerFixture(fixture)}))
-  const qualified=diagnosed.map(row=>row.result.pick).filter(Boolean)
-    .sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(a.odds)-Number(b.odds))
-  const skipped=diagnosed.filter(row=>!row.result.pick).reduce((map,row)=>{
-    const key=row.result.skip||'unknown'
-    map[key]=(map[key]||0)+1
-    return map
-  },{})
-  return{
-    meta:{
-      ...meta,
-      engineVersion:ENGINE_VERSION,
-      engine:ENGINE_ID,
-      qualified:qualified.length,
-      bestPicks:qualified.length,
-      skipped,
-      publishedRoutes:['FAV_WIN','FAV_2PLUS','OVER_2.5','GG']
-    },
-    priority:qualified,
-    bestPicks:qualified,
-    availableMarkets:[...new Set(qualified.map(row=>row.market))].sort()
-  }
+  const qualified=diagnosed.map(row=>row.result.pick).filter(Boolean).sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(a.odds)-Number(b.odds))
+  const skipped=diagnosed.filter(row=>!row.result.pick).reduce((map,row)=>{const key=row.result.skip||'unknown';map[key]=(map[key]||0)+1;return map},{})
+  return{meta:{...meta,engineVersion:ENGINE_VERSION,engine:ENGINE_ID,qualified:qualified.length,bestPicks:qualified.length,skipped,publishedRoutes:['FAV_WIN','FAV_2PLUS','OVER_2.5','GG']},priority:qualified,bestPicks:qualified,availableMarkets:[...new Set(qualified.map(row=>row.market))].sort()}
 }
