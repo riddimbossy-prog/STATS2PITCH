@@ -25,6 +25,8 @@ const awayOver=[[2,1],[3,2],[2,2],[1,0],[3,1]]
 const homeUnder=[[1,0],[2,0],[1,0],[2,1],[1,0]]
 const awayUnder=[[0,1],[0,2],[1,1],[0,1],[1,2]]
 const evenForm=[[1,1],[1,0],[0,1],[1,1],[2,2]]
+const mixedFav=[[2,1],[2,0],[3,1],[1,2],[1,1]]
+const mixedDog=[[1,2],[0,2],[1,3],[2,1],[1,1]]
 
 function markets(odds={}){
   const rows=[]
@@ -156,15 +158,28 @@ test('GG needs GG Yes under 1.50 and GG 2+ No over 1.30',()=>{
   assert.notEqual(miss.pick?.route,'gg')
 })
 
-test('v2 skips a fixture when competing routes are too close instead of taking first match',()=>{
+test('v2 scores every surviving route so a later stronger market can beat straight win',()=>{
   const result=diagnoseFilterFixture(fixture({
-    marketOdds:markets({
-      homeWin:1.32,awayWin:8.00,over15:1.22,under35:1.70,over25:1.40,under25:1.45,ggYes:1.40,gg2No:1.45
-    })
+    homeFixtures:venueRows(1,'home',mixedFav),
+    awayFixtures:venueRows(2,'away',mixedDog),
+    marketOdds:markets({homeWin:1.35,drawWin:4.20,awayWin:6.00,over15:1.22,under35:1.50})
+  }))
+  assert.equal(result.skip,null)
+  assert.equal(result.pick.route,'over-15')
+  assert.ok(result.candidates.some(row=>row.route==='straight-win'))
+  assert.ok(result.pick.filterScore>result.pick.runnerUpScore)
+})
+
+test('v2 skips when two strong goals routes are too close',()=>{
+  const result=diagnoseFilterFixture(fixture({
+    marketOdds:markets({homeWin:1.10,awayWin:8.00,over15:1.22,under35:1.70,over25:1.40}),
+    homeFixtures:venueRows(1,'home',homeOver),
+    awayFixtures:venueRows(2,'away',awayOver)
   }))
   assert.equal(result.pick,null)
   assert.equal(result.skip,'low-market-separation')
   assert.ok(result.candidates.length>=2)
+  assert.ok(result.separation<8)
 })
 
 test('H2H and stats against the priced favourite skip only the straight-win route',()=>{
