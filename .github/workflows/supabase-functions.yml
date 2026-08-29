@@ -62,6 +62,8 @@ jobs:
           fi
       - name: Deploy Stats2Pitch API
         run: npx --yes supabase@latest functions deploy stats2pitch-api --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+      - name: Deploy Stats2Pitch Bankers API
+        run: npx --yes supabase@latest functions deploy stats2pitch-bankers --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
       - name: Deploy Stats2Pitch Auth
         run: npx --yes supabase@latest functions deploy stats2pitch-auth --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
       - name: Verify login, API identity and token refresh
