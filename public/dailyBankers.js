@@ -1,10 +1,21 @@
-import {api,readBoardCache,writeBoardCache,dateStrip,isoToday,scrollDateStrip,bootDone} from './net.js'
+import {readBoardCache,writeBoardCache,dateStrip,isoToday,scrollDateStrip,bootDone} from './net.js'
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 
 const $=q=>document.querySelector(q)
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const state={date:new URLSearchParams(location.search).get('date')||isoToday(),board:null}
 const VIEW='bankers'
+const cfg=window.__STATS2PITCH_CONFIG__||{}
+const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
+const anon=String(cfg.supabaseAnonKey||'')
+
+async function bankerApi(date){
+  if(!base)throw new Error('Service unavailable')
+  const res=await fetch(`${base}/functions/v1/stats2pitch-bankers?date=${encodeURIComponent(date)}`,{headers:{apikey:anon,Authorization:`Bearer ${anon}`},cache:'default'})
+  const body=await res.json().catch(()=>null)
+  if(!res.ok)throw new Error('Unable to load bankers')
+  return body
+}
 
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
 function fmtDate(v){const d=new Date(v);return Number.isNaN(d.getTime())?'TBC':d.toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
@@ -67,7 +78,7 @@ async function load(){
   if(cached){state.board=cached;render();bootDone()}
   else{$('#safeGrid').innerHTML='<div class="empty-bankers">Loading bankers…</div>';$('#valueGrid').innerHTML='<div class="empty-bankers">Loading bankers…</div>'}
   try{
-    const board=await api(`/board?date=${encodeURIComponent(state.date)}&view=${VIEW}`,{cache:'default'})
+    const board=await bankerApi(state.date)
     state.board=board
     writeBoardCache(state.date,VIEW,board)
     render();bootDone()
