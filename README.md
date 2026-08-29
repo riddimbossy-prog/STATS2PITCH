@@ -6,7 +6,7 @@ Generator for Stats2Pitch boards and sporty.codes Elite.
 
 - **All Picks** — consensus engine (`stats2pitch-consensus-v4-over25`). Last-5 home/away form comes from SportyBet / Sportradar stats.
 - **VAR Tips** — dedicated board (`away-fav-streak-v1`) for home and away favourites. This is the feed for sporty.codes Elite.
-- **Goals Bankers** — one pick per match from favourite win, favourite 2+, Over 2.5 or GG (`goals-bankers-v1`). Does not feed Elite.
+- **Goals Bankers** — V3 match-shape router. One pick per match from favourite win, favourite 2+, Over 2.5 or GG (`goals-bankers-v3`). Skip is a valid result. Does not feed Elite.
 
 Public pages show fixture, teams, logos, league, kickoff, market, pick and odds. Engine method is not published on the site.
 

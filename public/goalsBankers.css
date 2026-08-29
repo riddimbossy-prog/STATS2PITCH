@@ -44,6 +44,17 @@
   letter-spacing: -0.02em;
   color: var(--ink);
 }
+.v3-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #c8f542;
+  color: #10140a;
+  font: 800 11px var(--mono);
+  letter-spacing: 0.08em;
+  vertical-align: 3px;
+}
 .goals-hero p {
   margin: 6px 0 0;
   color: var(--muted);

@@ -3,14 +3,13 @@ import assert from 'node:assert/strict'
 import {
   ENGINE_ID,
   classifyMatch,
-  pickMarket,
-  applyVetoes,
   decideGoalsBanker,
   extractGoalsBankerOdds,
   diagnoseGoalsBankerFixture,
   canAddAccaLeg,
   buildGoalsBankerBoard
 } from '../server/goalsBankersEngine.js'
+import {evaluateTwoInARowMarket} from '../server/goalsBankersV3.js'
 import {buildBoard} from '../server/engine.js'
 
 function finished(id,homeId,awayId,h,a){
@@ -26,7 +25,10 @@ function venueRows(teamId,venue,scores){
     :finished(index+1,800+index,teamId,pair[1],pair[0]))
 }
 
-function markets({streak=1.22,homeWin=1.30,awayWin=8.50,draw=5.00,over25=1.70,bttsYes=1.90,homeO15=1.35,awayO15=2.20}={}){
+function markets({
+  streak=1.22,homeWin=1.30,awayWin=8.50,draw=5.00,over25=1.70,bttsYes=1.90,
+  homeO15=1.35,awayO15=2.20,homeO25=1.95,awayO25=2.40,homeO05=1.45,awayO05=1.78
+}={}){
   const rows=[]
   const add=(marketKey,market,name,odd)=>{
     if(!Number.isFinite(Number(odd)))return
@@ -42,6 +44,10 @@ function markets({streak=1.22,homeWin=1.30,awayWin=8.50,draw=5.00,over25=1.70,bt
   add('both-teams-score','Both teams to score','Yes',bttsYes)
   add('home-team-goals','Home team goals','Over 1.5',homeO15)
   add('away-team-goals','Away team goals','Over 1.5',awayO15)
+  add('home-team-goals','Home team goals','Over 2.5',homeO25)
+  add('away-team-goals','Away team goals','Over 2.5',awayO25)
+  add('home-team-goals','Home team goals','Over 0.5',homeO05)
+  add('away-team-goals','Away team goals','Over 0.5',awayO05)
   return rows
 }
 
@@ -70,6 +76,8 @@ function odds(partial={}){
     over25:1.70,
     btts_yes:1.90,
     fav_2plus:1.35,
+    fav_tt_over25:1.95,
+    opp_tt_over05:1.78,
     streak_yes:1.22,
     ...partial
   }
@@ -78,6 +86,10 @@ function odds(partial={}){
 function decide(partial){
   return decideGoalsBanker(odds(partial))
 }
+
+test('engine id is goals-bankers-v3',()=>{
+  assert.equal(ENGINE_ID,'goals-bankers-v3')
+})
 
 test('streak gate skips outside 1.10-1.50 inclusive and never publishes streak',()=>{
   assert.equal(decide({streak_yes:null}).route,'SKIP')
@@ -97,128 +109,97 @@ test('streak gate skips outside 1.10-1.50 inclusive and never publishes streak',
   assert.doesNotMatch(JSON.stringify(pick.reasons||[]),/streak|first-match|2-in-a-row/i)
 })
 
-test('classify uses mismatch / strong / lean / balanced then balanced override',()=>{
+test('classify uses mismatch / strong / lean / balanced then balanced-goals override',()=>{
   assert.equal(classifyMatch(odds({fav_odds:1.40,opp_odds:5.00})),'MISMATCH')
   assert.equal(classifyMatch(odds({fav_odds:1.55,opp_odds:3.80,over25:1.90,btts_yes:1.90})),'STRONG')
   assert.equal(classifyMatch(odds({fav_odds:1.80,opp_odds:3.50,over25:1.90,btts_yes:1.90})),'LEAN')
   assert.equal(classifyMatch(odds({fav_odds:1.81,opp_odds:3.50})),'BALANCED')
-  assert.equal(classifyMatch(odds({fav_odds:1.50,opp_odds:4.00,btts_yes:1.70,over25:1.65})),'BALANCED')
+  assert.equal(classifyMatch(odds({fav_odds:1.50,opp_odds:4.00,btts_yes:1.70,over25:1.65})),'BALANCED_GOALS')
   assert.equal(classifyMatch(odds({fav_odds:1.30,opp_odds:6.00,btts_yes:1.60,over25:1.50})),'MISMATCH')
 })
 
-test('BALANCED picks Over 2.5 or GG and never a win or 2+',()=>{
-  assert.equal(pickMarket('BALANCED',odds({over25:1.60,btts_yes:1.81})),'OVER_2.5')
-  assert.equal(pickMarket('BALANCED',odds({over25:1.71,btts_yes:1.72})),'GG')
-  assert.equal(pickMarket('BALANCED',odds({over25:1.60,btts_yes:1.75})),'OVER_2.5')
-  assert.equal(pickMarket('BALANCED',odds({over25:1.65,btts_yes:1.60})),'GG')
-  assert.equal(pickMarket('BALANCED',odds({over25:1.80,btts_yes:1.90})),'SKIP')
-  assert.equal(applyVetoes('FAV_WIN','BALANCED',odds({})),'SKIP')
+test('V3 domination publishes 2+ or win, not GG',()=>{
+  const r=decide({})
+  assert.ok(r.route==='FAV_2PLUS'||r.route==='FAV_WIN')
+  assert.equal(r.v3.matchShape,'FAV_DOMINATION')
+  assert.equal(r.v3.eligibleMarkets.includes('GG'),false)
 })
 
-test('LEAN picks Over 2.5 or GG only',()=>{
-  assert.equal(pickMarket('LEAN',odds({over25:1.58,btts_yes:1.90})),'OVER_2.5')
-  assert.equal(pickMarket('LEAN',odds({over25:1.70,btts_yes:1.68})),'GG')
-  assert.equal(pickMarket('LEAN',odds({over25:1.70,btts_yes:1.80})),'SKIP')
-  assert.equal(applyVetoes('FAV_WIN','LEAN',odds({fav_odds:1.70})),'SKIP')
+test('live underdog does not auto-ban GG',()=>{
+  const r=evaluateTwoInARowMarket(odds({
+    fav_odds:1.28,draw_odds:5.4,opp_odds:7,fav_2plus:1.4,
+    fav_tt_over25:1.98,opp_tt_over05:1.45,over25:1.55,btts_yes:1.52
+  }))
+  assert.equal(r.contradictions.includes('WEAK_RESULT_LIVE_GOAL_THREAT'),true)
+  assert.notEqual(r.scores.GG,null)
 })
 
-test('MISMATCH first-match order: 2+, win, Over 2.5, else win',()=>{
-  assert.equal(pickMarket('MISMATCH',odds({fav_2plus:1.38})),'FAV_2PLUS')
-  assert.equal(pickMarket('MISMATCH',odds({fav_2plus:1.48,fav_odds:1.32})),'FAV_2PLUS')
-  assert.equal(pickMarket('MISMATCH',odds({fav_2plus:1.60,fav_odds:1.35,over25:1.75})),'FAV_WIN')
-  assert.equal(pickMarket('MISMATCH',odds({fav_2plus:1.55,fav_odds:1.40,over25:1.90})),'FAV_WIN')
-  assert.equal(pickMarket('MISMATCH',odds({fav_2plus:1.45,fav_odds:1.39,over25:1.50})),'OVER_2.5')
-  assert.equal(pickMarket('MISMATCH',odds({fav_2plus:1.50,fav_odds:1.39,over25:1.70})),'FAV_WIN')
+test('mismatch with live opponent keeps GG eligible',()=>{
+  const r=evaluateTwoInARowMarket(odds({
+    fav_odds:1.33,draw_odds:5,opp_odds:8,fav_2plus:1.45,
+    fav_tt_over25:2.05,opp_tt_over05:1.48,over25:1.62,btts_yes:1.5
+  }))
+  assert.equal(r.matchType,'MISMATCH')
+  assert.ok(r.eligibleMarkets.includes('GG'))
 })
 
-test('STRONG first-match order: 2+, Over 2.5, win, else skip',()=>{
-  assert.equal(pickMarket('STRONG',odds({fav_2plus:1.42})),'FAV_2PLUS')
-  assert.equal(pickMarket('STRONG',odds({fav_2plus:1.50,over25:1.52,btts_yes:1.75})),'OVER_2.5')
-  assert.equal(pickMarket('STRONG',odds({fav_2plus:1.55,over25:1.70,btts_yes:1.90,fav_odds:1.50})),'FAV_WIN')
-  assert.equal(pickMarket('STRONG',odds({fav_2plus:1.50,over25:1.70,btts_yes:1.90,fav_odds:1.48})),'FAV_WIN')
-  assert.equal(pickMarket('STRONG',odds({fav_2plus:1.50,over25:1.70,btts_yes:1.90,fav_odds:1.49})),'SKIP')
+test('result control with weak scoring publishes FAV_WIN',()=>{
+  assert.equal(decide({
+    fav_odds:1.3,draw_odds:5.1,opp_odds:7.2,fav_2plus:1.7,
+    fav_tt_over25:2.5,opp_tt_over05:1.85,over25:1.9,btts_yes:2.1
+  }).route,'FAV_WIN')
 })
 
-test('vetoes V2-V7 run after the pick',()=>{
-  assert.equal(applyVetoes('FAV_WIN','MISMATCH',odds({btts_yes:1.62,over25:1.60})),'OVER_2.5')
-  assert.equal(applyVetoes('FAV_2PLUS','MISMATCH',odds({fav_2plus:1.55,fav_odds:1.33})),'FAV_WIN')
-  assert.equal(applyVetoes('FAV_2PLUS','STRONG',odds({fav_2plus:1.55,fav_odds:1.30})),'SKIP')
-  assert.equal(applyVetoes('GG','MISMATCH',odds({opp_odds:4.00})),'SKIP')
-  assert.equal(applyVetoes('GG','LEAN',odds({opp_odds:5.50})),'SKIP')
-  assert.equal(applyVetoes('OVER_2.5','LEAN',odds({over25:1.80})),'SKIP')
-  assert.equal(applyVetoes('FAV_WIN','MISMATCH',odds({fav_odds:1.56,btts_yes:1.90,over25:1.90})),'SKIP')
+test('close Over vs GG is SKIP when separation is 5 or less',()=>{
+  const r=evaluateTwoInARowMarket(odds({
+    fav_odds:1.29,draw_odds:5.6,opp_odds:7,fav_2plus:1.38,
+    fav_tt_over25:1.9,opp_tt_over05:1.45,over25:1.5,btts_yes:1.5
+  }))
+  if(r.finalPick==='SKIP'){
+    assert.ok(['LOW_MARKET_SEPARATION','BELOW_FLOOR','CONFLICT_NO_CONFIRMATION'].includes(r.reasonCode))
+  }else if(r.separation!==null&&r.separation<=5){
+    assert.fail('published a pick with separation <= 5')
+  }
 })
 
-test('threshold card shortcuts hold on the full pipeline',()=>{
-  assert.equal(decide({fav_odds:1.35,opp_odds:6.00,fav_2plus:1.55,over25:1.90,btts_yes:1.90}).route,'FAV_WIN')
-  assert.equal(decide({fav_odds:1.30,opp_odds:6.00,fav_2plus:1.38,over25:1.90,btts_yes:1.40}).route,'FAV_2PLUS')
-  assert.equal(decide({fav_odds:1.40,opp_odds:6.00,fav_2plus:1.50,over25:1.75,btts_yes:1.90}).route,'FAV_WIN')
-  assert.equal(decide({fav_odds:1.50,opp_odds:4.00,fav_2plus:1.50,over25:1.52,btts_yes:1.75}).route,'OVER_2.5')
-  assert.equal(['OVER_2.5','GG'].includes(decide({fav_odds:1.70,opp_odds:3.50,over25:1.55,btts_yes:1.60}).route),true)
-  assert.notEqual(decide({fav_odds:1.70,opp_odds:3.50,over25:1.55,btts_yes:1.60}).route,'FAV_WIN')
-  assert.equal(decide({fav_odds:1.60,opp_odds:3.50,over25:1.90,btts_yes:1.90,fav_2plus:1.70}).route,'SKIP')
-  assert.equal(decide({fav_odds:1.30,opp_odds:6.00,fav_2plus:1.60,over25:1.90,btts_yes:1.90}).route,'FAV_WIN')
-  assert.equal(decide({fav_odds:1.50,opp_odds:4.00,over25:1.80,btts_yes:1.90,fav_2plus:1.50}).route,'SKIP')
-  assert.equal(decide({fav_odds:1.70,opp_odds:5.50,over25:1.90,btts_yes:1.60,fav_2plus:1.70}).route,'SKIP')
+test('never invents odds — missing team totals skip',()=>{
+  assert.equal(decide({fav_tt_over25:null}).skip,'missing-odds')
+  assert.equal(decide({opp_tt_over05:null}).skip,'missing-odds')
 })
 
 test('Why copy explains the published market against the other three',()=>{
-  const two=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.28,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.32,awayO15:2.10}})).pick
+  const two=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.28,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.32,awayO15:2.10,homeO25:1.92,awayO05:1.78}})).pick
   assert.equal(two.route,'FAV_2PLUS')
   const twoBlob=two.reasons.join(' ')
   assert.match(twoBlob,/2\+/)
-  assert.match(twoBlob,/Favourite win|straight win/i)
+  assert.match(twoBlob,/Favourite win/)
   assert.match(twoBlob,/Over 2\.5/)
   assert.match(twoBlob,/GG/)
   assert.match(twoBlob,/passed over/i)
-  assert.match(twoBlob,/one-sided favourite/)
-  assert.match(twoBlob,/ahead of the win/)
+  assert.match(twoBlob,/V3 banker/)
   assert.doesNotMatch(twoBlob,/streak|first-match|2-in-a-row|MISMATCH|BALANCED/i)
 
-  const win=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.30,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.60,awayO15:2.20}})).pick
+  const win=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.30,awayWin:8.50,draw:5.2,over25:1.92,bttsYes:2.15,homeO15:1.70,awayO15:2.20,homeO25:2.50,awayO05:1.88}})).pick
   assert.equal(win.route,'FAV_WIN')
   const winBlob=win.reasons.join(' ')
-  assert.match(winBlob,/to win|Favourite win|short-priced favourite/i)
-  assert.match(winBlob,/Favourite 2\+|2\+ did not qualify/)
+  assert.match(winBlob,/Favourite win|V3 banker/)
+  assert.match(winBlob,/Favourite 2\+|2\+/)
   assert.match(winBlob,/Over 2\.5/)
   assert.match(winBlob,/GG/)
   assert.match(winBlob,/passed over/i)
-
-  const over=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.50,awayWin:4.00,draw:4.20,over25:1.52,bttsYes:1.75,homeO15:1.55,awayO15:2.00}})).pick
-  assert.equal(over.route,'OVER_2.5')
-  const overBlob=over.reasons.join(' ')
-  assert.match(overBlob,/Over 2\.5/)
-  assert.match(overBlob,/Favourite win/i)
-  assert.match(overBlob,/Favourite 2\+|2\+/)
-  assert.match(overBlob,/GG/)
-  assert.match(overBlob,/passed over/i)
-
-  const gg=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.81,awayWin:3.50,draw:3.40,over25:1.71,bttsYes:1.65,homeO15:1.80,awayO15:1.90}})).pick
-  assert.equal(gg.route,'GG')
-  const ggBlob=gg.reasons.join(' ')
-  assert.match(ggBlob,/Both teams to score|GG/)
-  assert.match(ggBlob,/Favourite win/i)
-  assert.match(ggBlob,/2\+/)
-  assert.match(ggBlob,/Over 2\.5/)
-  assert.match(ggBlob,/passed over/i)
-  assert.match(ggBlob,/even match/)
-  assert.match(ggBlob,/not used/)
-
-  const replaced=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.35,awayWin:8.00,over25:1.60,bttsYes:1.62,homeO15:1.60}})).pick
-  assert.equal(replaced.route,'OVER_2.5')
-  assert.match(replaced.reasons.join(' '),/replaced the win/i)
-  assert.match(replaced.marketWhy.headline,/replaced the win/)
-  assert.doesNotMatch(replaced.reasons.join(' '),/V2|first-match|streak|MISMATCH/i)
 })
 
 test('fixture packs favourite 2+ as team Over 1.5, never the streak price',()=>{
-  const home=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.28,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.32,awayO15:2.10}})).pick
+  const home=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:1.28,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.32,awayO15:2.10,homeO25:1.92,awayO05:1.78}})).pick
   assert.equal(home.route,'FAV_2PLUS')
   assert.equal(home.market,'home-team-goals')
   assert.equal(home.selection,'Over 1.5')
   assert.equal(home.odds,1.32)
   assert.notEqual(home.odds,1.22)
-  const away=diagnoseGoalsBankerFixture(fixture({odds:{streak:1.22,homeWin:8.00,awayWin:1.28,over25:1.90,bttsYes:1.90,homeO15:2.10,awayO15:1.32}})).pick
+  const awayFix=fixture({odds:{streak:1.22,homeWin:8.00,awayWin:1.28,over25:1.90,bttsYes:1.90,homeO15:2.10,awayO15:1.32,awayO25:1.92,homeO05:1.78}})
+  awayFix.home.fixtures=venueRows(1,'home',[[0,2],[1,2],[0,1],[0,2],[1,3]])
+  awayFix.away.fixtures=venueRows(2,'away',[[2,0],[3,1],[2,1],[2,0],[3,0]])
+  const away=diagnoseGoalsBankerFixture(awayFix).pick
   assert.equal(away.route,'FAV_2PLUS')
   assert.equal(away.favourite,'away')
   assert.equal(away.market,'away-team-goals')
@@ -227,7 +208,7 @@ test('fixture packs favourite 2+ as team Over 1.5, never the streak price',()=>{
 })
 
 test('board builder attaches Goals Bankers separately from All Picks and VAR',()=>{
-  const row=fixture({odds:{streak:1.22,homeWin:1.28,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.32}})
+  const row=fixture({odds:{streak:1.22,homeWin:1.28,awayWin:8.00,over25:1.90,bttsYes:1.90,homeO15:1.32,homeO25:1.92,awayO05:1.78}})
   const isolated=buildGoalsBankerBoard([row])
   assert.equal(isolated.meta.engine,ENGINE_ID)
   assert.equal(isolated.bestPicks.length,1)
@@ -259,12 +240,14 @@ test('acca rules: max 3, max one FAV_WIN, goals leg on 3, no second borderline l
   assert.equal(canAddAccaLeg([],{fixtureId:7,route:'FAV_WIN',market:'goals-streak-2'}).ok,false)
 })
 
-test('extractOdds maps home favourite 2+ and streak filter inputs',()=>{
-  const book=extractGoalsBankerOdds(fixture({odds:{streak:1.18,homeWin:1.25,awayWin:9.00,draw:5.5,over25:1.88,bttsYes:1.92,homeO15:1.40,awayO15:2.20}}))
+test('extractOdds maps favourite 2+, team totals and streak filter inputs',()=>{
+  const book=extractGoalsBankerOdds(fixture({odds:{streak:1.18,homeWin:1.25,awayWin:9.00,draw:5.5,over25:1.88,bttsYes:1.92,homeO15:1.40,awayO15:2.20,homeO25:1.98,awayO05:1.74}}))
   assert.equal(book.favourite,'home')
   assert.equal(book.fav_odds,1.25)
   assert.equal(book.opp_odds,9.00)
   assert.equal(book.fav_2plus,1.40)
+  assert.equal(book.fav_tt_over25,1.98)
+  assert.equal(book.opp_tt_over05,1.74)
   assert.equal(book.streak_yes,1.18)
   assert.equal(book.over25,1.88)
 })

@@ -156,7 +156,7 @@ function passedReason(chosen,other,fav,prices,type){
 export function goalsMarketWhy(pick){
   const route=String(pick?.route||'')
   if(!GOAL_ROUTES.includes(route))return null
-  if(pick?.engine&&pick.engine!=='goals-bankers-v1')return null
+  if(pick?.engine&&pick.engine!=='goals-bankers-v1'&&pick.engine!=='goals-bankers-v3')return null
   if(pick?.marketWhy?.headline&&Array.isArray(pick.marketWhy.passed))return pick.marketWhy
   const book=pick?.oddsBook||{}
   const prices={FAV_WIN:px(book.fav_odds),FAV_2PLUS:px(book.fav_2plus),'OVER_2.5':px(book.over25),GG:px(book.btts_yes)}

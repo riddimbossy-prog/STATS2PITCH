@@ -19,7 +19,7 @@ test('refresh fills the public availability window, not only the Accra week',asy
 
 test('public board drops internals and keeps only the requested view',()=>{
   const board={
-    meta:{date:'2026-08-27',generatedAt:'2026-08-27T10:00:00Z',engineVersion:'stats2pitch-v5-var-tips',diagnostics:{secret:true},bankerRules:{x:1},varTipsEngine:'away-fav-streak-v1',goalsBankersEngine:'goals-bankers-v1'},
+    meta:{date:'2026-08-27',generatedAt:'2026-08-27T10:00:00Z',engineVersion:'stats2pitch-v5-var-tips',diagnostics:{secret:true},bankerRules:{x:1},varTipsEngine:'away-fav-streak-v1',goalsBankersEngine:'goals-bankers-v3'},
     bestPicks:[{fixtureId:1,market:'match-winner'}],
     varTips:[{fixtureId:2,market:'both-teams-score'}],
     filterTips:[{fixtureId:3,market:'total-goals'}],
@@ -71,6 +71,6 @@ test('public clients request a slim board view and reuse a cached board',async()
     assert.match(src,/warmNeighbors/)
   }
   assert.match(files[4],/sessionStorage/)
-  assert.match(files[5],/stats2pitch-shell-v5\.5\.12/)
+  assert.match(files[5],/stats2pitch-shell-v5\.6\.0/)
   assert.match(files[5],/\/net\.js/)
 })

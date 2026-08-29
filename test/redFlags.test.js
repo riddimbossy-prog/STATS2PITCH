@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {analyzeFixture} from '../server/engine.js'
-import {redFlagSkip,isCupCompetition,isSrlMatch} from '../server/redFlags.js'
+import {redFlagSkip,isCupCompetition,isSrlMatch,isEarlySeason} from '../server/redFlags.js'
 import {diagnoseFilterFixture} from '../server/filterEngine.js'
 import {diagnoseAwayFavFixture} from '../server/awayFavEngine.js'
 import {diagnoseGoalsBankerFixture} from '../server/goalsBankersEngine.js'
@@ -75,12 +75,14 @@ test('All Picks skips early season, cups, top-five clashes and similar form',()=
   }),'similar-form')
 })
 
-test('fewer than 5 current venue rounds is an early-season hard gate',()=>{
+test('fewer than 5 current venue rounds is an early-season flag, not a Goals Bankers hard skip',()=>{
   const short=fixture({earlySeason:false})
   short.earlySeason=false
   short.currentVenueSamples={home:3,away:4}
-  assert.equal(redFlagSkip(short),'early-season')
-  assert.equal(diagnoseGoalsBankerFixture({...short,marketOdds:[]}).skip,'early-season')
+  assert.equal(isEarlySeason(short),true)
+  assert.equal(redFlagSkip(short),null)
+  const diagnosed=diagnoseGoalsBankerFixture({...short,marketOdds:[]})
+  assert.notEqual(diagnosed.skip,'early-season')
 })
 
 test('split top-five and bottom-three clashes hard-gate Goals Bankers',()=>{

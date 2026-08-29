@@ -238,7 +238,7 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
       varTipsCount:Array.isArray(varBoard.bestPicks)?varBoard.bestPicks.length:0,
       filterTipsEngine:filterBoard.meta?.engine||'sporty-filter-v1',
       filterTipsCount:Array.isArray(filterBoard.bestPicks)?filterBoard.bestPicks.length:0,
-      goalsBankersEngine:goalsBoard.meta?.engine||'goals-bankers-v1',
+      goalsBankersEngine:goalsBoard.meta?.engine||'goals-bankers-v3',
       goalsBankersCount:Array.isArray(goalsBoard.bestPicks)?goalsBoard.bestPicks.length:0
     },
     priority:all,
