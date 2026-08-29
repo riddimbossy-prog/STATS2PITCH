@@ -5,9 +5,9 @@ import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafet
 import {buildAwayFavBoard,venueMetrics,favouriteSide,extractOdds} from './awayFavEngine.js'
 import {buildFilterBoard} from './filterEngine.js'
 import {buildGoalsBankerBoard} from './goalsBankersEngine.js'
+import {buildDailyBankersBoard} from './dailyBankersEngine.js'
 import {attachWhy,fixtureHasStats} from './pickWhy.js'
 import {redFlagSkip,favConflict} from './redFlags.js'
-
 
 const finite=v=>Number.isFinite(Number(v))
 const pct=(h,t)=>t?Math.round(h*100/t):null
@@ -202,7 +202,6 @@ export function analyzeFixture(f,{ignoreTransition=false}={}){
       oddsVerified:o.verified===true,apiOdd:o.apiOdd??null,statsOdd:o.statsOdd??null
     }
     out.push(attachWhy(pick,f))
-
   }
   const pool=!ignoreTransition&&leakRedirect?out.filter(redirectGoalMarket):out
   return pool.sort((a,b)=>b.consensus-a.consensus||Number(b.oddsVerified)-Number(a.oddsVerified)||a.odds-b.odds).map(p=>leakRedirect&&!ignoreTransition?{...p,transitionRedirect:{reason:leakRedirect.reason,stronger:leakRedirect.stronger,weaker:leakRedirect.weaker}}:p)
@@ -222,6 +221,7 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
   const varBoard=buildAwayFavBoard(fixtures,meta)
   const filterBoard=buildFilterBoard(fixtures,meta)
   const goalsBoard=buildGoalsBankerBoard(fixtures,meta)
+  const dailyBankersBoard=buildDailyBankersBoard(fixtures,meta)
   return{
     meta:{
       ...meta,
@@ -239,7 +239,10 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
       filterTipsEngine:filterBoard.meta?.engine||'sporty-filter-v1',
       filterTipsCount:Array.isArray(filterBoard.bestPicks)?filterBoard.bestPicks.length:0,
       goalsBankersEngine:goalsBoard.meta?.engine||'goals-bankers-v3',
-      goalsBankersCount:Array.isArray(goalsBoard.bestPicks)?goalsBoard.bestPicks.length:0
+      goalsBankersCount:Array.isArray(goalsBoard.bestPicks)?goalsBoard.bestPicks.length:0,
+      dailyBankersEngine:dailyBankersBoard.meta?.engine||'daily-bankers-v1',
+      safestBankersCount:Array.isArray(dailyBankersBoard.safestBankers)?dailyBankersBoard.safestBankers.length:0,
+      valueBankersCount:Array.isArray(dailyBankersBoard.valueBankers)?dailyBankersBoard.valueBankers.length:0
     },
     priority:all,
     bestPicks:best,
@@ -249,6 +252,10 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
     filterTips:filterBoard.bestPicks||[],
     filterTipsMeta:filterBoard.meta||null,
     goalsBankers:goalsBoard.bestPicks||[],
-    goalsBankersMeta:goalsBoard.meta||null
+    goalsBankersMeta:goalsBoard.meta||null,
+    dailyBankers:dailyBankersBoard.bestPicks||[],
+    safestBankers:dailyBankersBoard.safestBankers||[],
+    valueBankers:dailyBankersBoard.valueBankers||[],
+    dailyBankersMeta:dailyBankersBoard.meta||null
   }
 }
