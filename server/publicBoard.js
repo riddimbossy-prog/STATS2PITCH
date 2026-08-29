@@ -1,4 +1,4 @@
-const VIEWS=new Set(['all','var','filter','goals'])
+const VIEWS=new Set(['all','var','filter','goals','bankers'])
 
 function slimMeta(meta={}){
   return{
@@ -17,6 +17,9 @@ function slimMeta(meta={}){
     filterTipsCount:meta.filterTipsCount,
     goalsBankersEngine:meta.goalsBankersEngine,
     goalsBankersCount:meta.goalsBankersCount,
+    dailyBankersEngine:meta.dailyBankersEngine,
+    safestBankersCount:meta.safestBankersCount,
+    valueBankersCount:meta.valueBankersCount,
     requiresRefresh:meta.requiresRefresh===true,
     refresh:meta.refresh||null
   }
@@ -33,6 +36,9 @@ export function publicBoard(board={},view='all'){
     varTips:[],
     filterTips:[],
     goalsBankers:[],
+    dailyBankers:[],
+    safestBankers:[],
+    valueBankers:[],
     priority:[],
     bankers:[]
   }
@@ -53,6 +59,14 @@ export function publicBoard(board={},view='all'){
     empty.goalsBankers=Array.isArray(board?.goalsBankers)?board.goalsBankers:[]
     empty.goalsBankersMeta=board?.goalsBankersMeta||null
     empty.availableMarkets=markets(empty.goalsBankers)
+    return empty
+  }
+  if(v==='bankers'){
+    empty.dailyBankers=Array.isArray(board?.dailyBankers)?board.dailyBankers:[]
+    empty.safestBankers=Array.isArray(board?.safestBankers)?board.safestBankers:[]
+    empty.valueBankers=Array.isArray(board?.valueBankers)?board.valueBankers:[]
+    empty.dailyBankersMeta=board?.dailyBankersMeta||null
+    empty.availableMarkets=markets(empty.dailyBankers)
     return empty
   }
   empty.bestPicks=Array.isArray(board?.bestPicks)?board.bestPicks:[]
