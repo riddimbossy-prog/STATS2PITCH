@@ -2,8 +2,13 @@ export const FORM_SAMPLE=5
 export const FORM_GOALS_MIN=60
 export const FORM_FAV_WIN_MIN=80
 export const FORM_OPP_LOSS_MIN=60
+export const WEAK_FAV_BOTTOM_N=3
+export const WEAK_FAV_PPG_MAX=0.90
+export const WEAK_FAV_PPG_GAMES=3
 
 const finishedStatus=f=>['FT','AET','PEN'].includes(String(f?.fixture?.status?.short||'').toUpperCase())
+const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
+const num=v=>finite(v)?Number(v):null
 
 export function last5VenueRates(fixtures,teamId,venue){
   const rows=(fixtures||[]).filter(f=>{
@@ -28,19 +33,42 @@ export function last5VenueRates(fixtures,teamId,venue){
   return{played:n,ready:n>=FORM_SAMPLE,win:pct(win),loss:pct(loss),over25:pct(over25),btts:pct(btts),scored2plus:pct(scored2),conceded2plus:pct(conceded2)}
 }
 
-export function goalsFormGate(route,favourite,homeForm,awayForm,opts={}){
-  if(opts.waive)return{ok:true,skip:null,homeForm,awayForm,waived:true}
-  if(!homeForm?.ready||!awayForm?.ready)return{ok:false,skip:'form-sample',homeForm,awayForm}
+function applyRouteForm(route,favourite,homeForm,awayForm){
   const fav=favourite==='away'?awayForm:homeForm
   const opp=favourite==='away'?homeForm:awayForm
   if(route==='OVER_2.5'){
-    if((homeForm.over25??0)<FORM_GOALS_MIN||(awayForm.over25??0)<FORM_GOALS_MIN)return{ok:false,skip:'form-over25',homeForm,awayForm}
+    if((homeForm.over25??0)<FORM_GOALS_MIN||(awayForm.over25??0)<FORM_GOALS_MIN)return{ok:false,skip:'form-over25'}
   }else if(route==='GG'){
-    if((homeForm.btts??0)<FORM_GOALS_MIN||(awayForm.btts??0)<FORM_GOALS_MIN)return{ok:false,skip:'form-gg',homeForm,awayForm}
+    if((homeForm.btts??0)<FORM_GOALS_MIN||(awayForm.btts??0)<FORM_GOALS_MIN)return{ok:false,skip:'form-gg'}
   }else if(route==='FAV_2PLUS'){
-    if((fav.scored2plus??0)<FORM_GOALS_MIN||(opp.conceded2plus??0)<FORM_GOALS_MIN)return{ok:false,skip:'form-2plus',homeForm,awayForm}
+    if((fav.scored2plus??0)<FORM_GOALS_MIN||(opp.conceded2plus??0)<FORM_GOALS_MIN)return{ok:false,skip:'form-2plus'}
   }else if(route==='FAV_WIN'){
-    if((fav.win??0)<FORM_FAV_WIN_MIN||(opp.loss??0)<FORM_OPP_LOSS_MIN)return{ok:false,skip:'form-fav-win',homeForm,awayForm}
+    if((fav.win??0)<FORM_FAV_WIN_MIN||(opp.loss??0)<FORM_OPP_LOSS_MIN)return{ok:false,skip:'form-fav-win'}
   }
-  return{ok:true,skip:null,homeForm,awayForm}
+  return{ok:true,skip:null}
+}
+
+export function goalsFormGate(route,favourite,homeForm,awayForm,opts={}){
+  const homeN=Number(homeForm?.played||0)
+  const awayN=Number(awayForm?.played||0)
+  if(opts.waive){
+    if(homeN<1||awayN<1)return{ok:true,skip:null,homeForm,awayForm,waived:true}
+  }else if(!homeForm?.ready||!awayForm?.ready){
+    return{ok:false,skip:'form-sample',homeForm,awayForm}
+  }
+  const rates=applyRouteForm(route,favourite,homeForm,awayForm)
+  return{...rates,homeForm,awayForm,waived:opts.waive===true}
+}
+
+export function weakFavouriteGate(route,favourite,homeSplit,awaySplit){
+  if(!route||route==='SKIP')return{ok:true,skip:null}
+  const fav=favourite==='away'?awaySplit:homeSplit
+  const pos=num(fav?.position)
+  const size=num(fav?.size)
+  const ppg=num(fav?.ppg)
+  const played=num(fav?.played)
+  const bottom=pos!==null&&size!==null&&pos>size-WEAK_FAV_BOTTOM_N
+  const poorPpg=ppg!==null&&played!==null&&played>=WEAK_FAV_PPG_GAMES&&ppg<WEAK_FAV_PPG_MAX
+  if(!bottom&&!poorPpg)return{ok:true,skip:null,bottom:false,poorPpg:false}
+  return{ok:false,skip:bottom?'weak-favourite':'weak-favourite-ppg',bottom,poorPpg}
 }

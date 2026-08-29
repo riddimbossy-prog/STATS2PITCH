@@ -1,14 +1,14 @@
 import {ENGINE_VERSION} from './config.js'
 import {attachWhy,last5Form,last5Overall,fixtureHasStats} from './pickWhy.js'
 import {isSrlMatch,redFlagSkip,isEarlySeason} from './redFlags.js'
-import {last5VenueRates,goalsFormGate} from './goalsFormGate.js'
+import {last5VenueRates,goalsFormGate,weakFavouriteGate} from './goalsFormGate.js'
 import {
   ENGINE_ID,
   MARKET_LABEL,
   classifyMatchType,
   evaluateTwoInARowMarket
 } from './goalsBankersV3.js'
-export {last5VenueRates,goalsFormGate} from './goalsFormGate.js'
+export {last5VenueRates,goalsFormGate,weakFavouriteGate} from './goalsFormGate.js'
 export {ENGINE_ID}
 
 export const STREAK_MIN=1.10
@@ -246,6 +246,8 @@ export function diagnoseGoalsBankerFixture(fixture){
   const odds=extractGoalsBankerOdds(fixture)
   const decision=decideGoalsBanker(odds)
   if(decision.route==='SKIP')return{pick:null,skip:decision.skip||'skip',odds,type:decision.type,v3:decision.v3}
+  const weak=weakFavouriteGate(decision.route,odds.favourite,fixture?.homeSplit,fixture?.awaySplit)
+  if(!weak.ok)return{pick:null,skip:weak.skip,odds,type:decision.type,route:decision.route,v3:decision.v3}
   const homeForm=last5VenueRates(fixture?.home?.fixtures,fixture?.home?.id,'home')
   const awayForm=last5VenueRates(fixture?.away?.fixtures,fixture?.away?.id,'away')
   const form=goalsFormGate(decision.route,odds.favourite,homeForm,awayForm,{waive:isEarlySeason(fixture)})
