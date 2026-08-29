@@ -4,7 +4,7 @@ import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRema
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
-const REQUIRED_ENGINE='sporty-filter-v2'
+const REQUIRED_ENGINES=new Set(['sporty-filter-v1','sporty-filter-v2'])
 const BOARD_VIEW='filter'
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',timer:null}
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
@@ -17,7 +17,8 @@ function kickClock(v){const d=new Date(v);if(Number.isNaN(d.getTime()))return'TB
 function oddStr(r){const n=Number(r.odds);return Number.isFinite(n)?n.toFixed(2):'—'}
 function dates(){const a=[];for(let i=-6;i<=6;i++){const d=new Date();d.setUTCDate(d.getUTCDate()+i);a.push(d.toISOString().slice(0,10))}return a}
 function renderDates(){const host=$('#dates');if(!host)return;const ds=dates(),today=new Date().toISOString().slice(0,10),stamp=`${state.date}|${ds[0]}|${ds[ds.length-1]}`;if(host.dataset.stamp===stamp)return;host.dataset.stamp=stamp;host.innerHTML=ds.map(d=>`<button class="date ${d===state.date?'active':''}" data-d="${d}">${d===today?'Today':new Date(d+'T12:00:00Z').toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'})}</button>`).join('');host.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{state.date=b.dataset.d;history.replaceState(null,'',`?date=${encodeURIComponent(state.date)}`);load()});requestAnimationFrame(()=>scrollDateStrip(host))}
-function boardReady(board){const meta=board?.filterTipsMeta||{},engine=String(meta.engine||board?.meta?.filterTipsEngine||'');return engine===REQUIRED_ENGINE&&Array.isArray(board?.filterTips)}
+function boardEngine(board){const tips=Array.isArray(board?.filterTips)?board.filterTips:[];return String(board?.filterTipsMeta?.engine||board?.meta?.filterTipsEngine||tips[0]?.engine||'')}
+function boardReady(board){if(!Array.isArray(board?.filterTips))return false;const engine=boardEngine(board);return REQUIRED_ENGINES.has(engine)||board.filterTips.length>0}
 function decided(o){return ['won','lost','void','postponed'].includes(String(o||''))}
 function outcomeLabel(o){return({won:'WON',lost:'LOST',void:'VOID',postponed:'POSTPONED'})[o]||'SETTLED'}
 function resultFor(r){const live=(state.results?.filterTips||[]).find(x=>String(x.fixtureId)===String(r.fixtureId))?.result||null,stored=state.board?.results?.[String(r.fixtureId)]||null;if(live&&decided(live.outcome))return live;if(live&&live.matchState==='live')return live;if(stored&&decided(stored.outcome))return stored;return live||stored}
