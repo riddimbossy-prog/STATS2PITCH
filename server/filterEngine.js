@@ -23,6 +23,9 @@ export const RULES=Object.freeze({
   topN:5,
   bottomN:3,
   minVenueMatches:5,
+  baselineVenueSample:10,
+  recentWeight:0.60,
+  baselineWeight:0.40,
   similarPpg:0.35,
   similarGf:0.40,
   similarGa:0.40,
@@ -34,7 +37,11 @@ export const RULES=Object.freeze({
   streakMin:1.10,
   streakMax:1.50,
   ggOppGoalLiveMax:1.58,
-  ggOppGoalColdMin:1.70
+  ggOppGoalColdMin:1.70,
+  teamGoalLiveMax:1.55,
+  teamGoalColdMin:1.70,
+  favTwoGoalStrongMax:1.45,
+  favTwoGoalSupportMax:1.60
 })
 
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
@@ -44,7 +51,9 @@ const text=v=>String(v??'').trim()
 const norm=s=>text(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
 const done=f=>FINISHED.has(String(f?.fixture?.status?.short||'').toUpperCase())
 const atVenue=(f,id,venue)=>venue==='home'?String(f?.teams?.home?.id)===String(id):String(f?.teams?.away?.id)===String(id)
-const CUP=/\b(cup|copa|coppa|pokal|fa cup|league cup|champions|europa|conference|knockout|play[- ]?offs?|qualification|qualifier|trophy|super cup|community shield|elimination)\b/i
+const DOMESTIC_CUP=/\b(cup|copa|coppa|pokal|fa cup|league cup|knockout|play[- ]?offs?|qualification|qualifier|trophy|super cup|community shield|elimination)\b/i
+const EUROPE_COMP=/\b(champions league|europa league|conference league)\b/i
+const KNOCKOUT_STAGE=/\b(qualif(?:ication|ier|ying)?|play[- ]?offs?|round of|last 16|last 32|1 8|1 16|quarter(?:final)?|semi(?:final)?|final|knockout|elimination)\b/i
 
 function oddOf(markets,key,names){
   for(const market of markets||[]){
@@ -125,16 +134,40 @@ export function extractFilterOdds(fixture){
 }
 
 export function isCupCompetition(name){
-  return CUP.test(norm(name))
+  const value=norm(name)
+  return DOMESTIC_CUP.test(value)||EUROPE_COMP.test(value)
+}
+
+function shouldSkipCupFixture(fixture){
+  const league=norm(fixture?.league)
+  if(EUROPE_COMP.test(league)){
+    const stage=norm(fixture?.round||fixture?.stage||fixture?.leagueRound||fixture?.fixture?.round||'')
+    return KNOCKOUT_STAGE.test(`${league} ${stage}`)
+  }
+  return DOMESTIC_CUP.test(league)
+}
+
+function tierFromSplit(split){
+  const position=num(split?.position),size=num(split?.size)
+  if(!position||!size||position<1||size<2||position>size||split?.sampleReady===false)return null
+  const band=Math.max(1,Math.min(4,Math.ceil((position*4)/size)))
+  return ['A','B','C','D'][band-1]
+}
+
+function isBottomThree(split){
+  const position=num(split?.position),size=num(split?.size)
+  return !!position&&!!size&&position>size-RULES.bottomN
 }
 
 function tableGate(homeSplit,awaySplit){
   const hp=num(homeSplit?.position),ap=num(awaySplit?.position)
   const hs=num(homeSplit?.size),as=num(awaySplit?.size)
-  if(!hp||!ap||!hs||!as)return{ok:true,skip:null,verified:false}
-  if(hp<=RULES.topN&&ap<=RULES.topN)return{ok:false,skip:'both-top-five',verified:true}
-  if(hp>hs-RULES.bottomN&&ap>as-RULES.bottomN)return{ok:false,skip:'both-bottom-three',verified:true}
-  return{ok:true,skip:null,verified:true}
+  if(!hp||!ap||!hs||!as)return{ok:true,skip:null,verified:false,homeTier:null,awayTier:null}
+  const homeTier=tierFromSplit(homeSplit),awayTier=tierFromSplit(awaySplit)
+  if(hp<=RULES.topN&&ap<=RULES.topN)return{ok:false,skip:'both-top-five',verified:true,homeTier,awayTier}
+  if(hp>hs-RULES.bottomN&&ap>as-RULES.bottomN)return{ok:false,skip:'both-bottom-three',verified:true,homeTier,awayTier}
+  if(homeTier&&awayTier&&homeTier===awayTier)return{ok:false,skip:'same-tier',verified:true,homeTier,awayTier}
+  return{ok:true,skip:null,verified:true,homeTier,awayTier}
 }
 
 function similarForm(home,away){
@@ -182,10 +215,10 @@ function favConflict(fixture,home,away,side){
   return fav.ppg+RULES.noH2hPpgGap<opp.ppg
 }
 
-function venueRows(fixtures,teamId,venue){
+function venueRows(fixtures,teamId,venue,limit=FORM_SAMPLE){
   return (fixtures||[]).filter(f=>done(f)&&atVenue(f,teamId,venue))
     .sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0))
-    .slice(0,FORM_SAMPLE)
+    .slice(0,limit)
 }
 
 function full(f,id){
@@ -194,15 +227,15 @@ function full(f,id){
   return String(f?.teams?.home?.id)===String(id)?{own:h,opp:a,total:h+a}:{own:a,opp:h,total:h+a}
 }
 
-function venueRate(fixtures,teamId,venue,test){
+function venueRate(fixtures,teamId,venue,test,limit=FORM_SAMPLE){
   let t=0,h=0
-  for(const row of venueRows(fixtures,teamId,venue)){
+  for(const row of venueRows(fixtures,teamId,venue,limit)){
     const g=full(row,teamId)
     if(!g)continue
     t++
     if(test(g))h++
   }
-  return t?Math.round(h*100/t):null
+  return{rate:t?Math.round(h*100/t):null,sample:t}
 }
 
 function directionTest(route,side){
@@ -218,13 +251,33 @@ function directionTest(route,side){
   return null
 }
 
+function blendedRate(recent,baseline){
+  if(recent?.rate===null||recent?.rate===undefined)return null
+  const base=baseline?.rate===null||baseline?.rate===undefined?recent.rate:baseline.rate
+  return Math.round(Number(recent.rate)*RULES.recentWeight+Number(base)*RULES.baselineWeight)
+}
+
 function directionAgree(fixture,route,side){
   const tests=directionTest(route,side)
   if(!tests)return{ok:false,home:null,away:null,consensus:null}
-  const home=venueRate(fixture?.home?.fixtures,fixture?.home?.id,'home',tests.home)
-  const away=venueRate(fixture?.away?.fixtures,fixture?.away?.id,'away',tests.away)
+  const recentHome=venueRate(fixture?.home?.fixtures,fixture?.home?.id,'home',tests.home,FORM_SAMPLE)
+  const recentAway=venueRate(fixture?.away?.fixtures,fixture?.away?.id,'away',tests.away,FORM_SAMPLE)
+  const baselineHome=venueRate(fixture?.home?.fixtures,fixture?.home?.id,'home',tests.home,RULES.baselineVenueSample)
+  const baselineAway=venueRate(fixture?.away?.fixtures,fixture?.away?.id,'away',tests.away,RULES.baselineVenueSample)
+  const home=blendedRate(recentHome,baselineHome)
+  const away=blendedRate(recentAway,baselineAway)
   const consensus=home!=null&&away!=null?Math.min(home,away):null
-  return{ok:consensus!=null&&home>=RULES.directionMin&&away>=RULES.directionMin,home,away,consensus}
+  const recentConsensus=recentHome.rate!=null&&recentAway.rate!=null?Math.min(recentHome.rate,recentAway.rate):null
+  const baselineConsensus=baselineHome.rate!=null&&baselineAway.rate!=null?Math.min(baselineHome.rate,baselineAway.rate):null
+  const recentOk=recentHome.rate!=null&&recentAway.rate!=null&&recentHome.rate>=RULES.directionMin&&recentAway.rate>=RULES.directionMin
+  return{
+    ok:recentOk&&consensus!=null&&consensus>=RULES.directionMin,
+    home,away,consensus,
+    recentHome:recentHome.rate,recentAway:recentAway.rate,recentConsensus,
+    baselineHome:baselineHome.rate,baselineAway:baselineAway.rate,baselineConsensus,
+    recentSamples:{home:recentHome.sample,away:recentAway.sample},
+    baselineSamples:{home:baselineHome.sample,away:baselineAway.sample}
+  }
 }
 
 function gates(odds){
@@ -258,14 +311,28 @@ function averageMatchGoals(home,away){
 }
 
 function addScore(state,points,reason){
-  state.score+=points
+  state.rawScore+=points
   if(reason)state.reasons.push(reason)
 }
 
+function teamTotalContext(row,odds){
+  const favourite=row.favourite
+  if(!favourite)return{favO05:null,favO15:null,oppO05:null,oppO15:null}
+  if(favourite==='home')return{favO05:odds.homeO05,favO15:odds.homeO15,oppO05:odds.awayO05,oppO15:odds.awayO15}
+  return{favO05:odds.awayO05,favO15:odds.awayO15,oppO05:odds.homeO05,oppO15:odds.homeO15}
+}
+
 function scoreCandidate(row,direction,home,away,odds){
-  const state={score:Number(direction.consensus)||0,reasons:[],flags:[]}
+  const state={rawScore:Number(direction.consensus)||0,reasons:[],flags:[]}
   const totalAvg=averageMatchGoals(home,away)
   const streakHot=finite(odds.streakYes)&&odds.streakYes>=RULES.streakMin&&odds.streakYes<=RULES.streakMax
+  const totals=teamTotalContext(row,odds)
+
+  if(direction.baselineConsensus!=null&&direction.recentConsensus!=null){
+    if(direction.baselineConsensus>=80)addScore(state,6,'The longer venue baseline strongly confirms the recent direction.')
+    else if(direction.baselineConsensus>=60)addScore(state,3,'The longer venue baseline confirms the recent direction.')
+    else{addScore(state,-8,'The longer venue baseline is weaker than the recent streak.');state.flags.push('BASELINE_WEAK')}
+  }
 
   if(row.route==='straight-win'){
     if(row.odds<=1.30)addScore(state,7,'Favourite price is in the strongest part of the win band.')
@@ -286,6 +353,11 @@ function scoreCandidate(row,direction,home,away,odds){
 
     const oppWin=row.favourite==='home'?odds.awayWin:odds.homeWin
     if(finite(oppWin)&&oppWin>=5.50)addScore(state,4,'The opponent is priced as a clear result outsider.')
+    if(finite(totals.oppO05)){
+      if(totals.oppO05>=RULES.teamGoalColdMin)addScore(state,6,'The opponent team-total Over 0.5 price is cold, supporting favourite control.')
+      else if(totals.oppO05<=RULES.teamGoalLiveMax){addScore(state,-8,'The opponent is strongly priced to score, making the straight win less clean.');state.flags.push('OPP_GOAL_LIVE')}
+    }
+    if(finite(totals.favO15)&&totals.favO15<=RULES.favTwoGoalStrongMax)addScore(state,4,'The favourite is strongly priced to score at least two goals.')
   }
 
   if(row.route==='over-15'){
@@ -293,6 +365,9 @@ function scoreCandidate(row,direction,home,away,odds){
     addScore(state,odds.under35>=1.50?4:2,'Under 3.5 is loose enough to confirm the goal range.')
     if(totalAvg!==null&&totalAvg>=3.00)addScore(state,6,'Recent venue games carry a high combined goal environment.')
     else if(totalAvg!==null&&totalAvg>=2.60)addScore(state,3,'Recent venue games support a positive goal environment.')
+    if(finite(totals.favO15)&&totals.favO15<=RULES.favTwoGoalStrongMax)addScore(state,4,'Favourite team-total Over 1.5 strongly supports two-plus match goals.')
+    else if(finite(totals.favO15)&&totals.favO15<=RULES.favTwoGoalSupportMax)addScore(state,2,'Favourite team-total Over 1.5 supports the goal floor.')
+    if(finite(odds.homeO05)&&finite(odds.awayO05)&&Math.max(odds.homeO05,odds.awayO05)<=RULES.ggOppGoalLiveMax)addScore(state,2,'Both teams remain live to contribute at least one goal.')
     if(streakHot)addScore(state,3,'Goals Streak 2+ sits inside the 1.10–1.50 confirmation band.')
   }
 
@@ -301,6 +376,7 @@ function scoreCandidate(row,direction,home,away,odds){
     addScore(state,odds.over15>=1.50?4:2,'Over 1.5 is loose enough to confirm the low-total structure.')
     if(totalAvg!==null&&totalAvg<=2.20)addScore(state,6,'Recent venue games strongly support controlled totals.')
     else if(totalAvg!==null&&totalAvg<=2.60)addScore(state,3,'Recent venue games support controlled totals.')
+    if(finite(odds.homeO15)&&finite(odds.awayO15)&&Math.max(odds.homeO15,odds.awayO15)<=2.10){addScore(state,-5,'Both teams are priced aggressively for two goals, creating pressure against Under 3.5.');state.flags.push('TEAM_TOTAL_UNDER35_PRESSURE')}
     if(streakHot)addScore(state,-3,'Goals Streak 2+ creates some pressure against a low-total route.')
   }
 
@@ -309,6 +385,12 @@ function scoreCandidate(row,direction,home,away,odds){
     addScore(state,odds.under35>=1.70?4:2,'Under 3.5 is expensive enough to confirm a high-total structure.')
     if(totalAvg!==null&&totalAvg>=3.00)addScore(state,8,'Recent venue games strongly support three-plus goals.')
     else if(totalAvg!==null&&totalAvg>=2.70)addScore(state,4,'Recent venue games support three-plus goals.')
+    if(finite(totals.favO15)&&totals.favO15<=RULES.favTwoGoalStrongMax)addScore(state,6,'Favourite team-total Over 1.5 provides a strong source for three-plus match goals.')
+    else if(finite(totals.favO15)&&totals.favO15<=RULES.favTwoGoalSupportMax)addScore(state,3,'Favourite team-total Over 1.5 supports the high-total route.')
+    if(finite(totals.oppO05)&&totals.oppO05<=RULES.teamGoalLiveMax)addScore(state,3,'The opponent is live to contribute a goal to the total.')
+    else if(finite(totals.oppO05)&&totals.oppO05>=RULES.teamGoalColdMin&&(!finite(totals.favO15)||totals.favO15>RULES.favTwoGoalSupportMax)){
+      addScore(state,-6,'The opponent goal price is cold and the favourite two-goal price does not compensate.');state.flags.push('OVER_GOAL_SOURCE_WEAK')
+    }
     if(streakHot)addScore(state,5,'Goals Streak 2+ confirms the high-event direction.')
   }
 
@@ -317,6 +399,7 @@ function scoreCandidate(row,direction,home,away,odds){
     addScore(state,odds.over15>=1.70?4:2,'Over 1.5 is expensive enough to confirm a low-total structure.')
     if(totalAvg!==null&&totalAvg<=2.30)addScore(state,8,'Recent venue games strongly support a low total.')
     else if(totalAvg!==null&&totalAvg<=2.70)addScore(state,4,'Recent venue games support a low total.')
+    if(finite(odds.homeO05)&&finite(odds.awayO05)&&Math.max(odds.homeO05,odds.awayO05)<=1.40){addScore(state,-6,'Both teams are strongly priced to score, creating pressure against Under 2.5.');state.flags.push('TEAM_TOTAL_UNDER25_PRESSURE')}
     if(streakHot){addScore(state,-6,'Goals Streak 2+ conflicts with a strict Under 2.5 route.');state.flags.push('STREAK_UNDER_CONFLICT')}
   }
 
@@ -332,8 +415,16 @@ function scoreCandidate(row,direction,home,away,odds){
     if(streakHot)addScore(state,3,'Goals Streak 2+ confirms an active scoring environment.')
   }
 
-  state.score=Math.round(clamp(state.score))
-  return{...state,capability:direction.consensus,totalGoalEnvironment:totalAvg===null?null:+totalAvg.toFixed(2)}
+  const rawScore=Math.round(state.rawScore)
+  return{
+    score:rawScore,
+    rawScore,
+    displayScore:Math.round(clamp(rawScore)),
+    reasons:state.reasons,
+    flags:state.flags,
+    capability:direction.consensus,
+    totalGoalEnvironment:totalAvg===null?null:+totalAvg.toFixed(2)
+  }
 }
 
 function publicReasons(pick,home,away,direction,odds){
@@ -344,10 +435,12 @@ function publicReasons(pick,home,away,direction,odds){
   else if(pick.route==='straight-win'&&pick.favourite==='away')lines.push(`${awayName} is the priced favourite at ${Number(pick.odds).toFixed(2)}.`)
   else lines.push(`${label} cleared the SportyBet odds filter at ${Number(pick.odds).toFixed(2)}.`)
   for(const reason of pick?.filterReasons||[])if(!lines.includes(reason))lines.push(reason)
-  if(direction?.home!=null&&direction?.away!=null)lines.push(`Both sides last-5 venue form supports ${label} (${direction.home}% home, ${direction.away}% away).`)
+  if(direction?.recentHome!=null&&direction?.recentAway!=null)lines.push(`Last-5 venue support for ${label}: ${direction.recentHome}% home, ${direction.recentAway}% away.`)
+  if(direction?.baselineHome!=null&&direction?.baselineAway!=null)lines.push(`Longer venue baseline: ${direction.baselineHome}% home, ${direction.baselineAway}% away.`)
+  if(direction?.home!=null&&direction?.away!=null)lines.push(`Blended 60/40 venue capability: ${direction.home}% home, ${direction.away}% away.`)
   if(home?.ppg!=null)lines.push(`${homeName} average ${home.ppg} PPG at home (${home.gf} scored, ${home.ga} conceded).`)
   if(away?.ppg!=null)lines.push(`${awayName} average ${away.ppg} PPG away (${away.gf} scored, ${away.ga} conceded).`)
-  if(finite(pick?.scoreSeparation)&&pick.runnerUpRoute)lines.push(`${label} beat the next eligible route by ${pick.scoreSeparation} evidence points.`)
+  if(finite(pick?.scoreSeparation)&&pick.runnerUpRoute)lines.push(`${label} beat the next eligible route by ${pick.scoreSeparation} raw evidence points.`)
   return lines
 }
 
@@ -381,10 +474,16 @@ function packPick(fixture,odds,home,away,routed,direction,runnerUp=null){
     homeConsensus:direction.home,
     awayConsensus:direction.away,
     consensus:direction.consensus,
+    recentConsensus:direction.recentConsensus??null,
+    baselineConsensus:direction.baselineConsensus??null,
+    capabilityBlend:{recentWeight:RULES.recentWeight,baselineWeight:RULES.baselineWeight,baselineSample:RULES.baselineVenueSample},
     filterScore:routed.filterScore,
+    rawFilterScore:routed.rawFilterScore??routed.filterScore,
+    displayScore:routed.displayScore??Math.round(clamp(routed.filterScore)),
     capability:routed.capability,
     runnerUpRoute:runnerUp?.route||null,
     runnerUpScore:runnerUp?.filterScore??null,
+    runnerUpDisplayScore:runnerUp?.displayScore??null,
     scoreSeparation:separation,
     filterFlags:routed.filterFlags||[],
     filterReasons:routed.filterReasons||[],
@@ -403,9 +502,9 @@ export function diagnoseFilterFixture(fixture){
   if(isSrlMatch(fixture))return{pick:null,skip:'srl'}
   if(!fixtureHasStats(fixture))return{pick:null,skip:'no-stats'}
   if(fixture?.earlySeason===true)return{pick:null,skip:'early-season'}
-  if(isCupCompetition(fixture?.league))return{pick:null,skip:'cup'}
+  if(shouldSkipCupFixture(fixture))return{pick:null,skip:'cup'}
   const table=tableGate(fixture?.homeSplit,fixture?.awaySplit)
-  if(!table.ok)return{pick:null,skip:table.skip}
+  if(!table.ok)return{pick:null,skip:table.skip,tableVerified:table.verified,homeTier:table.homeTier,awayTier:table.awayTier}
 
   const home=venueMetrics(fixture?.home?.fixtures,fixture?.home?.id,'home')
   const away=venueMetrics(fixture?.away?.fixtures,fixture?.away?.id,'away')
@@ -418,6 +517,13 @@ export function diagnoseFilterFixture(fixture){
   const candidates=[]
   const rejected=[]
   for(const row of routed){
+    if(row.route==='straight-win'){
+      const favouriteSplit=row.favourite==='home'?fixture?.homeSplit:fixture?.awaySplit
+      if(isBottomThree(favouriteSplit)){
+        rejected.push({route:row.route,reason:'bottom-three-favourite'})
+        continue
+      }
+    }
     if(row.route==='straight-win'&&similarForm(home,away)){
       rejected.push({route:row.route,reason:'similar-form-win'})
       continue
@@ -432,11 +538,21 @@ export function diagnoseFilterFixture(fixture){
       continue
     }
     const scored=scoreCandidate(row,direction,home,away,odds)
-    if(scored.score<RULES.candidateMinScore){
-      rejected.push({route:row.route,reason:'low-evidence-score',score:scored.score,direction})
+    if(scored.rawScore<RULES.candidateMinScore){
+      rejected.push({route:row.route,reason:'low-evidence-score',score:scored.rawScore,displayScore:scored.displayScore,direction})
       continue
     }
-    candidates.push({...row,direction,filterScore:scored.score,capability:scored.capability,filterReasons:scored.reasons,filterFlags:scored.flags,totalGoalEnvironment:scored.totalGoalEnvironment})
+    candidates.push({
+      ...row,
+      direction,
+      filterScore:scored.rawScore,
+      rawFilterScore:scored.rawScore,
+      displayScore:scored.displayScore,
+      capability:scored.capability,
+      filterReasons:scored.reasons,
+      filterFlags:scored.flags,
+      totalGoalEnvironment:scored.totalGoalEnvironment
+    })
   }
 
   if(!candidates.length){
@@ -444,15 +560,16 @@ export function diagnoseFilterFixture(fixture){
     let skip='direction-disagree'
     if(reasons.size===1)skip=rejected[0]?.reason||skip
     else if(reasons.has('low-evidence-score'))skip='low-evidence-score'
+    else if(reasons.has('bottom-three-favourite')&&!reasons.has('direction-disagree'))skip='bottom-three-favourite'
     else if(reasons.has('fav-conflict')&&!reasons.has('direction-disagree'))skip='fav-conflict'
-    return{pick:null,skip,odds,home,away,rejected,tableVerified:table.verified}
+    return{pick:null,skip,odds,home,away,rejected,tableVerified:table.verified,homeTier:table.homeTier,awayTier:table.awayTier}
   }
 
-  candidates.sort((a,b)=>b.filterScore-a.filterScore||Number(b.capability)-Number(a.capability)||Number(a.odds)-Number(b.odds)||String(a.route).localeCompare(String(b.route)))
+  candidates.sort((a,b)=>b.rawFilterScore-a.rawFilterScore||Number(b.capability)-Number(a.capability)||Number(a.odds)-Number(b.odds)||String(a.route).localeCompare(String(b.route)))
   const top=candidates[0],runnerUp=candidates[1]||null
-  const separation=runnerUp?top.filterScore-runnerUp.filterScore:null
+  const separation=runnerUp?top.rawFilterScore-runnerUp.rawFilterScore:null
   if(runnerUp&&separation<RULES.marketSeparationMin){
-    return{pick:null,skip:'low-market-separation',odds,home,away,candidates,rejected,separation,tableVerified:table.verified}
+    return{pick:null,skip:'low-market-separation',odds,home,away,candidates,rejected,separation,tableVerified:table.verified,homeTier:table.homeTier,awayTier:table.awayTier}
   }
 
   return{
@@ -466,7 +583,9 @@ export function diagnoseFilterFixture(fixture){
     candidates,
     rejected,
     separation,
-    tableVerified:table.verified
+    tableVerified:table.verified,
+    homeTier:table.homeTier,
+    awayTier:table.awayTier
   }
 }
 
@@ -477,7 +596,7 @@ export function evaluateFilterFixture(fixture){
 export function buildFilterBoard(fixtures,meta={}){
   const diagnosed=(fixtures||[]).map(fixture=>({fixture,result:diagnoseFilterFixture(fixture)}))
   const qualified=diagnosed.map(row=>row.result.pick).filter(Boolean)
-    .sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(b.filterScore||0)-Number(a.filterScore||0)||Number(a.odds)-Number(b.odds))
+    .sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(b.rawFilterScore||b.filterScore||0)-Number(a.rawFilterScore||a.filterScore||0)||Number(a.odds)-Number(b.odds))
   const skipped=diagnosed.filter(row=>!row.result.pick).reduce((map,row)=>{
     const key=row.result.skip||'unknown'
     map[key]=(map[key]||0)+1
@@ -489,7 +608,10 @@ export function buildFilterBoard(fixtures,meta={}){
       engineVersion:ENGINE_VERSION,
       engine:ENGINE_ID,
       filterVersion:'v2',
+      capabilityRevision:'v2.1',
       formSample:FORM_SAMPLE,
+      baselineVenueSample:RULES.baselineVenueSample,
+      capabilityWeights:{recent:RULES.recentWeight,baseline:RULES.baselineWeight},
       candidateMinScore:RULES.candidateMinScore,
       marketSeparationMin:RULES.marketSeparationMin,
       qualified:qualified.length,
