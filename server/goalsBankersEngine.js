@@ -6,8 +6,9 @@ import {
   ENGINE_ID,
   MARKET_LABEL,
   classifyMatchType,
-  evaluateTwoInARowMarket
-} from './goalsBankersV3.js'
+  evaluateTwoInARowMarket,
+  statsFromFixture
+} from './goalsBankersV4.js'
 export {last5VenueRates,goalsFormGate,weakFavouriteGate} from './goalsFormGate.js'
 export {ENGINE_ID}
 
@@ -118,19 +119,20 @@ function skipCode(v3){
   if(v3.finalPick!=='SKIP')return null
   if(v3.reasonCode==='STREAK_GATE')return 'streak-gate'
   if(v3.reasonCode==='INSUFFICIENT_MARKET_DATA')return 'missing-odds'
-  if(v3.reasonCode==='LOW_MARKET_SEPARATION')return 'low-separation'
+  if(v3.reasonCode==='INSUFFICIENT_SPLIT_SAMPLE')return 'split-sample'
+  if(v3.reasonCode==='LOW_MARKET_SEPARATION'||v3.reasonCode==='LOW_CAPABILITY_SEPARATION')return 'low-separation'
   if(v3.reasonCode==='BELOW_FLOOR'||v3.reasonCode==='CONFLICT_NO_CONFIRMATION')return 'no-confirmation'
   if(String(v3.reasonCode).startsWith('VETO_'))return 'veto'
   return 'skip'
 }
 
-export function decideGoalsBanker(odds){
+export function decideGoalsBanker(odds,ctx={}){
   const streak=num(odds?.streak_yes)
   if(!finite(streak)||streak<STREAK_MIN||streak>STREAK_MAX){
-    return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'streak-gate',odds,v3:null}
+    return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'streak-gate',odds,v4:null,v3:null}
   }
   if(!finite(odds?.fav_odds)||!odds?.favourite){
-    return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'fav-unclear',odds,v3:null}
+    return{route:'SKIP',type:null,rule:null,raw:null,vetoes:[],skip:'fav-unclear',odds,v4:null,v3:null}
   }
   const v3=evaluateTwoInARowMarket({
     fav_odds:odds.fav_odds,
@@ -142,7 +144,7 @@ export function decideGoalsBanker(odds){
     over25:odds.over25,
     btts_yes:odds.btts_yes,
     streak_yes:odds.streak_yes
-  },{fixtureId:odds.fixtureId||null})
+  },{fixtureId:odds.fixtureId||ctx.fixtureId||null,stats:ctx.stats||odds.stats||null,earlySeason:ctx.earlySeason===true})
   return{
     route:v3.finalPick,
     type:v3.matchType,
@@ -151,6 +153,7 @@ export function decideGoalsBanker(odds){
     vetoes:v3.veto?[v3.veto]:[],
     skip:skipCode(v3),
     odds,
+    v4:v3,
     v3
   }
 }
@@ -186,7 +189,7 @@ export function explainGoalsDecision({type,rule,raw,route,vetoes,odds,home,away,
     route,
     chosen:MARKET_LABEL[route],
     price:prices[route],
-    headline:`${MARKET_LABEL[route]} is the V3 banker for ${fav}.`,
+    headline:`${MARKET_LABEL[route]} is the V4 banker for ${fav}.`,
     passed:WHY_ROUTES.filter(id=>id!==route).map(id=>({id,label:MARKET_LABEL[id],price:prices[id],reason:`${MARKET_LABEL[id]} was passed over.`}))
   }
 }
@@ -220,7 +223,17 @@ function packPick(fixture,odds,decision,published){
     odds:+Number(published.odds).toFixed(2),engine:ENGINE_ID,engineVersion:ENGINE_VERSION,
     route:decision.route,classification:decision.type,
     borderline:decision.v3?.borderline===true,
+    highBorderline:decision.v3?.highBorderline===true,
     matchShape:decision.v3?.matchShape||null,
+    bankerClass:decision.v3?.bankerClass||null,
+    capabilityScore:decision.v3?.finalPick&&decision.v3.capabilities
+      ?(decision.v3.finalPick==='FAV_WIN'?decision.v3.capabilities.favWin.score
+        :decision.v3.finalPick==='FAV_2PLUS'?decision.v3.capabilities.fav2Plus.score
+        :decision.v3.finalPick==='OVER_2.5'?decision.v3.capabilities.over25.score
+        :decision.v3.capabilities.gg.score)
+      :null,
+    marketScore:decision.v3?.finalPick?decision.v3.scores?.[decision.v3.finalPick]??null:null,
+    separation:decision.v3?.separation??null,
     favourite:odds.favourite,family:published.family,
     oddsBook:{
       fav_odds:odds.fav_odds,opp_odds:odds.opp_odds,draw_odds:odds.draw_odds,
@@ -244,7 +257,8 @@ export function diagnoseGoalsBankerFixture(fixture){
   const hard=redFlagSkip(fixture)
   if(hard)return{pick:null,skip:hard}
   const odds=extractGoalsBankerOdds(fixture)
-  const decision=decideGoalsBanker(odds)
+  const stats=odds.favourite?statsFromFixture(fixture,odds.favourite):null
+  const decision=decideGoalsBanker(odds,{stats,earlySeason:isEarlySeason(fixture),fixtureId:fixture.fixtureId})
   if(decision.route==='SKIP')return{pick:null,skip:decision.skip||'skip',odds,type:decision.type,v3:decision.v3}
   const weak=weakFavouriteGate(decision.route,odds.favourite,fixture?.homeSplit,fixture?.awaySplit)
   if(!weak.ok)return{pick:null,skip:weak.skip,odds,type:decision.type,route:decision.route,v3:decision.v3}
@@ -265,6 +279,10 @@ export function canAddAccaLeg(slip,pick){
   const legs=Array.isArray(slip)?slip:[]
   if(!pick||pick.route==='SKIP')return{ok:false,reason:'no-pick'}
   if(String(pick.market||'')==='goals-streak-2'||pick.route==='STREAK')return{ok:false,reason:'streak-not-on-slip'}
+  if(pick.highBorderline===true)return{ok:false,reason:'high-borderline'}
+  if(Number.isFinite(pick.capabilityScore)&&pick.capabilityScore<75)return{ok:false,reason:'capability'}
+  if(Number.isFinite(pick.marketScore)&&pick.marketScore<82)return{ok:false,reason:'score-floor'}
+  if(Number.isFinite(pick.separation)&&pick.separation<8)return{ok:false,reason:'separation'}
   if(legs.length>=3)return{ok:false,reason:'max-3'}
   if(legs.some(row=>String(row.fixtureId)===String(pick.fixtureId)))return{ok:false,reason:'same-match'}
   const next=[...legs,pick]
