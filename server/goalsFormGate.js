@@ -28,7 +28,8 @@ export function last5VenueRates(fixtures,teamId,venue){
   return{played:n,ready:n>=FORM_SAMPLE,win:pct(win),loss:pct(loss),over25:pct(over25),btts:pct(btts),scored2plus:pct(scored2),conceded2plus:pct(conceded2)}
 }
 
-export function goalsFormGate(route,favourite,homeForm,awayForm){
+export function goalsFormGate(route,favourite,homeForm,awayForm,opts={}){
+  if(opts.waive)return{ok:true,skip:null,homeForm,awayForm,waived:true}
   if(!homeForm?.ready||!awayForm?.ready)return{ok:false,skip:'form-sample',homeForm,awayForm}
   const fav=favourite==='away'?awayForm:homeForm
   const opp=favourite==='away'?homeForm:awayForm
