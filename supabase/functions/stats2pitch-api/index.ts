@@ -107,10 +107,10 @@ function attachCrests(board:any){
     return{...row,homeLogo,awayLogo}
   }
   const next={...board}
-  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
 }
-function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,goalsBankersCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],fixtures:[],availableMarkets:[],results:{}}}
+function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,goalsBankersCount:0,safestBankersCount:0,valueBankersCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],dailyBankers:[],safestBankers:[],valueBankers:[],fixtures:[],availableMarkets:[],results:{}}}
 function slimMeta(meta:any={}){
   return{
     date:meta.date,
@@ -128,12 +128,15 @@ function slimMeta(meta:any={}){
     filterTipsCount:meta.filterTipsCount,
     goalsBankersEngine:meta.goalsBankersEngine,
     goalsBankersCount:meta.goalsBankersCount,
+    dailyBankersEngine:meta.dailyBankersEngine,
+    safestBankersCount:meta.safestBankersCount,
+    valueBankersCount:meta.valueBankersCount,
     requiresRefresh:meta.requiresRefresh===true,
     refresh:meta.refresh||null
   }
 }
 function publicBoard(board:any={},view='all'){
-  const v=['all','var','filter','goals'].includes(String(view||''))?String(view):'all'
+  const v=['all','var','filter','goals','bankers'].includes(String(view||''))?String(view):'all'
   const empty:any={
     meta:slimMeta(board?.meta||{}),
     fixtures:Array.isArray(board?.fixtures)?board.fixtures:[],
@@ -143,6 +146,10 @@ function publicBoard(board:any={},view='all'){
     varTips:[],
     filterTips:[],
     goalsBankers:[],
+    dailyBankers:[],
+    safestBankers:[],
+    valueBankers:[],
+    dailyBankersMeta:null,
     priority:[],
     bankers:[]
   }
@@ -150,6 +157,14 @@ function publicBoard(board:any={},view='all'){
   if(v==='var'){empty.varTips=board?.varTips||[];empty.varTipsMeta=board?.varTipsMeta||null;empty.availableMarkets=markets(empty.varTips);return empty}
   if(v==='filter'){empty.filterTips=board?.filterTips||[];empty.filterTipsMeta=board?.filterTipsMeta||null;empty.availableMarkets=markets(empty.filterTips);return empty}
   if(v==='goals'){empty.goalsBankers=board?.goalsBankers||[];empty.goalsBankersMeta=board?.goalsBankersMeta||null;empty.availableMarkets=markets(empty.goalsBankers);return empty}
+  if(v==='bankers'){
+    empty.dailyBankers=board?.dailyBankers||[]
+    empty.safestBankers=board?.safestBankers||[]
+    empty.valueBankers=board?.valueBankers||[]
+    empty.dailyBankersMeta=board?.dailyBankersMeta||null
+    empty.availableMarkets=markets([...empty.safestBankers,...empty.valueBankers,...empty.dailyBankers])
+    return empty
+  }
   empty.bestPicks=board?.bestPicks||[]
   empty.availableMarkets=Array.isArray(board?.availableMarkets)&&board.availableMarkets.length?board.availableMarkets:markets(empty.bestPicks)
   return empty

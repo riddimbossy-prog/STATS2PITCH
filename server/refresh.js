@@ -164,6 +164,9 @@ export async function refreshNow(date,onProgress=()=>{}){
   board.meta.diagnostics.filterTipsSkipped=board.filterTipsMeta?.skipped||{}
   board.meta.diagnostics.goalsBankers=(board.goalsBankers||[]).length
   board.meta.diagnostics.goalsBankersSkipped=board.goalsBankersMeta?.skipped||{}
+  board.meta.diagnostics.safestBankers=(board.safestBankers||[]).length
+  board.meta.diagnostics.valueBankers=(board.valueBankers||[]).length
+  board.meta.diagnostics.dailyBankersEngine=board.dailyBankersMeta?.engine||board.meta?.dailyBankersEngine||null
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p])),eligibleIds=new Set(fixtures.map(f=>String(f.fixtureId)))
   const statsById=new Map(fixtures.map(f=>[String(f.fixtureId),f.statsReady!==false]))
   board.fixtures=raw.filter(f=>eligibleIds.has(String(f?.fixture?.id))).map(f=>{

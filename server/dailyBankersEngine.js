@@ -2,23 +2,24 @@ import {FINISHED} from './config.js'
 import {fixtureHasStats} from './pickWhy.js'
 import {isSrlMatch} from './redFlags.js'
 
-export const DAILY_BANKERS_ENGINE='daily-bankers-v1'
+export const DAILY_BANKERS_ENGINE='daily-bankers-v2'
 export const DAILY_BANKERS_RULES=Object.freeze({
   recentSample:5,
+  minSample:3,
   baselineSample:10,
   recentWeight:0.60,
   baselineWeight:0.40,
   safestMinOdd:1.15,
-  safestMaxOdd:1.75,
-  safestMinConsensus:80,
-  safestMinScore:84,
-  valueMinOdd:1.55,
-  valueMaxOdd:3.00,
-  valueMinConsensus:60,
-  valueMinEdge:0.08,
-  valueMinScore:76,
-  maxSafest:6,
-  maxValue:6
+  safestMaxOdd:1.80,
+  safestMinConsensus:75,
+  safestMinScore:80,
+  valueMinOdd:1.50,
+  valueMaxOdd:3.10,
+  valueMinConsensus:55,
+  valueMinEdge:0.06,
+  valueMinScore:72,
+  maxSafest:8,
+  maxValue:8
 })
 
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
@@ -46,6 +47,14 @@ function rows(fixtures,id,venue,limit){
     .sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0)).slice(0,limit)
 }
 
+function overallRows(fixtures,id,limit){
+  return (fixtures||[]).filter(f=>{
+    if(!done(f))return false
+    const h=String(f?.teams?.home?.id??''),a=String(f?.teams?.away?.id??'')
+    return h===String(id)||a===String(id)
+  }).sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0)).slice(0,limit)
+}
+
 function rate(fixtures,id,venue,limit,test,halfOnly=false){
   let total=0,hits=0
   for(const f of rows(fixtures,id,venue,limit)){
@@ -55,6 +64,30 @@ function rate(fixtures,id,venue,limit,test,halfOnly=false){
     if(test(g))hits++
   }
   return{rate:pct(hits,total),hits,total}
+}
+
+function rateOverall(fixtures,id,limit,test,halfOnly=false){
+  let total=0,hits=0
+  for(const f of overallRows(fixtures,id,limit)){
+    const g=halfOnly?half(f,id):full(f,id)
+    if(!g)continue
+    total++
+    if(test(g))hits++
+  }
+  return{rate:pct(hits,total),hits,total}
+}
+
+function sideEvidence(fixture,side,test,halfOnly,limit){
+  const team=fixture?.[side]||{}
+  const id=team.id
+  const venue=rate(team.fixtures,id,side,limit,test,halfOnly)
+  if(venue.total>=DAILY_BANKERS_RULES.recentSample)return{...venue,source:'venue'}
+  const overall=rateOverall(team.lastMatches||team.fixtures,id,Math.max(limit,DAILY_BANKERS_RULES.recentSample),test,halfOnly)
+  if(venue.total>=1&&overall.total>=DAILY_BANKERS_RULES.minSample&&venue.rate!=null&&overall.rate!=null){
+    return{rate:Math.round(venue.rate*0.7+overall.rate*0.3),hits:venue.hits,total:Math.max(venue.total,overall.total),source:'blended',overall:overall.rate}
+  }
+  if(overall.total>=DAILY_BANKERS_RULES.minSample)return{...overall,source:'overall'}
+  return{...venue,source:'venue'}
 }
 
 function parseOU(s){
@@ -70,9 +103,9 @@ function selectionTests(marketKey,name){
     return null
   }
   if(marketKey==='double-chance'){
-    if(n==='1x'||n.includes('home or draw'))return{home:g=>g.own>=g.opp,away:g=>g.own<=g.opp,teamSide:'home'}
-    if(n==='x2'||n.includes('draw or away'))return{home:g=>g.own<=g.opp,away:g=>g.own>=g.opp,teamSide:'away'}
-    if(n==='12'||n.includes('home or away'))return{home:g=>g.own!==g.opp,away:g=>g.own!==g.opp,teamSide:null}
+    if(n==='1x'||n.includes('home or draw')||n==='home draw')return{home:g=>g.own>=g.opp,away:g=>g.own<=g.opp,teamSide:'home'}
+    if(n==='x2'||n.includes('draw or away')||n==='draw away')return{home:g=>g.own<=g.opp,away:g=>g.own>=g.opp,teamSide:'away'}
+    if(n==='12'||n.includes('home or away')||n==='home away')return{home:g=>g.own!==g.opp,away:g=>g.own!==g.opp,teamSide:null}
     return null
   }
   if(marketKey==='draw-no-bet'){
@@ -81,8 +114,8 @@ function selectionTests(marketKey,name){
     return null
   }
   if(marketKey==='both-teams-score'){
-    if(n==='yes')return{home:g=>g.own>0&&g.opp>0,away:g=>g.own>0&&g.opp>0}
-    if(n==='no')return{home:g=>!(g.own>0&&g.opp>0),away:g=>!(g.own>0&&g.opp>0)}
+    if(n==='yes'||n==='gg'||n==='btts yes'||n==='goal goal')return{home:g=>g.own>0&&g.opp>0,away:g=>g.own>0&&g.opp>0}
+    if(n==='no'||n==='ng'||n==='btts no'||n==='no goal')return{home:g=>!(g.own>0&&g.opp>0),away:g=>!(g.own>0&&g.opp>0)}
     return null
   }
   if(marketKey==='total-goals'){
@@ -106,6 +139,12 @@ function selectionTests(marketKey,name){
     const p=parseOU(name);if(!p||p.line<0.5||p.line>3.5)return null
     return{home:g=>p.side==='over'?g.opp>p.line:g.opp<p.line,away:g=>p.side==='over'?g.own>p.line:g.own<p.line,line:p.line,side:p.side,teamSide:'away'}
   }
+  if(marketKey==='team-goals'){
+    const p=parseOU(name);if(!p||p.line<0.5||p.line>3.5)return null
+    if(/\bhome\b/.test(n))return{home:g=>p.side==='over'?g.own>p.line:g.own<p.line,away:g=>p.side==='over'?g.opp>p.line:g.opp<p.line,line:p.line,side:p.side,teamSide:'home'}
+    if(/\baway\b/.test(n))return{home:g=>p.side==='over'?g.opp>p.line:g.opp<p.line,away:g=>p.side==='over'?g.own>p.line:g.own<p.line,line:p.line,side:p.side,teamSide:'away'}
+    return null
+  }
   return null
 }
 
@@ -126,10 +165,11 @@ function marketLabel(m,o){
   if(m.marketKey==='double-chance')return`Double Chance · ${s}`
   if(m.marketKey==='draw-no-bet')return`DNB · ${s}`
   if(m.marketKey==='both-teams-score')return`BTTS · ${s}`
-  if(m.marketKey==='home-team-goals')return`Home Team · ${s}`
-  if(m.marketKey==='away-team-goals')return`Away Team · ${s}`
+  if(m.marketKey==='home-team-goals'||(m.marketKey==='team-goals'&&/\bhome\b/.test(norm(o?.name))))return`Home Team · ${s}`
+  if(m.marketKey==='away-team-goals'||(m.marketKey==='team-goals'&&/\baway\b/.test(norm(o?.name))))return`Away Team · ${s}`
   if(m.marketKey==='first-half-goals')return`1H · ${s}`
   if(m.marketKey==='first-half-winner')return`1H Result · ${s}`
+  if(m.marketKey==='total-goals')return s
   return s
 }
 
@@ -139,7 +179,7 @@ function reliabilityBonus(marketKey,name){
   if(marketKey==='draw-no-bet')return 4
   if(marketKey==='total-goals'&&p?.line===1.5&&p.side==='over')return 6
   if(marketKey==='total-goals'&&p?.line===3.5&&p.side==='under')return 5
-  if((marketKey==='home-team-goals'||marketKey==='away-team-goals')&&p?.line===0.5&&p.side==='over')return 5
+  if((marketKey==='home-team-goals'||marketKey==='away-team-goals'||marketKey==='team-goals')&&p?.line===0.5&&p.side==='over')return 5
   if(marketKey==='both-teams-score')return 2
   if(marketKey==='match-winner')return 1
   if(marketKey.startsWith('first-half'))return-4
@@ -147,7 +187,7 @@ function reliabilityBonus(marketKey,name){
 }
 
 function supportedMarket(marketKey){
-  return new Set(['match-winner','double-chance','draw-no-bet','both-teams-score','total-goals','home-team-goals','away-team-goals','first-half-goals','first-half-winner']).has(marketKey)
+  return new Set(['match-winner','double-chance','draw-no-bet','both-teams-score','total-goals','home-team-goals','away-team-goals','team-goals','first-half-goals','first-half-winner']).has(marketKey)
 }
 
 function evaluateOutcome(fixture,market,outcome){
@@ -157,14 +197,15 @@ function evaluateOutcome(fixture,market,outcome){
   const tests=selectionTests(market.marketKey,outcome.name)
   if(!tests)return null
   const homeId=fixture?.home?.id,awayId=fixture?.away?.id
-  const recentHome=rate(fixture?.home?.fixtures,homeId,'home',DAILY_BANKERS_RULES.recentSample,tests.home,tests.halfOnly)
-  const recentAway=rate(fixture?.away?.fixtures,awayId,'away',DAILY_BANKERS_RULES.recentSample,tests.away,tests.halfOnly)
-  if(recentHome.total<DAILY_BANKERS_RULES.recentSample||recentAway.total<DAILY_BANKERS_RULES.recentSample)return null
-  const baseHome=rate(fixture?.home?.fixtures,homeId,'home',DAILY_BANKERS_RULES.baselineSample,tests.home,tests.halfOnly)
-  const baseAway=rate(fixture?.away?.fixtures,awayId,'away',DAILY_BANKERS_RULES.baselineSample,tests.away,tests.halfOnly)
+  const recentHome=sideEvidence(fixture,'home',tests.home,tests.halfOnly,DAILY_BANKERS_RULES.recentSample)
+  const recentAway=sideEvidence(fixture,'away',tests.away,tests.halfOnly,DAILY_BANKERS_RULES.recentSample)
+  if(recentHome.total<DAILY_BANKERS_RULES.minSample||recentAway.total<DAILY_BANKERS_RULES.minSample)return null
+  if(recentHome.rate==null||recentAway.rate==null)return null
+  const baseHome=sideEvidence(fixture,'home',tests.home,tests.halfOnly,DAILY_BANKERS_RULES.baselineSample)
+  const baseAway=sideEvidence(fixture,'away',tests.away,tests.halfOnly,DAILY_BANKERS_RULES.baselineSample)
   const recentConsensus=Math.min(recentHome.rate,recentAway.rate)
   const baselineConsensus=Math.min(baseHome.rate??recentHome.rate,baseAway.rate??recentAway.rate)
-  const baselineReady=baseHome.total>=DAILY_BANKERS_RULES.recentSample&&baseAway.total>=DAILY_BANKERS_RULES.recentSample
+  const baselineReady=baseHome.total>=DAILY_BANKERS_RULES.minSample&&baseAway.total>=DAILY_BANKERS_RULES.minSample
   const capability=baselineReady
     ?Math.round(recentConsensus*DAILY_BANKERS_RULES.recentWeight+baselineConsensus*DAILY_BANKERS_RULES.baselineWeight)
     :recentConsensus
@@ -187,17 +228,19 @@ function evaluateOutcome(fixture,market,outcome){
   if(edge>0)rawScore+=Math.min(12,edge*100)
   if(Math.abs(recentConsensus-baselineConsensus)>=30)rawScore-=8
   if(tests.halfOnly)rawScore-=3
+  if(recentHome.total<DAILY_BANKERS_RULES.recentSample||recentAway.total<DAILY_BANKERS_RULES.recentSample)rawScore-=4
+  if(fixture?.earlySeason===true)rawScore-=2
 
   const reasons=[]
-  reasons.push(`Both sides' venue form supports ${marketLabel(market,outcome)}: ${recentHome.rate}% from the home side and ${recentAway.rate}% from the away side over the recent split sample.`)
-  if(baselineReady)reasons.push(`The longer venue baseline is ${baselineConsensus}% in the same direction, so this is not relying only on the latest five matches.`)
+  reasons.push(`Both sides' recent form supports ${marketLabel(market,outcome)}: ${recentHome.rate}% from the home side and ${recentAway.rate}% from the away side over the recent sample.`)
+  if(baselineReady)reasons.push(`The longer baseline is ${baselineConsensus}% in the same direction, so this is not relying only on the latest matches.`)
   if(tests.teamSide&&homeTier&&awayTier&&!sameTier)reasons.push(`The selected side also has a different venue tier from the opponent, which reduces the risk of a same-level matchup.`)
   if(market.marketKey==='double-chance')reasons.push('This market protects the stake against one of the three match results, which is why it can qualify as a safer banker.')
   if(market.marketKey==='draw-no-bet')reasons.push('A draw returns the stake, so the selection only needs the chosen side to avoid losing for stake protection.')
   if(market.marketKey==='total-goals')reasons.push('Both teams are showing the same total-goals direction in their relevant home/away games.')
   if(market.marketKey==='both-teams-score')reasons.push('Both teams repeatedly show the same scoring/conceding pattern, so the BTTS price has statistical support from both sides.')
   if(market.marketKey.includes('team-goals'))reasons.push('The team-total pick is supported by one side producing that goal line and the opponent allowing it in the matching venue split.')
-  reasons.push(`At odds ${odds.toFixed(2)}, the price implies about ${Math.round(implied*100)}%; the blended venue evidence is ${capability}%.`)
+  reasons.push(`At odds ${odds.toFixed(2)}, the price implies about ${Math.round(implied*100)}%; the blended evidence is ${capability}%.`)
 
   const safest=odds>=DAILY_BANKERS_RULES.safestMinOdd&&odds<=DAILY_BANKERS_RULES.safestMaxOdd
     &&capability>=DAILY_BANKERS_RULES.safestMinConsensus&&rawScore>=DAILY_BANKERS_RULES.safestMinScore
@@ -217,12 +260,12 @@ function evaluateOutcome(fixture,market,outcome){
     impliedProbability:+(implied*100).toFixed(1),valueEdge:+(edge*100).toFixed(1),
     oddsVerified:outcome?.verified===true,homeTier,awayTier,
     why:reasons,whyText:reasons.join(' '),
-    evidence:{recent:{home:recentHome.rate,away:recentAway.rate},baseline:baselineReady?{home:baseHome.rate,away:baseAway.rate}:null}
+    evidence:{recent:{home:recentHome.rate,away:recentAway.rate,sourceHome:recentHome.source,sourceAway:recentAway.source},baseline:baselineReady?{home:baseHome.rate,away:baseAway.rate}:null}
   }
 }
 
 export function analyzeDailyBankerFixture(fixture){
-  if(isSrlMatch(fixture)||!fixtureHasStats(fixture)||fixture?.earlySeason===true)return{safe:null,value:null,candidates:[]}
+  if(isSrlMatch(fixture)||!fixtureHasStats(fixture))return{safe:null,value:null,candidates:[]}
   const candidates=[]
   for(const market of fixture?.marketOdds||[])for(const outcome of market?.outcomes||[]){
     const row=evaluateOutcome(fixture,market,outcome)
@@ -234,12 +277,16 @@ export function analyzeDailyBankerFixture(fixture){
   return{safe,value,candidates}
 }
 
+function samePick(a,b){
+  return a&&b&&String(a.fixtureId)===String(b.fixtureId)&&String(a.market)===String(b.market)&&norm(a.selection)===norm(b.selection)
+}
+
 export function buildDailyBankersBoard(fixtures,meta={}){
   const safest=[],value=[]
   for(const fixture of fixtures||[]){
     const result=analyzeDailyBankerFixture(fixture)
     if(result.safe)safest.push(result.safe)
-    else if(result.value)value.push(result.value)
+    if(result.value&&!samePick(result.safe,result.value))value.push(result.value)
   }
   safest.sort((a,b)=>b.rawScore-a.rawScore||a.odds-b.odds||Date.parse(a.kickoff)-Date.parse(b.kickoff))
   value.sort((a,b)=>b.valueEdge-a.valueEdge||b.rawScore-a.rawScore||Date.parse(a.kickoff)-Date.parse(b.kickoff))

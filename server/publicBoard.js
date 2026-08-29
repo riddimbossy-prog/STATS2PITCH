@@ -66,7 +66,7 @@ export function publicBoard(board={},view='all'){
     empty.safestBankers=Array.isArray(board?.safestBankers)?board.safestBankers:[]
     empty.valueBankers=Array.isArray(board?.valueBankers)?board.valueBankers:[]
     empty.dailyBankersMeta=board?.dailyBankersMeta||null
-    empty.availableMarkets=markets(empty.dailyBankers)
+    empty.availableMarkets=markets([...empty.safestBankers,...empty.valueBankers,...empty.dailyBankers])
     return empty
   }
   empty.bestPicks=Array.isArray(board?.bestPicks)?board.bestPicks:[]

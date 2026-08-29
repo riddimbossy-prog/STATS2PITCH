@@ -35,13 +35,13 @@ Deno.serve(async req=>{
     const raw=url.searchParams.get('date')
     const date=dateOk(raw)?String(raw):today()
     const row=await snapshot(date)
-    if(!row)return json({meta:{date,generatedAt:null,engine:'daily-bankers-v1'},fixtures:[],results:{},dailyBankers:[],safestBankers:[],valueBankers:[],dailyBankersMeta:null})
+    if(!row)return json({meta:{date,generatedAt:null,engine:'daily-bankers-v2'},fixtures:[],results:{},dailyBankers:[],safestBankers:[],valueBankers:[],dailyBankersMeta:null})
     const board=row.payload||{}
     const safest=Array.isArray(board.safestBankers)?board.safestBankers:[]
     const value=Array.isArray(board.valueBankers)?board.valueBankers:[]
     const daily=Array.isArray(board.dailyBankers)?board.dailyBankers:[...safest,...value]
     return json({
-      meta:{date,generatedAt:board?.meta?.generatedAt||row.generatedAt,dailyBankersEngine:board?.meta?.dailyBankersEngine||board?.dailyBankersMeta?.engine||'daily-bankers-v1',safestBankersCount:safest.length,valueBankersCount:value.length},
+      meta:{date,generatedAt:board?.meta?.generatedAt||row.generatedAt,dailyBankersEngine:board?.meta?.dailyBankersEngine||board?.dailyBankersMeta?.engine||'daily-bankers-v2',safestBankersCount:safest.length,valueBankersCount:value.length},
       fixtures:Array.isArray(board.fixtures)?board.fixtures:[],
       results:board?.results&&typeof board.results==='object'?board.results:{},
       dailyBankers:daily,

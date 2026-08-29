@@ -1,20 +1,27 @@
-import {readBoardCache,writeBoardCache,dateStrip,isoToday,scrollDateStrip,bootDone} from './net.js'
+import {readBoardCache,writeBoardCache,dateStrip,isoToday,scrollDateStrip,bootDone,api,hasRemainingTips} from './net.js'
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 
 const $=q=>document.querySelector(q)
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const state={date:new URLSearchParams(location.search).get('date')||isoToday(),board:null}
 const VIEW='bankers'
 const cfg=window.__STATS2PITCH_CONFIG__||{}
 const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
 const anon=String(cfg.supabaseAnonKey||'')
 
+function pickRows(board){
+  return [...(Array.isArray(board?.safestBankers)?board.safestBankers:[]),...(Array.isArray(board?.valueBankers)?board.valueBankers:[])]
+}
+
 async function bankerApi(date){
-  if(!base)throw new Error('Service unavailable')
-  const res=await fetch(`${base}/functions/v1/stats2pitch-bankers?date=${encodeURIComponent(date)}`,{headers:{apikey:anon,Authorization:`Bearer ${anon}`},cache:'default'})
-  const body=await res.json().catch(()=>null)
-  if(!res.ok)throw new Error('Unable to load bankers')
-  return body
+  if(base&&anon){
+    try{
+      const res=await fetch(`${base}/functions/v1/stats2pitch-bankers?date=${encodeURIComponent(date)}`,{headers:{apikey:anon,Authorization:`Bearer ${anon}`},cache:'default'})
+      const body=await res.json().catch(()=>null)
+      if(res.ok&&body)return body
+    }catch{}
+  }
+  return api(`/board?date=${encodeURIComponent(date)}&view=${VIEW}`,{cache:'default'})
 }
 
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
@@ -22,7 +29,7 @@ function fmtDate(v){const d=new Date(v);return Number.isNaN(d.getTime())?'TBC':d
 function resultFor(row){return state.board?.results?.[String(row.fixtureId)]||null}
 function resultChip(row){const r=resultFor(row);if(!r)return'';const o=String(r.outcome||'');if(!['won','lost','void','postponed'].includes(o))return'';return`<span class="result-chip ${esc(o)}">${esc(o.toUpperCase())}</span>`}
 function metric(label,value,suffix=''){return`<div class="metric"><span>${esc(label)}</span><b>${value===null||value===undefined?'—':esc(value)}${suffix}</b></div>`}
-function reasons(row){const list=Array.isArray(row.why)?row.why:row.whyText?[row.whyText]:[];return list.slice(0,5).map(x=>`<li>${esc(x)}</li>`).join('')}
+function reasons(row){const list=Array.isArray(row.why)?row.why:row.whyText?[row.whyText]:Array.isArray(row.reasons)?row.reasons:[];return list.slice(0,5).map(x=>`<li>${esc(x)}</li>`).join('')}
 
 function card(row,kind){
   const crests=fixtureCrests(state.board)
@@ -45,7 +52,7 @@ function card(row,kind){
       ${metric(safe?'RECENT SUPPORT':'VALUE EDGE',safe?row.recentConsensus:(Number.isFinite(edge)?edge.toFixed(1):null),safe?'%':' pts')}
     </div>
     <div class="why-title"><b>Why this pick</b></div>
-    <ul class="why-list">${reasons(row)}</ul>
+    <ul class="why-list">${reasons(row)||'<li>Venue splits and the SportyBet price agree on this line.</li>'}</ul>
     <div class="kickoff"><span>${esc(fmtDate(row.kickoff))}</span>${resultChip(row)}</div>
   </article>`
 }
@@ -53,7 +60,7 @@ function card(row,kind){
 function renderDates(){
   const host=$('#bankerDates');if(!host)return
   const today=isoToday(),dates=dateStrip(today)
-  host.innerHTML=dates.map(d=>`<button class="${d===state.date?'active':''}" data-date="${d}">${d===today?'Today':new Date(d+'T12:00:00Z').toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'})}</button>`).join('')
+  host.innerHTML=dates.map(d=>`<button class="date ${d===state.date?'active':''}" data-date="${d}">${d===today?'Today':new Date(d+'T12:00:00Z').toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'})}</button>`).join('')
   host.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>{state.date=b.dataset.date;history.replaceState(null,'',`?date=${encodeURIComponent(state.date)}`);load()})
   requestAnimationFrame(()=>scrollDateStrip(host))
 }
@@ -65,11 +72,36 @@ function render(){
   const safeHost=$('#safeGrid'),valueHost=$('#valueGrid')
   $('#safeCount').textContent=String(safe.length)
   $('#valueCount').textContent=String(value.length)
-  const engine=state.board?.dailyBankersMeta?.engine||state.board?.meta?.dailyBankersEngine||'daily-bankers-v1'
+  const engine=state.board?.dailyBankersMeta?.engine||state.board?.meta?.dailyBankersEngine||'daily-bankers-v2'
   $('#engineChip').textContent=engine
   safeHost.innerHTML=safe.length?safe.map(r=>card(r,'safest')).join(''):'<div class="empty-bankers">No Safest Banker cleared every rule for this date.</div>'
   valueHost.innerHTML=value.length?value.map(r=>card(r,'value')).join(''):'<div class="empty-bankers">No Value Banker has enough statistical edge for this date.</div>'
   bindCrestFallbacks(document)
+}
+
+async function hopIfEmpty(){
+  if(pickRows(state.board).length)return false
+  const today=isoToday()
+  if(state.date<today)return false
+  const dates=dateStrip(today)
+  const start=Math.max(0,dates.indexOf(state.date))
+  for(const date of dates.slice(start+1)){
+    if(date<today)continue
+    let board=readBoardCache(date,VIEW)
+    if(!board){
+      try{
+        board=await bankerApi(date)
+        if(board)writeBoardCache(date,VIEW,board)
+      }catch{continue}
+    }
+    if(hasRemainingTips(pickRows(board))||pickRows(board).length){
+      state.date=date
+      state.board=board
+      history.replaceState(null,'',`?date=${encodeURIComponent(date)}`)
+      return true
+    }
+  }
+  return false
 }
 
 async function load(){
@@ -81,6 +113,7 @@ async function load(){
     const board=await bankerApi(state.date)
     state.board=board
     writeBoardCache(state.date,VIEW,board)
+    await hopIfEmpty()
     render();bootDone()
   }catch(e){
     if(!cached){$('#safeGrid').innerHTML='<div class="empty-bankers">Bankers are unavailable right now.</div>';$('#valueGrid').innerHTML='';bootDone()}

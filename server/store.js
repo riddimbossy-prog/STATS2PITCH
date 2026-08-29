@@ -31,7 +31,7 @@ export function attachCrests(board){
     return{...row,homeLogo,awayLogo,homeId,awayId}
   }
   const next={...board}
-  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
 }
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
@@ -53,7 +53,7 @@ function mergeRows(oldRows,freshRows,now,existing){
   return out.sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
 }
 function countTips(board){
-  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.goalsBankers||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
+  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.goalsBankers||[]).length+(board?.dailyBankers||[]).length+(board?.safestBankers||[]).length+(board?.valueBankers||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
 }
 function incomingFeedEmpty(board){
   const source=Number(board?.meta?.sourceFixtures??board?.meta?.diagnostics?.sourceFixtures??0)

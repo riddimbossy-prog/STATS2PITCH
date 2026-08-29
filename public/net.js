@@ -45,7 +45,7 @@ export function addDays(iso,n){
 }
 
 export function isoToday(){
-  return new Date().toISOString().slice(0,10)
+  return new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Accra',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
 }
 
 export function dateStrip(today=isoToday()){
