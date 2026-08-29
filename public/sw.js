@@ -1,5 +1,5 @@
-const CACHE='stats2pitch-shell-v5.7.0'
-const SHELL=['/','/filter-tips.html','/var-tips.html','/goals-bankers.html','/results.html','/offline.html','/conceptD.css','/mobile2026.css','/filterTips.css','/varTips.css','/goalsBankers.css','/leagueFlags.js','/appCrests.js','/filterTips.js','/varTips.js','/goalsBankers.js','/performanceAdvice.js','/net.js','/crests.js','/whyPopup.js','/pwa.js','/assets/s2p-pitch-mark.svg','/assets/stats2pitch-favicon-v3.png','/assets/football-real.svg']
+const CACHE='stats2pitch-shell-v5.8.0'
+const SHELL=['/','/filter-tips.html','/var-tips.html','/goals-bankers.html','/daily-bankers.html','/results.html','/offline.html','/conceptD.css','/mobile2026.css','/filterTips.css','/varTips.css','/goalsBankers.css','/dailyBankers.css','/leagueFlags.js','/appCrests.js','/filterTips.js','/varTips.js','/goalsBankers.js','/dailyBankers.js','/performanceAdvice.js','/net.js','/crests.js','/whyPopup.js','/pwa.js','/assets/s2p-pitch-mark.svg','/assets/stats2pitch-favicon-v3.png','/assets/football-real.svg']
 
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())))
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())))
