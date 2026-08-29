@@ -87,7 +87,7 @@ export function settleBoard(board,fixtures=[]){
   const map=new Map((fixtures||[]).map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]}))
   const prior=board?.results||{}
   const results={...prior}
-  for(const pick of [...(board?.bestPicks||[]),...(board?.varTips||[]),...(board?.filterTips||[]),...(board?.goalsBankers||[])]){
+  for(const pick of [...(board?.bestPicks||[]),...(board?.varTips||[]),...(board?.filterTips||[]),...(board?.goalsBankers||[]),...(board?.dailyBankers||[])]){
     const key=String(pick.fixtureId),fixture=map.get(key)
     if(!fixture)continue
     results[key]=resolveResult(pick,fixture,prior[key])
