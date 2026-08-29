@@ -25,6 +25,8 @@ const awayOver=[[2,1],[3,2],[2,2],[1,0],[3,1]]
 const homeUnder=[[1,0],[2,0],[1,0],[2,1],[1,0]]
 const awayUnder=[[0,1],[0,2],[1,1],[0,1],[1,2]]
 const evenForm=[[1,1],[1,0],[0,1],[1,1],[2,2]]
+const mixedFav=[[2,1],[2,0],[3,1],[1,2],[1,1]]
+const mixedDog=[[1,2],[0,2],[1,3],[2,1],[1,1]]
 
 function markets(odds={}){
   const rows=[]
@@ -35,6 +37,7 @@ function markets(odds={}){
     found.outcomes.push({name,odd:Number(odd)})
   }
   add('match-winner','Match winner','Home',odds.homeWin)
+  add('match-winner','Match winner','Draw',odds.drawWin)
   add('match-winner','Match winner','Away',odds.awayWin)
   add('total-goals','Total goals','Over 1.5',odds.over15)
   add('total-goals','Total goals','Under 3.5',odds.under35)
@@ -42,6 +45,11 @@ function markets(odds={}){
   add('total-goals','Total goals','Under 2.5',odds.under25)
   add('both-teams-score','Both teams to score','Yes',odds.ggYes)
   add('both-teams-score-2','GG/NG 2+','No',odds.gg2No)
+  add('home-team-goals','Home team goals','Over 0.5',odds.homeO05)
+  add('home-team-goals','Home team goals','Over 1.5',odds.homeO15)
+  add('away-team-goals','Away team goals','Over 0.5',odds.awayO05)
+  add('away-team-goals','Away team goals','Over 1.5',odds.awayO15)
+  add('goals-streak-2','Goals Streak 2+','Yes',odds.streakYes)
   return rows
 }
 
@@ -63,17 +71,20 @@ function fixture(overrides={}){
   }
 }
 
-test('combined board attaches Filter Tips separately from All Picks and VAR Tips',()=>{
-  const board=buildBoard([fixture()])
+const winOnly=()=>markets({homeWin:1.35,drawWin:4.80,awayWin:8.00})
+
+test('combined board attaches Filter Tips v2 separately from All Picks and VAR Tips',()=>{
+  const board=buildBoard([fixture({marketOdds:winOnly()})])
   assert.ok(Array.isArray(board.filterTips))
   assert.equal(board.meta.filterTipsEngine,ENGINE_ID)
   assert.equal(board.filterTips[0].engine,ENGINE_ID)
   assert.equal(board.filterTips[0].route,'straight-win')
+  assert.ok(Number.isFinite(board.filterTips[0].filterScore))
   assert.ok(board.bestPicks.every(row=>row.engine!==ENGINE_ID))
 })
 
-test('straight win publishes a favourite priced 1.20 to 1.55',()=>{
-  const result=diagnoseFilterFixture(fixture())
+test('straight win publishes a favourite priced 1.20 to 1.55 when it is the clear route',()=>{
+  const result=diagnoseFilterFixture(fixture({marketOdds:winOnly()}))
   assert.equal(result.skip,null)
   assert.equal(result.pick.route,'straight-win')
   assert.equal(result.pick.selection,'Home')
@@ -86,7 +97,6 @@ test('straight win publishes a favourite priced 1.20 to 1.55',()=>{
 
 test('over 1.5 needs O1.5 under 1.30 and U3.5 over 1.39',()=>{
   const result=diagnoseFilterFixture(fixture({
-    homeWin:undefined,
     marketOdds:markets({homeWin:1.10,awayWin:8.00,over15:1.22,under35:1.50}),
     homeFixtures:venueRows(1,'home',homeOver),
     awayFixtures:venueRows(2,'away',awayOver)
@@ -148,13 +158,28 @@ test('GG needs GG Yes under 1.50 and GG 2+ No over 1.30',()=>{
   assert.notEqual(miss.pick?.route,'gg')
 })
 
-test('one pick per match tries markets in listed order',()=>{
+test('v2 scores every surviving route so a later stronger market can beat straight win',()=>{
   const result=diagnoseFilterFixture(fixture({
-    marketOdds:markets({
-      homeWin:1.32,awayWin:8.00,over15:1.22,under35:1.70,over25:1.40,under25:1.45,ggYes:1.40,gg2No:1.45
-    })
+    homeFixtures:venueRows(1,'home',mixedFav),
+    awayFixtures:venueRows(2,'away',mixedDog),
+    marketOdds:markets({homeWin:1.35,drawWin:4.20,awayWin:6.00,over15:1.22,under35:1.50})
   }))
-  assert.equal(result.pick.route,'straight-win')
+  assert.equal(result.skip,null)
+  assert.equal(result.pick.route,'over-15')
+  assert.ok(result.candidates.some(row=>row.route==='straight-win'))
+  assert.ok(result.pick.filterScore>result.pick.runnerUpScore)
+})
+
+test('v2 skips when two strong goals routes are too close',()=>{
+  const result=diagnoseFilterFixture(fixture({
+    marketOdds:markets({homeWin:1.10,awayWin:8.00,over15:1.22,under35:1.70,over25:1.40}),
+    homeFixtures:venueRows(1,'home',homeOver),
+    awayFixtures:venueRows(2,'away',awayOver)
+  }))
+  assert.equal(result.pick,null)
+  assert.equal(result.skip,'low-market-separation')
+  assert.ok(result.candidates.length>=2)
+  assert.ok(result.separation<8)
 })
 
 test('H2H and stats against the priced favourite skip only the straight-win route',()=>{
@@ -182,6 +207,15 @@ test('H2H and stats against the priced favourite skip only the straight-win rout
   assert.equal(next.pick.route,'over-15')
 })
 
+test('one or two H2H rows cannot overrule a strong current venue profile',()=>{
+  const result=diagnoseFilterFixture(fixture({
+    h2h:[{home:'Home FC',away:'Away FC',hs:0,as:2}],
+    marketOdds:winOnly()
+  }))
+  assert.equal(result.skip,null)
+  assert.equal(result.pick.route,'straight-win')
+})
+
 test('top five vs top five and bottom three vs bottom three are skipped',()=>{
   const top=diagnoseFilterFixture(fixture({homeSplit:{position:2,size:20,sampleReady:true},awaySplit:{position:4,size:20,sampleReady:true}}))
   assert.equal(top.skip,'both-top-five')
@@ -189,20 +223,26 @@ test('top five vs top five and bottom three vs bottom three are skipped',()=>{
   assert.equal(bottom.skip,'both-bottom-three')
 })
 
-test('early season, similar form and cup ties are skipped',()=>{
+test('early season and cup ties are still hard skips',()=>{
   assert.equal(diagnoseFilterFixture(fixture({earlySeason:true})).skip,'early-season')
-  const similar=diagnoseFilterFixture(fixture({
-    homeFixtures:venueRows(1,'home',evenForm),
-    awayFixtures:venueRows(2,'away',evenForm)
-  }))
-  assert.equal(similar.skip,'similar-form')
   assert.equal(isCupCompetition('FA Cup'),true)
   assert.equal(isCupCompetition('UEFA Champions League'),true)
   assert.equal(isCupCompetition('Premier League'),false)
   assert.equal(diagnoseFilterFixture(fixture({league:'FA Cup'})).skip,'cup')
 })
 
-test('direction disagreement skips that market then tries the next',()=>{
+test('similar form vetoes the win route but does not automatically kill a supported goals route',()=>{
+  const result=diagnoseFilterFixture(fixture({
+    homeFixtures:venueRows(1,'home',evenForm),
+    awayFixtures:venueRows(2,'away',evenForm),
+    marketOdds:markets({homeWin:1.35,awayWin:8.00,over15:1.22,under35:1.50})
+  }))
+  assert.equal(result.skip,null)
+  assert.equal(result.pick.route,'over-15')
+  assert.ok(result.rejected.some(row=>row.route==='straight-win'&&row.reason==='similar-form-win'))
+})
+
+test('direction disagreement skips the market',()=>{
   const result=diagnoseFilterFixture(fixture({
     marketOdds:markets({homeWin:1.10,awayWin:8.00,over15:1.22,under35:1.70,over25:1.40}),
     homeFixtures:venueRows(1,'home',homeUnder),
@@ -225,12 +265,23 @@ test('SportyBet market 60000 is GG 2+ No for the GG gate',()=>{
   assert.equal(odds.gg2No,1.45)
 })
 
+test('v2 extracts draw, team-total and goals-streak context when present',()=>{
+  const odds=extractFilterOdds(fixture({marketOdds:markets({
+    homeWin:1.35,drawWin:4.60,awayWin:8.00,homeO05:1.12,awayO05:1.55,homeO15:1.32,awayO15:2.10,streakYes:1.40
+  })}))
+  assert.equal(odds.drawWin,4.60)
+  assert.equal(odds.homeO05,1.12)
+  assert.equal(odds.awayO05,1.55)
+  assert.equal(odds.streakYes,1.40)
+})
+
 test('filter board sorts published tips by kickoff',()=>{
   const board=buildFilterBoard([
-    fixture({fixtureId:2,kickoff:'2026-08-27T20:00:00Z'}),
-    fixture({fixtureId:1,kickoff:'2026-08-27T16:00:00Z'})
+    fixture({fixtureId:2,kickoff:'2026-08-27T20:00:00Z',marketOdds:winOnly()}),
+    fixture({fixtureId:1,kickoff:'2026-08-27T16:00:00Z',marketOdds:winOnly()})
   ])
   assert.equal(board.bestPicks.length,2)
   assert.equal(board.bestPicks[0].fixtureId,1)
   assert.equal(board.meta.engine,ENGINE_ID)
+  assert.equal(board.meta.filterVersion,'v2')
 })

@@ -71,7 +71,7 @@ test('board version is consensus All Picks plus VAR Tips',()=>{
   assert.ok(Array.isArray(board.varTips))
   assert.ok(Array.isArray(board.filterTips))
   assert.ok(Array.isArray(board.goalsBankers))
-  assert.equal(board.meta.filterTipsEngine,'sporty-filter-v1')
+  assert.equal(board.meta.filterTipsEngine,'sporty-filter-v2')
   assert.equal(board.meta.goalsBankersEngine,'goals-bankers-v3')
 })
 
