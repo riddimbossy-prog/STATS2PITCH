@@ -148,7 +148,7 @@ export function assessHardGate(fixture,ctx={}){
   if(ctx.favourite&&favConflict(fixture,ctx.home,ctx.away,ctx.favourite)){
     if(!flags.some(row=>row.code==='stats-mismatch'))flags.push(flag('stats-mismatch','fav-conflict'))
   }
-  const hard=flags.find(row=>['srl','early-season','cup','both-top-five','both-bottom-three','stats-mismatch'].includes(row.code))
+  const hard=flags.find(row=>['srl','cup','both-top-five','both-bottom-three','stats-mismatch'].includes(row.code))
   return{
     blocked:!!hard,
     skip:hard?.code||null,
@@ -160,7 +160,6 @@ export function assessHardGate(fixture,ctx={}){
 
 export function structuralSkip(fixture,homeMetrics=null,awayMetrics=null){
   if(isSrlMatch(fixture))return'srl'
-  if(isEarlySeason(fixture))return'early-season'
   if(isCupCompetition(fixture?.league))return'cup'
   const table=tableGate(fixture?.homeSplit,fixture?.awaySplit)
   if(!table.ok)return table.skip
