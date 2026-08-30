@@ -1,1 +1,84 @@
-:root{--db-bg:#070909;--db-card:#0d1110;--db-line:#1d2824;--db-text:#f4f7f5;--db-muted:#91a19b;--db-mint:#39e6a5;--db-gold:#f2c45c;--db-red:#ff6b6b}.bankers-shell{max-width:1240px;margin:0 auto;padding:18px 18px 96px}.bankers-hero{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:end;margin:12px 0 18px}.bankers-hero h1{margin:0;font-size:clamp(28px,4vw,54px);letter-spacing:-.045em}.bankers-hero p{margin:8px 0 0;color:var(--db-muted);max-width:720px;font-size:15px;line-height:1.6}.engine-chip{border:1px solid var(--db-line);background:#0b0f0e;border-radius:999px;padding:9px 13px;font:700 11px/1.1 'Space Mono',monospace;color:var(--db-muted)}.bankers-datebar{display:flex;gap:8px;overflow:auto;padding:6px 0 18px;scrollbar-width:none}.bankers-datebar::-webkit-scrollbar{display:none}.bankers-datebar button{white-space:nowrap;border:1px solid var(--db-line);background:#0b0f0e;color:var(--db-muted);border-radius:14px;padding:11px 13px;font-weight:700}.bankers-datebar button.active{color:#04120d;background:var(--db-mint);border-color:var(--db-mint)}.banker-section{margin-top:22px}.banker-section-head{display:flex;justify-content:space-between;gap:16px;align-items:end;margin-bottom:12px}.banker-section-head h2{margin:0;font-size:22px}.banker-section-head p{margin:4px 0 0;color:var(--db-muted);font-size:13px}.count-pill{border:1px solid var(--db-line);border-radius:999px;padding:7px 10px;color:var(--db-muted);font:700 11px/1 'Space Mono',monospace}.banker-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.banker-card{position:relative;overflow:hidden;border:1px solid var(--db-line);background:linear-gradient(180deg,#0e1311,#090c0b);border-radius:22px;padding:17px;box-shadow:0 16px 46px rgba(0,0,0,.18)}.banker-card.safe{border-color:rgba(57,230,165,.34)}.banker-card.value{border-color:rgba(242,196,92,.34)}.banker-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.banker-type{display:inline-flex;align-items:center;gap:7px;font:800 11px/1 'Space Mono',monospace;letter-spacing:.04em}.banker-type.safe{color:var(--db-mint)}.banker-type.value{color:var(--db-gold)}.league-line{color:var(--db-muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.match-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin:18px 0}.banker-team{display:flex;align-items:center;gap:9px;min-width:0}.banker-team.away{justify-content:flex-end;text-align:right}.banker-team img{width:38px;height:38px;object-fit:contain;border-radius:50%;background:#111}.banker-team b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.vs{color:var(--db-muted);font:800 11px/1 'Space Mono',monospace}.pick-box{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid var(--db-line);background:#090d0c;border-radius:16px;padding:14px}.pick-box small{display:block;color:var(--db-muted);font:700 10px/1 'Space Mono',monospace;margin-bottom:5px}.pick-box strong{font-size:18px}.price{font:800 20px/1 'Space Mono',monospace}.banker-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:11px 0}.metric{border:1px solid var(--db-line);border-radius:12px;padding:10px;background:#0a0d0c}.metric span{display:block;color:var(--db-muted);font-size:10px}.metric b{display:block;margin-top:4px;font:800 15px/1 'Space Mono',monospace}.why-title{font-size:12px;margin:14px 0 7px;color:var(--db-text)}.why-list{margin:0;padding-left:18px;color:#c7d1cd;font-size:12.5px;line-height:1.55}.why-list li+li{margin-top:5px}.kickoff{margin-top:12px;color:var(--db-muted);font-size:11px;display:flex;justify-content:space-between;gap:10px}.result-chip{font:800 10px/1 'Space Mono',monospace;border-radius:999px;padding:5px 8px;border:1px solid var(--db-line)}.result-chip.won{color:var(--db-mint)}.result-chip.lost{color:var(--db-red)}.result-chip.void,.result-chip.postponed{color:var(--db-gold)}.empty-bankers{border:1px dashed var(--db-line);border-radius:20px;padding:34px;text-align:center;color:var(--db-muted)}.bankers-note{margin:20px 0 0;border:1px solid var(--db-line);border-radius:16px;padding:13px 15px;color:var(--db-muted);font-size:12px;line-height:1.6}.bankers-note b{color:var(--db-text)}@media(max-width:800px){.bankers-hero{grid-template-columns:1fr}.engine-chip{justify-self:start}.banker-grid{grid-template-columns:1fr}.bankers-shell{padding-left:12px;padding-right:12px}.banker-card{border-radius:18px}.banker-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.metric{padding:9px 7px}.metric b{font-size:13px}}@media(max-width:430px){.bankers-shell{padding-bottom:110px}.banker-section-head{align-items:flex-start}.banker-team img{width:32px;height:32px}.banker-team b{font-size:12px}.pick-box strong{font-size:16px}.price{font-size:18px}.why-list{font-size:12px}.banker-metrics{gap:5px}.metric span{font-size:9px}}
+/* Stats2Pitch Daily Bankers — VAR board chrome */
+
+.bankers-note {
+  margin: 20px 0 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 13px 15px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: var(--shadow);
+}
+.bankers-note b { color: var(--ink); }
+
+.var-badge.value {
+  background: #f2c45c;
+  color: #1a1404;
+  box-shadow: 0 0 10px rgba(242, 196, 92, 0.28);
+}
+.m-board-tag.value {
+  background: #f2c45c;
+  color: #1a1404;
+}
+.card:has(.var-badge.value) {
+  border-color: rgba(242, 196, 92, 0.32);
+  background: linear-gradient(160deg, rgba(242, 196, 92, 0.06), var(--surface));
+}
+.card:has(.var-badge.value):hover {
+  border-color: #f2c45c;
+  box-shadow: 0 0 24px rgba(242, 196, 92, 0.16), var(--shadow);
+}
+.card:has(.var-badge.value) .league {
+  background: rgba(242, 196, 92, 0.07);
+  border-bottom-color: rgba(242, 196, 92, 0.18);
+}
+
+.banker-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.banker-metrics-row div {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px;
+}
+.banker-metrics-row small {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.banker-metrics-row b {
+  display: block;
+  margin-top: 4px;
+  font: 700 16px var(--mono);
+  color: var(--ink);
+}
+
+.mobile-nav.bankers-nav svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  margin: 0 auto 2px;
+}
+
+@media (max-width: 800px) {
+  .mobile-nav.bankers-nav {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    width: min(98vw, 640px);
+    border-radius: 22px;
+  }
+  .mobile-nav.bankers-nav a { padding: 10px 2px 8px; }
+}
+@media (max-width: 430px) {
+  .banker-metrics-row b { font-size: 13px; }
+  .banker-metrics-row { gap: 6px; }
+}

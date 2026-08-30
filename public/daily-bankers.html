@@ -3,30 +3,79 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#070909">
+  <meta name="theme-color" content="#0a0a0b">
   <title>Bankers of the Day · Stats2Pitch</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=5.9.0">
-  <link rel="icon" type="image/svg+xml" href="/assets/s2p-pitch-mark.svg?v=5.9.0">
+  <link rel="manifest" href="/manifest.webmanifest?v=5.10.0">
+  <link rel="icon" type="image/svg+xml" href="/assets/s2p-pitch-mark.svg?v=5.10.0">
+  <link rel="icon" type="image/png" href="/assets/stats2pitch-favicon-v3.png?v=5.10.0">
+  <link rel="apple-touch-icon" href="/assets/stats2pitch-apple.png?v=5.10.0">
+  <link rel="preconnect" href="https://s.sporty.net" crossorigin>
+  <link rel="preconnect" href="https://img.sportradar.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/conceptD.css?v=5.9.0">
-  <link rel="stylesheet" href="/mobile2026.css?v=5.9.0">
-  <link rel="stylesheet" href="/fontPlus2.css?v=5.9.0">
-  <link rel="stylesheet" href="/dailyBankers.css?v=5.9.0">
-  <style>html.s2p-booting{background:#000}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#000}.mobile-nav.bankers-nav{grid-template-columns:repeat(6,minmax(0,1fr))}@media(max-width:430px){.mobile-nav.bankers-nav span{font-size:9px}}</style>
+  <link rel="stylesheet" href="/conceptD.css?v=5.10.0">
+  <link rel="stylesheet" href="/mobile2026.css?v=5.10.0">
+  <link rel="stylesheet" href="/varTips.css?v=5.10.0">
+  <link rel="stylesheet" href="/dailyBankers.css?v=5.10.0">
+  <link rel="stylesheet" href="/fontPlus2.css?v=5.10.0">
+<style>html.s2p-booting{background:#000}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#000}.mobile-nav.bankers-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}@media(max-width:430px){.mobile-nav.bankers-nav span{font-size:9px}}</style>
 </head>
 <body data-view="bankers">
   <div id="boot" class="s2p-boot" role="status" aria-live="polite" aria-label="Loading Stats2Pitch">
-    <div class="s2p-boot-fallback" aria-hidden="true"><svg viewBox="0 0 220 150"><rect x="18" y="12" width="184" height="126" rx="2"/><line x1="18" y1="75" x2="202" y2="75"/><circle cx="110" cy="75" r="22"/><rect x="18" y="42" width="32" height="66"/><rect x="170" y="42" width="32" height="66"/></svg><b>2</b></div>
+    <div class="s2p-boot-fallback" aria-hidden="true">
+      <svg viewBox="0 0 220 150">
+        <rect x="18" y="12" width="184" height="126" rx="2"/>
+        <line x1="18" y1="75" x2="202" y2="75"/>
+        <circle cx="110" cy="75" r="22"/>
+        <rect x="18" y="42" width="32" height="66"/>
+        <rect x="18" y="54" width="16" height="42"/>
+        <rect x="170" y="42" width="32" height="66"/>
+        <rect x="186" y="54" width="16" height="42"/>
+      </svg>
+      <b>2</b>
+    </div>
+    <video class="s2p-boot-video" autoplay muted loop playsinline preload="auto" poster="/assets/s2p-boot.jpg?v=5.10.0">
+      <source src="/assets/s2p-boot.mp4?v=5.10.0" type="video/mp4">
+    </video>
   </div>
-  <script>(function(){var b=document.getElementById('boot'),shown=Date.now(),done=false;window.s2pBootDone=function(){if(done)return;done=true;setTimeout(function(){b?.classList.add('is-done');document.documentElement.classList.remove('s2p-booting');setTimeout(function(){b?.remove()},420)},Math.max(0,500-(Date.now()-shown)))};setTimeout(function(){window.s2pBootDone()},12000)})();</script>
+  <script>
+    (function(){
+      var b=document.getElementById('boot');
+      if(!b)return;
+      var v=b.querySelector('video'), shown=Date.now(), done=false;
+      if(v){
+        v.addEventListener('playing',function(){v.classList.add('is-on')});
+        var p=v.play();
+        if(p&&p.catch)p.catch(function(){});
+      }
+      window.s2pBootDone=function(){
+        if(done)return;
+        done=true;
+        var wait=Math.max(0,800-(Date.now()-shown));
+        setTimeout(function(){
+          b.classList.add('is-done');
+          document.documentElement.classList.remove('s2p-booting');
+          setTimeout(function(){
+            try{
+              if(v){v.pause();v.removeAttribute('src');v.load()}
+              b.remove();
+            }catch(e){}
+          },520);
+        },wait);
+      };
+      setTimeout(function(){window.s2pBootDone()},14000);
+    })();
+  </script>
   <div class="app">
     <header>
       <div class="header-inner">
         <a class="brand" href="/" style="text-decoration:none;color:inherit">
-          <img class="brand-mark" src="/assets/s2p-pitch-mark.svg?v=5.9.0" width="42" height="42" alt="Stats2Pitch">
-          <div class="brand-copy"><div class="brand-text">STATS<span>2</span>PITCH <em class="year-badge">2026</em></div><div class="brand-sub">Smart Football Picks</div></div>
+          <img class="brand-mark" src="/assets/s2p-pitch-mark.svg?v=5.10.0" width="42" height="42" alt="Stats2Pitch">
+          <div class="brand-copy">
+            <div class="brand-text">STATS<span>2</span>PITCH <em class="year-badge">2026</em></div>
+            <div class="brand-sub">Smart Football Picks</div>
+          </div>
         </a>
         <nav class="page-tabs">
           <a class="page-tab" href="/">All Picks</a>
@@ -36,36 +85,82 @@
           <a class="page-tab active" href="/daily-bankers.html">Daily Bankers</a>
           <a class="page-tab" href="/results.html">Results</a>
         </nav>
+        <div class="header-actions">
+          <button id="installApp" hidden>Install</button>
+          <button class="icon-btn" id="notifyBell" aria-label="Refresh" title="Refresh">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 006 0"/></svg>
+          </button>
+          <button class="icon-btn" id="profileBtn" aria-label="Filters" title="Filters">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.1-3.1 3.4-4.6 7-4.6s5.9 1.5 7 4.6"/></svg>
+          </button>
+          <button id="refresh">Refresh</button>
+        </div>
       </div>
     </header>
-    <main class="bankers-shell">
-      <section class="bankers-hero">
-        <div><h1>Bankers of the Day</h1><p>Every available SportyBet market is checked against the teams’ relevant home and away evidence. Safest Bankers favour stronger protection and consistency. Value Bankers require the quoted odds to offer a meaningful edge over the statistical evidence.</p></div>
-        <div id="engineChip" class="engine-chip">daily-bankers-v2</div>
+    <div class="wrap">
+      <section class="var-intro">
+        <strong>Bankers of the Day</strong>
+        <p>Every available SportyBet market is checked against the teams’ relevant home and away evidence. Safest Bankers favour stronger protection and consistency. Value Bankers require the quoted odds to offer a meaningful edge over the statistical evidence. Tap a match to see why it was chosen.</p>
       </section>
-      <nav id="bankerDates" class="bankers-datebar" aria-label="Banker dates"></nav>
-      <section class="banker-section">
-        <div class="banker-section-head"><div><h2>Safest Bankers of the Day</h2><p>Higher agreement, stronger stake protection, and disciplined price ranges.</p></div><span class="count-pill"><span id="safeCount">0</span> PICKS</span></div>
-        <div id="safeGrid" class="banker-grid"></div>
-      </section>
-      <section class="banker-section">
-        <div class="banker-section-head"><div><h2>Value Bankers of the Day</h2><p>Markets where venue evidence is materially stronger than the probability implied by the odds.</p></div><span class="count-pill"><span id="valueCount">0</span> PICKS</span></div>
-        <div id="valueGrid" class="banker-grid"></div>
-      </section>
+      <section id="varStats"></section>
+      <div class="controls-shell">
+        <nav id="dates"></nav>
+        <div class="toolbar filters">
+          <select id="kindFilter" aria-label="Banker kind">
+            <option value="all">All bankers</option>
+            <option value="safest">Safest</option>
+            <option value="value">Value</option>
+          </select>
+          <select id="statusFilter" aria-label="Match status">
+            <option value="all">All statuses</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="live">Live</option>
+            <option value="settled">Settled</option>
+          </select>
+          <select id="countryFilter" aria-label="Country"><option value="all">All countries</option></select>
+          <select id="leagueFilter" aria-label="League"><option value="all">All leagues</option></select>
+          <select id="market" aria-label="Market"><option value="all">All markets</option></select>
+          <button id="clearFilters">Clear</button>
+          <span id="status">Loading…</span>
+        </div>
+      </div>
+      <div id="countryChips" class="country-chips" aria-label="Country shortcuts"></div>
+      <main id="cards"><div class="empty">Loading Daily Bankers…</div></main>
       <div class="bankers-note"><b>How this board works:</b> a pick must be supported from both sides of the matchup using the relevant home/away split. The engine can skip a match completely. “Value” means statistical edge at the quoted price; it does not mean guaranteed profit.</div>
-    </main>
+    </div>
   </div>
+  <div id="modal" class="modal hidden"></div>
   <nav class="mobile-nav bankers-nav">
-    <a href="/"><span>Picks</span></a>
-    <a href="/filter-tips.html"><span>Filter</span></a>
-    <a href="/var-tips.html"><span>VAR</span></a>
-    <a href="/goals-bankers.html"><span>Goals</span></a>
-    <a class="active" href="/daily-bankers.html"><span>Bankers</span></a>
-    <a href="/results.html"><span>Results</span></a>
+    <a href="/">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      <span>Picks</span>
+    </a>
+    <a href="/filter-tips.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      <span>Filter</span>
+    </a>
+    <a href="/var-tips.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+      <span>VAR</span>
+    </a>
+    <a href="/goals-bankers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
+      <span>Goals</span>
+    </a>
+    <a class="active" href="/daily-bankers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v6c0 5-3.4 7.8-8 9-4.6-1.2-8-4-8-9V7z"/></svg>
+      <span>Bankers</span>
+    </a>
+    <a href="/results.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>
+      <span>Results</span>
+    </a>
   </nav>
   <script src="/runtime-config.js"></script>
-  <script src="/leagueFlags.js?v=5.9.0"></script>
-  <script type="module" src="/dailyBankers.js?v=5.9.0"></script>
-  <script src="/pwa.js?v=5.9.0"></script>
+  <link rel="modulepreload" href="/net.js?v=5.10.0">
+  <link rel="modulepreload" href="/dailyBankers.js?v=5.10.0">
+  <script src="/leagueFlags.js?v=5.10.0"></script>
+  <script type="module" src="/dailyBankers.js?v=5.10.0"></script>
+  <script src="/pwa.js?v=5.10.0"></script>
 </body>
 </html>
