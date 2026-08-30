@@ -14,6 +14,7 @@ export const BANKER_RULES=Object.freeze({
   streakYesMax:1.40,
   over15Max:1.30,
   streakUnder35Min:1.40,
+  minPublishOdds:1.20,
   topFive:5
 })
 
@@ -149,7 +150,7 @@ export function buildLeagueScoringProfile(history=[]){
   let className='insufficient'
   if(matches>=20){
     if(Number(over25Rate)>=56||Number(avgGoals)>=2.8)className='high-scoring'
-    else if(Number(over25Rate)<50&&Number(avgGoals)<=2.6&&Number(drawRate)>=30)className='low-scoring-draw-heavy'
+    else if(Number(over25Rate)<50&&Number(avgGoals)<=2.6&&Number(drawRate)>=30)className='neutral'
     else className='neutral'
   }
   return{class:className,matches,avgGoals,drawRate,over25Rate}
@@ -174,6 +175,14 @@ function publishedFav2Plus(f,odds){
   return odds.favourite==='home'
     ?{market:'home-team-goals',selection:'Over 1.5',displaySelection:`${f.home.name} 2+`,odds:price,family:'Team Goals'}
     :{market:'away-team-goals',selection:'Over 1.5',displaySelection:`${f.away.name} 2+`,odds:price,family:'Team Goals'}
+}
+
+function publishedFav3Plus(f,odds){
+  const price=px(odds.favO25)
+  if(!price||!odds.favourite)return null
+  return odds.favourite==='home'
+    ?{market:'home-team-goals',selection:'Over 2.5',displaySelection:`${f.home.name} 3+`,odds:price,family:'Team Goals'}
+    :{market:'away-team-goals',selection:'Over 2.5',displaySelection:`${f.away.name} 3+`,odds:price,family:'Team Goals'}
 }
 
 function publishedOver(line,price){
@@ -201,6 +210,26 @@ function publishedDrawOrOver25(odds){
   return null
 }
 
+function nextAvailableSteps(f,odds,published){
+  const sel=String(published?.selection||'')
+  const fam=String(published?.family||'')
+  if(fam==='1X2'&&(sel==='Home'||sel==='Away'))return [publishedFav2Plus(f,odds),publishedOver(1.5,odds.over15),publishedFav3Plus(f,odds),publishedOver(2.5,odds.over25)]
+  if(fam==='Team Goals'&&sel==='Over 1.5')return [publishedFav3Plus(f,odds),publishedOver(1.5,odds.over15),publishedOver(2.5,odds.over25)]
+  if(fam==='Goals'&&sel==='Over 1.5')return [publishedOver(2.5,odds.over25)]
+  if(sel==='Over 2.5'||fam==='Combo')return [publishedDraw(odds),publishedFav2Plus(f,odds)]
+  return [publishedFav2Plus(f,odds),publishedOver(1.5,odds.over15),publishedOver(2.5,odds.over25)]
+}
+
+function liftToFloor(f,odds,published){
+  if(!published)return{published:null,lifted:false,from:null}
+  if(Number(published.odds)>=BANKER_RULES.minPublishOdds)return{published,lifted:false,from:null}
+  const from={...published}
+  for(const next of nextAvailableSteps(f,odds,published)){
+    if(next&&Number(next.odds)>=BANKER_RULES.minPublishOdds)return{published:next,lifted:true,from}
+  }
+  return{published:null,lifted:true,from}
+}
+
 function pack(f,odds,rule,published,reasons){
   return{
     fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
@@ -226,6 +255,13 @@ function boardReason(odds){
   return `Board filter: team total Over 2.5 is ${px(odds.boardTeamOver25)} (home ${px(odds.homeO25)} / away ${px(odds.awayO25)}), max ${BANKER_RULES.boardTeamOver25Max.toFixed(2)}.`
 }
 
+function emit(f,odds,rule,published,reasons){
+  const chosen=liftToFloor(f,odds,published)
+  if(!chosen.published)return{pick:null,skip:'odds-below-floor',odds}
+  if(chosen.lifted)reasons.push(`Qualified price ${chosen.from.displaySelection} @ ${chosen.from.odds} was under ${BANKER_RULES.minPublishOdds.toFixed(2)}. Next available: ${chosen.published.displaySelection} @ ${chosen.published.odds}.`)
+  return{pick:pack(f,odds,rule,chosen.published,reasons),skip:null,odds}
+}
+
 export function evaluateBankerFixture(f){
   if(isSrlMatch(f))return{pick:null,skip:'srl'}
   const odds=extractBankerOdds(f)
@@ -242,23 +278,23 @@ export function evaluateBankerFixture(f){
   if(onBoard&&finite(homeO05)&&finite(awayO05)&&homeO05<BANKER_RULES.bothTeamTotalMax&&awayO05<BANKER_RULES.bothTeamTotalMax&&finite(over25)&&over25<BANKER_RULES.drawOrOver25MatchMax){
     const published=publishedDrawOrOver25(odds)
     if(published){
-      return{pick:pack(f,odds,'DRAW_OR_OVER25',published,[
+      return emit(f,odds,'DRAW_OR_OVER25',published,[
         boardReason(odds),
         `Both team totals Over 0.5 are under ${BANKER_RULES.bothTeamTotalMax.toFixed(2)} (${px(homeO05)} / ${px(awayO05)}).`,
         `Match Over 2.5 is ${px(over25)} (under ${BANKER_RULES.drawOrOver25MatchMax.toFixed(2)}).`,
-        `Published ${published.displaySelection} @ ${published.odds}.`
-      ]),skip:null,odds}
+        `Qualified ${published.displaySelection} @ ${published.odds}.`
+      ])
     }
   }
 
   if(onBoard&&finite(oppO05)&&oppO05>BANKER_RULES.oppOver05FavWinMin){
     const published=publishedFavWin(f,odds)
     if(published){
-      return{pick:pack(f,odds,'OPP_O05_FAV_WIN',published,[
+      return emit(f,odds,'OPP_O05_FAV_WIN',published,[
         boardReason(odds),
         `Opponent team total Over 0.5 is ${px(oppO05)} > ${BANKER_RULES.oppOver05FavWinMin.toFixed(2)}.`,
         `Favourite to win: ${published.displaySelection} @ ${published.odds}.`
-      ]),skip:null,odds}
+      ])
     }
     return{pick:null,skip:'missing-fav-win-odds',odds}
   }
@@ -266,22 +302,22 @@ export function evaluateBankerFixture(f){
   if(onBoard&&finite(oppO05)&&oppO05<BANKER_RULES.oppTeamTotalOver25Max){
     const published=publishedOver(2.5,over25)
     if(published){
-      return{pick:pack(f,odds,'OPP_TT_OVER25',published,[
+      return emit(f,odds,'OPP_TT_OVER25',published,[
         boardReason(odds),
         `Opponent team total Over 0.5 is ${px(oppO05)} < ${BANKER_RULES.oppTeamTotalOver25Max.toFixed(2)}.`,
         `Total goals Over 2.5 @ ${published.odds}.`
-      ]),skip:null,odds}
+      ])
     }
   }
 
   if(onBoard&&finite(under35)&&under35>BANKER_RULES.under35Fav2PlusMin){
     const published=publishedFav2Plus(f,odds)
     if(published){
-      return{pick:pack(f,odds,'U35_FAV_2PLUS',published,[
+      return emit(f,odds,'U35_FAV_2PLUS',published,[
         boardReason(odds),
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.under35Fav2PlusMin.toFixed(2)}.`,
         `Favourite to score 2+: ${published.displaySelection} @ ${published.odds}.`
-      ]),skip:null,odds}
+      ])
     }
     return{pick:null,skip:'missing-fav-2plus-odds',odds}
   }
@@ -293,12 +329,12 @@ export function evaluateBankerFixture(f){
     if(bothTopFive(f))return{pick:null,skip:'both-top-five',odds}
     const published=publishedOver(1.5,over15)
     if(published){
-      return{pick:pack(f,odds,'STREAK_OVER15',published,[
+      return emit(f,odds,'STREAK_OVER15',published,[
         `Over 1.5 board: 3+ goals streak Yes is ${px(streak)} (${BANKER_RULES.streakYesMin.toFixed(2)}-${BANKER_RULES.streakYesMax.toFixed(2)}).`,
         `Over 1.5 is ${px(over15)} < ${BANKER_RULES.over15Max.toFixed(2)}.`,
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`,
         'Top-5 vs Top-5 is blocked for this route.'
-      ]),skip:null,odds}
+      ])
     }
   }
 
