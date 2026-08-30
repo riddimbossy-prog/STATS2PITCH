@@ -80,14 +80,15 @@ test('Over 1.5 board starts on 3+ goals streak Yes 1.20-1.40',()=>{
   assert.match(r.pick.whyText,/3\+ goals streak Yes is 1\.20/)
 })
 
-test('2-in-a-row streak Yes does not open the Over 1.5 board',()=>{
-  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:null,streak2:1.28,awayO05:1.60}))
-  assert.equal(r.pick,null)
-  assert.equal(r.skip,'missing-3plus-streak')
+test('2-in-a-row streak Yes 1.20-1.40 opens Over 1.5 when 3+ is outside the window',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:4.20,streak2:1.28,awayO05:1.60}))
+  assert.equal(r.pick?.rule,'STREAK_OVER15')
+  assert.equal(r.pick?.selection,'Over 1.5')
+  assert.equal(r.pick?.odds,1.22)
 })
 
-test('3+ streak Yes below 1.20 does not publish Over 1.5',()=>{
-  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.19,awayO05:1.60}))
+test('streak Yes below 1.20 does not publish Over 1.5',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.19,streak2:1.19,awayO05:1.60}))
   assert.equal(r.pick,null)
   assert.equal(r.skip,'streak-3plus-outside-window')
 })
