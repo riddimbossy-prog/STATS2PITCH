@@ -32,9 +32,10 @@ test('VAR Tips is a dedicated public tab with no method copy',async()=>{
     assert.match(page,/>Filter Tips</)
     assert.match(page,/>VAR Tips</)
     assert.match(page,/>Goals Bankers</)
+    assert.match(page,/>Daily Bankers</)
     assert.match(page,/>Results</)
+    assert.match(page,/href="\/daily-bankers\.html"/)
     assert.doesNotMatch(page,/href="\/bankers\.html"/)
-    assert.doesNotMatch(page,/>Bankers</)
   }
   assert.match(sw,/\/var-tips\.html/)
   assert.match(sw,/\/filter-tips\.html/)
