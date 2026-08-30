@@ -1,4 +1,6 @@
 import {ENGINE_VERSION} from './config.js'
+import {BANKER_ENGINE} from './bankerEngine.js'
+import {toBankerPageRows} from './bankerPage.js'
 
 const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'')
 const URL=!raw?'':/^https?:\/\//i.test(raw)?raw:raw.includes('.supabase.co')?`https://${raw}`:`https://${raw}.supabase.co`
@@ -33,6 +35,25 @@ export function attachCrests(board){
   const next={...board}
   for(const key of ['bestPicks','varTips','filterTips','goalsBankers','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
+}
+function applyBankerPage(board){
+  if(!board||!Array.isArray(board.bankers))return board
+  const page=toBankerPageRows(board.bankers)
+  return{
+    ...board,
+    safestBankers:page.safestBankers,
+    valueBankers:page.valueBankers,
+    dailyBankers:page.bestPicks,
+    dailyBankersMeta:page.meta,
+    meta:{
+      ...(board.meta||{}),
+      dailyBankersEngine:BANKER_ENGINE,
+      safestBankersCount:page.safestBankers.length,
+      valueBankersCount:page.valueBankers.length,
+      bankerRulesEngine:BANKER_ENGINE,
+      bankerRulesCount:board.bankers.length
+    }
+  }
 }
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
 function stampPick(p,at){return{...p,publishedAt:p?.publishedAt||at,proofKey:p?.proofKey||proofKey(p)}}
@@ -97,6 +118,7 @@ export async function listBoards(fromDate,toDate){
   return await request(path)
 }
 export async function saveBoard(date,board,{preservePublished=true}={}){
+  board=applyBankerPage(board)
   const existing=preservePublished?await loadBoard(date,{allowVersionMismatch:true}).catch(()=>null):null
   if(preservePublished&&existing&&incomingFeedEmpty(board)&&countTips(existing)>0){
     const kept={
