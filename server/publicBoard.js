@@ -20,6 +20,8 @@ function slimMeta(meta={}){
     dailyBankersEngine:meta.dailyBankersEngine,
     safestBankersCount:meta.safestBankersCount,
     valueBankersCount:meta.valueBankersCount,
+    bankerRulesEngine:meta.bankerRulesEngine||meta.bankerRules?.engine||null,
+    bankerRulesCount:meta.bankerRulesCount??meta.diagnostics?.bankerRulePicks??null,
     requiresRefresh:meta.requiresRefresh===true,
     refresh:meta.refresh||null
   }
@@ -62,14 +64,17 @@ export function publicBoard(board={},view='all'){
     return empty
   }
   if(v==='bankers'){
+    empty.bankers=Array.isArray(board?.bankers)?board.bankers:[]
+    empty.bankerRulesMeta=board?.bankerRulesMeta||null
     empty.dailyBankers=Array.isArray(board?.dailyBankers)?board.dailyBankers:[]
     empty.safestBankers=Array.isArray(board?.safestBankers)?board.safestBankers:[]
     empty.valueBankers=Array.isArray(board?.valueBankers)?board.valueBankers:[]
     empty.dailyBankersMeta=board?.dailyBankersMeta||null
-    empty.availableMarkets=markets([...empty.safestBankers,...empty.valueBankers,...empty.dailyBankers])
+    empty.availableMarkets=markets([...empty.bankers,...empty.safestBankers,...empty.valueBankers,...empty.dailyBankers])
     return empty
   }
   empty.bestPicks=Array.isArray(board?.bestPicks)?board.bestPicks:[]
+  empty.bankers=Array.isArray(board?.bankers)?board.bankers:[]
   empty.availableMarkets=Array.isArray(board?.availableMarkets)&&board.availableMarkets.length?board.availableMarkets:markets(empty.bestPicks)
   return empty
 }

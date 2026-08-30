@@ -1,98 +1,91 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {evaluateBankerFixture as evaluateBankerFixtureRaw,buildLeagueScoringProfile} from '../server/bankerEngine.js'
+import {evaluateBankerFixture,buildLeagueScoringProfile,BANKER_ENGINE} from '../server/bankerEngine.js'
 
-const evaluateBankerFixture=f=>evaluateBankerFixtureRaw(f,{ignoreTransition:true})
+function outcome(name,odd){return{name,odd}}
+function markets({homeWin=1.45,awayWin=4.20,draw=3.80,over15=1.22,over25=1.72,under35=1.55,homeO05=1.18,awayO05=1.85,homeO15=1.55,awayO15=2.40,streak=1.32}={}){
+  return[
+    {marketKey:'match-winner',market:'1X2',outcomes:[outcome('Home',homeWin),outcome('Draw',draw),outcome('Away',awayWin)]},
+    {marketKey:'total-goals',market:'Total Goals',outcomes:[outcome('Over 1.5',over15),outcome('Over 2.5',over25),outcome('Under 3.5',under35)]},
+    {marketKey:'home-team-goals',market:'Home Team Goals',outcomes:[outcome('Over 0.5',homeO05),outcome('Over 1.5',homeO15)]},
+    {marketKey:'away-team-goals',market:'Away Team Goals',outcomes:[outcome('Over 0.5',awayO05),outcome('Over 1.5',awayO15)]},
+    {marketKey:'goals-streak-2',market:'Goals Streak',outcomes:[outcome('Yes',streak)]}
+  ]
+}
 
-let seq=1
-function homeGame(gf,ga){return{fixture:{id:seq++,date:`2026-07-${String(seq).padStart(2,'0')}T12:00:00Z`,status:{short:'FT'}},teams:{home:{id:1},away:{id:99}},goals:{home:gf,away:ga}}}
-function awayGame(gf,ga){return{fixture:{id:seq++,date:`2026-07-${String(seq).padStart(2,'0')}T12:00:00Z`,status:{short:'FT'}},teams:{home:{id:98},away:{id:2}},goals:{home:ga,away:gf}}}
-function fixture(homeRows,awayRows,{early=false,hpos=7,apos=10,leagueClass='neutral'}={}){return{fixtureId:'fx',league:'Test League',country:'Test',kickoff:'2026-08-20T18:00:00Z',home:{id:1,name:'Home',fixtures:homeRows},away:{id:2,name:'Away',fixtures:awayRows},earlySeason:early,homeSplit:{position:hpos,size:12,sampleReady:true},awaySplit:{position:apos,size:12,sampleReady:true},bankerLeagueProfile:{class:leagueClass,matches:60,avgGoals:leagueClass==='high-scoring'?3.1:2.4,over25Rate:leagueClass==='high-scoring'?61:42,drawRate:leagueClass==='low-scoring-draw-heavy'?34:20}}}
+function fixture(odds={},extra={}){
+  return{
+    fixtureId:'fx',league:'Test League',country:'Test',kickoff:'2026-08-20T18:00:00Z',
+    home:{id:1,name:'Home FC'},away:{id:2,name:'Away FC'},
+    homeSplit:{position:extra.hpos??7,size:12,sampleReady:true},
+    awaySplit:{position:extra.apos??10,size:12,sampleReady:true},
+    marketOdds:markets(odds),
+    ...extra.rest
+  }
+}
 
-const dominant=[homeGame(2,0),homeGame(3,1),homeGame(2,0),homeGame(2,1),homeGame(3,0)]
-const weakAway=[awayGame(0,2),awayGame(1,3),awayGame(0,2),awayGame(1,2),awayGame(1,1)]
-
-test('home straight win needs any two home strength factors while all away weakness factors pass',()=>{
-  const r=evaluateBankerFixture(fixture(dominant,weakAway))
-  assert.equal(r.pick?.rule,'HOME_STRAIGHT_WIN')
-  assert.equal(r.pick?.market,'match-winner')
-  assert.equal(r.pick?.ruleMeta?.homeFactorsPassed,2,'GF average is below 2.50, so PPG + GA must be enough')
-  assert.equal(r.pick?.ruleMeta?.awayFactorsPassed,3)
+test('engine id is banker-totals-v1',()=>{
+  const r=evaluateBankerFixture(fixture({awayO05:1.90,over25:1.80}))
+  assert.equal(r.pick.engine,BANKER_ENGINE)
 })
 
-test('home straight win is blocked when only one of three home factors passes',()=>{
-  const oneFactorHome=[homeGame(3,2),homeGame(2,1),homeGame(2,1),homeGame(2,1),homeGame(1,1)]
-  const r=evaluateBankerFixture(fixture(oneFactorHome,weakAway))
-  assert.notEqual(r.pick?.rule,'HOME_STRAIGHT_WIN')
-  assert.equal(r.pick?.rule,'AWAY_TEAM_NOT_TO_WIN')
-})
-
-test('home straight win away-side weakness is non-negotiable',()=>{
-  const awayFailsGA=[awayGame(0,1),awayGame(0,1),awayGame(0,1),awayGame(0,1),awayGame(1,1)]
-  const r=evaluateBankerFixture(fixture(dominant,awayFailsGA))
-  assert.notEqual(r.pick?.rule,'HOME_STRAIGHT_WIN','missing the mandatory away GA >=2.00 factor must block straight win')
-  assert.equal(r.pick?.rule,'AWAY_TEAM_NOT_TO_WIN')
-})
-
-test('away team not to win keeps home 1.50 PPG mandatory and accepts any one away weakness factor',()=>{
-  const steadyHome=[homeGame(1,0),homeGame(1,1),homeGame(2,1),homeGame(0,1),homeGame(1,0)]
-  const awayOnlyGA=[awayGame(4,3),awayGame(4,3),awayGame(0,3),awayGame(0,3),awayGame(3,3)]
-  const r=evaluateBankerFixture(fixture(steadyHome,awayOnlyGA))
-  assert.equal(r.pick?.rule,'AWAY_TEAM_NOT_TO_WIN')
-  assert.equal(r.pick?.ruleMeta?.homePPGMandatory,true)
-  assert.equal(r.pick?.ruleMeta?.awayFactorsPassed,1,'only the away GA >=2.50 factor should be required here')
-})
-
-test('away team not to win cannot qualify when home is below the mandatory 1.50 PPG constant',()=>{
-  const home14=[homeGame(1,0),homeGame(1,0),homeGame(1,1),homeGame(0,1),homeGame(0,1)]
-  const awayOnlyGA=[awayGame(4,3),awayGame(4,3),awayGame(0,3),awayGame(0,3),awayGame(3,3)]
-  const r=evaluateBankerFixture(fixture(home14,awayOnlyGA))
-  assert.equal(r.skip,'no-rule-qualified')
+test('board skips when Over 2.5 is above 2.05 and streak route is not open',()=>{
+  const r=evaluateBankerFixture(fixture({over25:2.20,over15:1.40,under35:1.30,streak:1.60,awayO05:1.90}))
   assert.equal(r.pick,null)
+  assert.equal(r.skip,'over25-above-board-max')
 })
 
-test('early season is a hard skip',()=>{
-  const r=evaluateBankerFixture(fixture(dominant,weakAway,{early:true}))
-  assert.equal(r.skip,'early-season')
+test('opponent Over 0.5 above 1.70 publishes favourite win',()=>{
+  const r=evaluateBankerFixture(fixture({homeWin:1.40,awayWin:5.00,over25:1.85,awayO05:1.85,under35:1.40}))
+  assert.equal(r.pick?.rule,'OPP_O05_FAV_WIN')
+  assert.equal(r.pick?.market,'match-winner')
+  assert.equal(r.pick?.selection,'Home')
+  assert.equal(r.pick?.odds,1.40)
 })
 
-test('two split top-five teams are skipped',()=>{
-  const r=evaluateBankerFixture(fixture(dominant,weakAway,{hpos:2,apos:5}))
+test('opponent team total under 1.50 publishes Over 2.5',()=>{
+  const r=evaluateBankerFixture(fixture({over25:1.88,awayO05:1.35,under35:1.45,homeO05:1.40}))
+  assert.equal(r.pick?.rule,'OPP_TT_OVER25')
+  assert.equal(r.pick?.selection,'Over 2.5')
+  assert.equal(r.pick?.odds,1.88)
+})
+
+test('Under 3.5 above 1.60 publishes favourite 2+',()=>{
+  const r=evaluateBankerFixture(fixture({over25:1.90,awayO05:1.60,under35:1.75,homeO15:1.38}))
+  assert.equal(r.pick?.rule,'U35_FAV_2PLUS')
+  assert.equal(r.pick?.market,'home-team-goals')
+  assert.equal(r.pick?.selection,'Over 1.5')
+  assert.equal(r.pick?.displaySelection,'Home FC 2+')
+})
+
+test('both team totals under 1.30 and Over 2.5 under 1.50 publishes Over 2.5 or Draw',()=>{
+  const r=evaluateBankerFixture(fixture({over25:1.32,homeO05:1.20,awayO05:1.22,draw:3.60,under35:1.45}))
+  assert.equal(r.pick?.rule,'DRAW_OR_OVER25')
+  assert.equal(r.pick?.selection,'Over 2.5')
+  assert.equal(r.pick?.odds,1.32)
+})
+
+test('streak Yes 1.25-1.40 with cheap Over 1.5 and open Under 3.5 publishes Over 1.5',()=>{
+  const r=evaluateBankerFixture(fixture({over25:2.30,over15:1.22,under35:1.55,streak:1.30,awayO05:1.60}))
+  assert.equal(r.pick?.rule,'STREAK_OVER15')
+  assert.equal(r.pick?.selection,'Over 1.5')
+  assert.equal(r.pick?.odds,1.22)
+})
+
+test('streak Over 1.5 never publishes when both split tables are top 5',()=>{
+  const r=evaluateBankerFixture(fixture({over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:2,apos:4}))
+  assert.equal(r.pick,null)
   assert.equal(r.skip,'both-top-five')
 })
 
-test('home below one PPG is a global red flag even when both teams are weak',()=>{
-  const weakHome=[homeGame(1,0),homeGame(0,1),homeGame(0,2),homeGame(1,1),homeGame(0,2)]
-  const r=evaluateBankerFixture(fixture(weakHome,weakAway,{leagueClass:'low-scoring-draw-heavy'}))
-  assert.equal(r.skip,'home-under-1-ppg')
-  assert.equal(r.pick,null)
+test('favourite can be the away side',()=>{
+  const r=evaluateBankerFixture(fixture({homeWin:3.80,awayWin:1.50,over25:1.70,homeO05:1.88,awayO05:1.15,under35:1.40}))
+  assert.equal(r.pick?.rule,'OPP_O05_FAV_WIN')
+  assert.equal(r.pick?.selection,'Away')
+  assert.equal(r.pick?.displaySelection,'Away FC to Win')
 })
 
-test('away 1.5+ PPG, 2+ GF and 1+ GA produces Over 1.5 route',()=>{
-  const home=[homeGame(1,0),homeGame(1,1),homeGame(0,1),homeGame(2,1),homeGame(0,0)]
-  const away=[awayGame(2,1),awayGame(2,1),awayGame(3,2),awayGame(2,2),awayGame(1,2)]
-  const r=evaluateBankerFixture(fixture(home,away,{hpos:7,apos:3}))
-  assert.equal(r.pick?.rule,'AWAY_STRENGTH_OVER15')
-  assert.equal(r.pick?.selection,'Over 1.5')
-})
-
-test('balanced 1.5+ PPG teams use O2.5 in a high-scoring league',()=>{
-  const home=[homeGame(3,1),homeGame(3,1),homeGame(2,2),homeGame(3,0),homeGame(0,1)]
-  const away=[awayGame(1,0),awayGame(1,1),awayGame(2,1),awayGame(1,2),awayGame(2,1)]
-  const r=evaluateBankerFixture(fixture(home,away,{hpos:3,apos:8,leagueClass:'high-scoring'}))
-  assert.equal(r.pick?.rule,'BALANCED_HIGH_SCORING_OVER25')
-  assert.equal(r.pick?.selection,'Over 2.5')
-})
-
-test('balanced 1.5+ PPG teams use O1.5 in a low-scoring draw-heavy league',()=>{
-  const home=[homeGame(3,1),homeGame(3,1),homeGame(2,2),homeGame(3,0),homeGame(0,1)]
-  const away=[awayGame(1,0),awayGame(1,1),awayGame(2,1),awayGame(1,2),awayGame(2,1)]
-  const r=evaluateBankerFixture(fixture(home,away,{hpos:3,apos:8,leagueClass:'low-scoring-draw-heavy'}))
-  assert.equal(r.pick?.rule,'BALANCED_LOW_SCORING_OVER15')
-  assert.equal(r.pick?.selection,'Over 1.5')
-})
-
-test('league profile recognises high scoring sample',()=>{
+test('league profile still recognises a high-scoring sample',()=>{
   const rows=[]
   for(let i=0;i<20;i++)rows.push({fixture:{status:{short:'FT'}},goals:{home:i%2?2:3,away:1}})
   assert.equal(buildLeagueScoringProfile(rows).class,'high-scoring')
