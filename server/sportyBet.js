@@ -3,7 +3,7 @@ import {fetchJson} from './http.js'
 const COUNTRY=String(process.env.SPORTYBET_COUNTRY||'gh').replace(/[^a-z]/gi,'').toLowerCase()||'gh'
 const BASE=String(process.env.SPORTYBET_BASE||'https://www.sportybet.com').replace(/\/+$/,'')
 const SPORT='sr:sport:1'
-const MARKETS='1,10,11,18,19,20,29,60000,60010,60011,60012'
+const MARKETS='1,10,11,18,19,20,29,60000,60010,60011,60012,60020'
 const PAGE=Math.max(20,Math.min(100,Number(process.env.SPORTYBET_PAGE_SIZE||100)))
 const TIMELINE=Math.max(12,Number(process.env.SPORTYBET_TIMELINE||168))
 const ZONE=process.env.APP_TIMEZONE||'Africa/Accra'
@@ -92,7 +92,7 @@ function statusOf(ev){
   if(/live|1st|2nd|half|\bht\b|pause|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
   const goals=scoreOf(ev)
   if(Number.isFinite(Number(goals?.home))&&Number.isFinite(Number(goals?.away))&&code>=3)return{short:'FT',long:ev.matchStatus||'Match Finished'}
-  return{short:'NS',long:ev.matchStatus||'Not started'}
+  return{short:'NS',long:ev.matchStatus||ev.matchStatus||'Not started'}
 }
 
 function scoreOf(ev){
