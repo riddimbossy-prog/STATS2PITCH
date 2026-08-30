@@ -99,14 +99,26 @@ function renderStats(rows){
     if(r.kind==='value')counts.value++
     if(stateFor(r)==='upcoming')counts.upcoming++
   }
-  host.innerHTML=`<button type="button" data-reset="1"><small>Daily Bankers</small><b>${counts.total}</b></button><button type="button" data-kind="safest"><small>Safest</small><b>${counts.safest}</b></button><button type="button" data-kind="value"><small>Value</small><b>${counts.value}</b></button><button type="button" data-stat="upcoming"><small>Upcoming</small><b>${counts.upcoming}</b></button>`
+  host.innerHTML=`<button type="button" data-reset="1" class="${state.kind==='all'&&state.status==='all'?'is-on':''}"><small>Daily Bankers</small><b>${counts.total}</b></button><button type="button" data-kind="safest" class="${state.kind==='safest'?'is-on':''}"><small>Safest</small><b>${counts.safest}</b></button><button type="button" data-kind="value" class="${state.kind==='value'?'is-on':''}"><small>Value</small><b>${counts.value}</b></button><button type="button" data-stat="upcoming" class="${state.status==='upcoming'?'is-on':''}"><small>Upcoming</small><b>${counts.upcoming}</b></button>`
   host.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     if(b.dataset.reset){state.kind='all';state.status='all'}
     else if(b.dataset.kind){state.kind=b.dataset.kind;state.status='all'}
     else if(b.dataset.stat){state.status=b.dataset.stat;state.kind='all'}
-    if($('#kindFilter'))$('#kindFilter').value=state.kind
     if($('#statusFilter'))$('#statusFilter').value=state.status
     render()
+  })
+}
+
+function renderKindTabs(rows){
+  const host=$('#kindTabs'); if(!host)return
+  const safest=rows.filter(r=>r.kind==='safest').length
+  const value=rows.filter(r=>r.kind==='value').length
+  const labels={all:`All <em>${rows.length}</em>`,safest:`Safest <em>${safest}</em>`,value:`Value <em>${value}</em>`}
+  host.querySelectorAll('[data-kind]').forEach(b=>{
+    const on=b.dataset.kind===state.kind
+    b.classList.toggle('active',on)
+    b.setAttribute('aria-selected',on?'true':'false')
+    if(labels[b.dataset.kind]) b.innerHTML=labels[b.dataset.kind]
   })
 }
 
@@ -141,7 +153,7 @@ function render(){
   const markets=uniq(leagueRows.map(x=>x.market))
   state.market=options($('#market'),markets,state.market,'All markets',m=>esc(marketName({market:m})))
   if($('#statusFilter'))$('#statusFilter').value=state.status
-  if($('#kindFilter'))$('#kindFilter').value=state.kind
+  renderKindTabs(baseRows)
   renderCountryChips(baseRows)
   renderStats(baseRows)
   const rows=filtered(baseRows)
@@ -203,7 +215,12 @@ async function load(){
   }
 }
 
-$('#kindFilter')?.addEventListener('change',e=>{state.kind=e.target.value;render()})
+$('#kindTabs')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-kind]')
+  if(!b)return
+  state.kind=b.dataset.kind
+  render()
+})
 $('#statusFilter')?.addEventListener('change',e=>{state.status=e.target.value;render()})
 $('#countryFilter')?.addEventListener('change',e=>{state.country=e.target.value;state.league='all';render()})
 $('#leagueFilter')?.addEventListener('change',e=>{state.league=e.target.value;render()})
