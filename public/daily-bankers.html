@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="/conceptD.css?v=5.10.0">
   <link rel="stylesheet" href="/mobile2026.css?v=5.10.0">
   <link rel="stylesheet" href="/varTips.css?v=5.10.0">
-  <link rel="stylesheet" href="/dailyBankers.css?v=5.10.0">
+  <link rel="stylesheet" href="/dailyBankers.css?v=5.11.0">
   <link rel="stylesheet" href="/fontPlus2.css?v=5.10.0">
 <style>html.s2p-booting{background:#000}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#000}.mobile-nav.bankers-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}@media(max-width:430px){.mobile-nav.bankers-nav span{font-size:9px}}</style>
 </head>
@@ -105,12 +105,12 @@
       <section id="varStats"></section>
       <div class="controls-shell">
         <nav id="dates"></nav>
+        <div class="kind-tabs" id="kindTabs" role="tablist" aria-label="Switch between Safest and Value bankers">
+          <button type="button" class="kind-tab active" role="tab" id="kindTabAll" aria-selected="true" data-kind="all">All</button>
+          <button type="button" class="kind-tab" role="tab" id="kindTabSafest" aria-selected="false" data-kind="safest">Safest</button>
+          <button type="button" class="kind-tab" role="tab" id="kindTabValue" aria-selected="false" data-kind="value">Value</button>
+        </div>
         <div class="toolbar filters">
-          <select id="kindFilter" aria-label="Banker kind">
-            <option value="all">All bankers</option>
-            <option value="safest">Safest</option>
-            <option value="value">Value</option>
-          </select>
           <select id="statusFilter" aria-label="Match status">
             <option value="all">All statuses</option>
             <option value="upcoming">Upcoming</option>
@@ -158,9 +158,9 @@
   </nav>
   <script src="/runtime-config.js"></script>
   <link rel="modulepreload" href="/net.js?v=5.10.0">
-  <link rel="modulepreload" href="/dailyBankers.js?v=5.10.0">
+  <link rel="modulepreload" href="/dailyBankers.js?v=5.11.0">
   <script src="/leagueFlags.js?v=5.10.0"></script>
-  <script type="module" src="/dailyBankers.js?v=5.10.0"></script>
+  <script type="module" src="/dailyBankers.js?v=5.11.0"></script>
   <script src="/pwa.js?v=5.10.0"></script>
 </body>
 </html>
