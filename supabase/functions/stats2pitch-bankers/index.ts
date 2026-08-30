@@ -35,19 +35,23 @@ Deno.serve(async req=>{
     const raw=url.searchParams.get('date')
     const date=dateOk(raw)?String(raw):today()
     const row=await snapshot(date)
-    if(!row)return json({meta:{date,generatedAt:null,engine:'daily-bankers-v2'},fixtures:[],results:{},dailyBankers:[],safestBankers:[],valueBankers:[],dailyBankersMeta:null})
+    if(!row)return json({meta:{date,generatedAt:null,engine:'banker-totals-v1'},fixtures:[],results:{},dailyBankers:[],safestBankers:[],valueBankers:[],bankers:[],dailyBankersMeta:null})
     const board=row.payload||{}
-    const safest=Array.isArray(board.safestBankers)?board.safestBankers:[]
-    const value=Array.isArray(board.valueBankers)?board.valueBankers:[]
-    const daily=Array.isArray(board.dailyBankers)?board.dailyBankers:[...safest,...value]
+    const dedicated=Array.isArray(board.bankers)?board.bankers:[]
+    const safest=Array.isArray(board.safestBankers)?board.safestBankers:dedicated.filter((x:any)=>x?.kind!=='value'&&x?.rule!=='OPP_TT_OVER25'&&x?.rule!=='DRAW_OR_OVER25')
+    const value=Array.isArray(board.valueBankers)?board.valueBankers:dedicated.filter((x:any)=>x?.kind==='value'||x?.rule==='OPP_TT_OVER25'||x?.rule==='DRAW_OR_OVER25')
+    const daily=Array.isArray(board.dailyBankers)&&board.dailyBankers.length?board.dailyBankers:[...safest,...value]
+    const engine=board?.dailyBankersMeta?.engine||board?.meta?.bankerRulesEngine||board?.bankerRulesMeta?.engine||board?.meta?.dailyBankersEngine||'banker-totals-v1'
     return json({
-      meta:{date,generatedAt:board?.meta?.generatedAt||row.generatedAt,dailyBankersEngine:board?.meta?.dailyBankersEngine||board?.dailyBankersMeta?.engine||'daily-bankers-v2',safestBankersCount:safest.length,valueBankersCount:value.length},
+      meta:{date,generatedAt:board?.meta?.generatedAt||row.generatedAt,dailyBankersEngine:engine,safestBankersCount:safest.length,valueBankersCount:value.length,bankerRulesCount:dedicated.length},
       fixtures:Array.isArray(board.fixtures)?board.fixtures:[],
       results:board?.results&&typeof board.results==='object'?board.results:{},
       dailyBankers:daily,
       safestBankers:safest,
       valueBankers:value,
-      dailyBankersMeta:board?.dailyBankersMeta||null
+      bankers:dedicated,
+      dailyBankersMeta:board?.dailyBankersMeta||null,
+      bankerRulesMeta:board?.bankerRulesMeta||null
     })
   }catch(error){
     console.error('stats2pitch-bankers',String(error?.message||error))
