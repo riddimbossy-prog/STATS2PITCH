@@ -61,6 +61,8 @@ export function settlePick(pick,fixture){
     const yes=h>0&&a>0
     if(sel==='yes')outcome=result(yes)
     else if(sel==='no')outcome=result(!yes)
+  }else if(market==='draw-or-over-25'){
+    outcome=result(h===a||(h+a)>2.5)
   }else if(market==='total-goals'){
     const p=ou(pick?.selection);if(p)outcome=result(p.side==='over'?h+a>p.line:h+a<p.line,h+a===p.line)
   }else if(market==='home-team-goals'){
@@ -87,7 +89,7 @@ export function settleBoard(board,fixtures=[]){
   const map=new Map((fixtures||[]).map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]}))
   const prior=board?.results||{}
   const results={...prior}
-  for(const pick of [...(board?.bestPicks||[]),...(board?.varTips||[]),...(board?.filterTips||[]),...(board?.goalsBankers||[]),...(board?.dailyBankers||[])]){
+  for(const pick of [...(board?.bestPicks||[]),...(board?.varTips||[]),...(board?.filterTips||[]),...(board?.goalsBankers||[]),...(board?.dailyBankers||[]),...(board?.bankers||[])]){
     const key=String(pick.fixtureId),fixture=map.get(key)
     if(!fixture)continue
     results[key]=resolveResult(pick,fixture,prior[key])
