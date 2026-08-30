@@ -3,7 +3,7 @@ import {isSrlMatch} from './redFlags.js'
 
 export const BANKER_ENGINE='banker-totals-v1'
 export const BANKER_RULES=Object.freeze({
-  boardOver25Max:2.05,
+  boardTeamOver25Max:2.05,
   oppOver05FavWinMin:1.70,
   oppTeamTotalOver25Max:1.50,
   under35Fav2PlusMin:1.60,
@@ -92,6 +92,8 @@ export function extractBankerOdds(fixture){
   const awayO05=teamGoalOdd(markets,'away',0.5,awayName)
   const homeO15=teamGoalOdd(markets,'home',1.5,homeName)
   const awayO15=teamGoalOdd(markets,'away',1.5,awayName)
+  const homeO25=teamGoalOdd(markets,'home',2.5,homeName)
+  const awayO25=teamGoalOdd(markets,'away',2.5,awayName)
   let streak=scanOdd(markets,(key,market,name)=>isStreakName(key,market,name)&&/yes/.test(name))
   if(!streak)streak=oddOf(markets,'goals-streak-2',['Yes'])
   const drawOrOver25=scanOdd(markets,(key,market,name)=>{
@@ -108,10 +110,13 @@ export function extractBankerOdds(fixture){
   const oppWin=favourite==='home'?awayWin:favourite==='away'?homeWin:null
   const oppO05=favourite==='home'?awayO05:favourite==='away'?homeO05:null
   const favO15=favourite==='home'?homeO15:favourite==='away'?awayO15:null
+  const favO25=favourite==='home'?homeO25:favourite==='away'?awayO25:null
+  const teamOver25Prices=[homeO25,awayO25].filter(finite).map(Number)
+  const boardTeamOver25=teamOver25Prices.length?Math.min(...teamOver25Prices):null
   return{
     favourite,homeWin,awayWin,draw,favWin,oppWin,
     over15,over25,under35,streakYes:streak,drawOrOver25,
-    homeO05,awayO05,homeO15,awayO15,oppO05,favO15
+    homeO05,awayO05,homeO15,awayO15,homeO25,awayO25,oppO05,favO15,favO25,boardTeamOver25
   }
 }
 
@@ -195,10 +200,15 @@ function pack(f,odds,rule,published,reasons){
       favWin:px(odds.favWin),oppWin:px(odds.oppWin),draw:px(odds.draw),
       over15:px(odds.over15),over25:px(odds.over25),under35:px(odds.under35),
       oppO05:px(odds.oppO05),homeO05:px(odds.homeO05),awayO05:px(odds.awayO05),
-      favO15:px(odds.favO15),streakYes:px(odds.streakYes)
+      favO15:px(odds.favO15),homeO25:px(odds.homeO25),awayO25:px(odds.awayO25),
+      favO25:px(odds.favO25),boardTeamOver25:px(odds.boardTeamOver25),streakYes:px(odds.streakYes)
     },
     sportyEventId:f.sportyEventId||null
   }
+}
+
+function boardReason(odds){
+  return `Board filter: team total Over 2.5 is ${px(odds.boardTeamOver25)} (home ${px(odds.homeO25)} / away ${px(odds.awayO25)}), max ${BANKER_RULES.boardTeamOver25Max.toFixed(2)}.`
 }
 
 export function evaluateBankerFixture(f){
@@ -211,12 +221,14 @@ export function evaluateBankerFixture(f){
   const under35=num(odds.under35)
   const over15=num(odds.over15)
   const streak=num(odds.streakYes)
-  const onBoard=finite(over25)&&over25<=BANKER_RULES.boardOver25Max
+  const boardTeamOver25=num(odds.boardTeamOver25)
+  const onBoard=finite(boardTeamOver25)&&boardTeamOver25<=BANKER_RULES.boardTeamOver25Max
 
-  if(onBoard&&finite(homeO05)&&finite(awayO05)&&homeO05<BANKER_RULES.bothTeamTotalMax&&awayO05<BANKER_RULES.bothTeamTotalMax&&over25<BANKER_RULES.drawOrOver25MatchMax){
+  if(onBoard&&finite(homeO05)&&finite(awayO05)&&homeO05<BANKER_RULES.bothTeamTotalMax&&awayO05<BANKER_RULES.bothTeamTotalMax&&finite(over25)&&over25<BANKER_RULES.drawOrOver25MatchMax){
     const published=publishedDrawOrOver25(odds)
     if(published){
       return{pick:pack(f,odds,'DRAW_OR_OVER25',published,[
+        boardReason(odds),
         `Both team totals Over 0.5 are under ${BANKER_RULES.bothTeamTotalMax.toFixed(2)} (${px(homeO05)} / ${px(awayO05)}).`,
         `Match Over 2.5 is ${px(over25)} (under ${BANKER_RULES.drawOrOver25MatchMax.toFixed(2)}).`,
         `Published ${published.displaySelection} @ ${published.odds}.`
@@ -228,7 +240,7 @@ export function evaluateBankerFixture(f){
     const published=publishedFavWin(f,odds)
     if(published){
       return{pick:pack(f,odds,'OPP_O05_FAV_WIN',published,[
-        `Board filter: Over 2.5 is ${px(over25)} \u2264 ${BANKER_RULES.boardOver25Max.toFixed(2)}.`,
+        boardReason(odds),
         `Opponent team total Over 0.5 is ${px(oppO05)} > ${BANKER_RULES.oppOver05FavWinMin.toFixed(2)}.`,
         `Favourite to win: ${published.displaySelection} @ ${published.odds}.`
       ]),skip:null,odds}
@@ -240,7 +252,7 @@ export function evaluateBankerFixture(f){
     const published=publishedOver(2.5,over25)
     if(published){
       return{pick:pack(f,odds,'OPP_TT_OVER25',published,[
-        `Board filter: Over 2.5 is ${px(over25)} \u2264 ${BANKER_RULES.boardOver25Max.toFixed(2)}.`,
+        boardReason(odds),
         `Opponent team total Over 0.5 is ${px(oppO05)} < ${BANKER_RULES.oppTeamTotalOver25Max.toFixed(2)}.`,
         `Total goals Over 2.5 @ ${published.odds}.`
       ]),skip:null,odds}
@@ -251,7 +263,7 @@ export function evaluateBankerFixture(f){
     const published=publishedFav2Plus(f,odds)
     if(published){
       return{pick:pack(f,odds,'U35_FAV_2PLUS',published,[
-        `Board filter: Over 2.5 is ${px(over25)} \u2264 ${BANKER_RULES.boardOver25Max.toFixed(2)}.`,
+        boardReason(odds),
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.under35Fav2PlusMin.toFixed(2)}.`,
         `Favourite to score 2+: ${published.displaySelection} @ ${published.odds}.`
       ]),skip:null,odds}
@@ -267,7 +279,7 @@ export function evaluateBankerFixture(f){
     const published=publishedOver(1.5,over15)
     if(published){
       return{pick:pack(f,odds,'STREAK_OVER15',published,[
-        `Goals streak Yes is ${px(streak)} (${BANKER_RULES.streakYesMin.toFixed(2)}\u2013${BANKER_RULES.streakYesMax.toFixed(2)}).`,
+        `Goals streak Yes is ${px(streak)} (${BANKER_RULES.streakYesMin.toFixed(2)}-${BANKER_RULES.streakYesMax.toFixed(2)}).`,
         `Over 1.5 is ${px(over15)} < ${BANKER_RULES.over15Max.toFixed(2)}.`,
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`,
         'Top-5 vs Top-5 is blocked for this route.'
@@ -275,8 +287,8 @@ export function evaluateBankerFixture(f){
     }
   }
 
-  if(!finite(over25))return{pick:null,skip:'missing-over25',odds}
-  if(!onBoard)return{pick:null,skip:'over25-above-board-max',odds}
+  if(!finite(boardTeamOver25))return{pick:null,skip:'missing-team-over25',odds}
+  if(!onBoard)return{pick:null,skip:'team-over25-above-board-max',odds}
   return{pick:null,skip:'no-rule-qualified',odds}
 }
 
