@@ -1,0 +1,3 @@
+.s2p-boot-fallback{display:none!important}
+.s2p-boot-video{opacity:1!important}
+@media (prefers-reduced-motion:reduce){.s2p-boot-video{display:block!important;opacity:1!important}}
