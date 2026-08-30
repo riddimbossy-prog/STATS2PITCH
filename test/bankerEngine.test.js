@@ -50,6 +50,14 @@ test('opponent Over 0.5 above 1.70 publishes favourite win',()=>{
   assert.equal(r.pick?.odds,1.40)
 })
 
+test('favourite win shorter than 1.20 steps to favourite 2+',()=>{
+  const r=evaluateBankerFixture(fixture({homeWin:1.15,awayWin:5.80,homeO25:1.80,awayO05:1.85,homeO15:1.33,under35:1.40}))
+  assert.equal(r.pick?.rule,'OPP_O05_FAV_WIN')
+  assert.equal(r.pick?.displaySelection,'Home FC 2+')
+  assert.equal(r.pick?.odds,1.33)
+  assert.match(r.pick.whyText,/under 1\.20/)
+})
+
 test('opponent team total under 1.50 publishes Over 2.5',()=>{
   const r=evaluateBankerFixture(fixture({over25:1.88,awayO05:1.35,under35:1.45,homeO05:1.40,homeO25:1.90}))
   assert.equal(r.pick?.rule,'OPP_TT_OVER25')
@@ -65,6 +73,13 @@ test('Under 3.5 above 1.60 publishes favourite 2+',()=>{
   assert.equal(r.pick?.displaySelection,'Home FC 2+')
 })
 
+test('favourite 2+ shorter than 1.20 steps to Over 1.5',()=>{
+  const r=evaluateBankerFixture(fixture({over25:1.90,awayO05:1.60,under35:1.75,homeO15:1.12,homeO25:1.18,over15:1.26,homeO25:1.95}))
+  assert.equal(r.pick?.rule,'U35_FAV_2PLUS')
+  assert.equal(r.pick?.selection,'Over 1.5')
+  assert.equal(r.pick?.odds,1.26)
+})
+
 test('both team totals under 1.30 and match Over 2.5 under 1.50 publishes Over 2.5 or Draw',()=>{
   const r=evaluateBankerFixture(fixture({over25:1.32,homeO05:1.20,awayO05:1.22,draw:3.60,under35:1.45,homeO25:1.70}))
   assert.equal(r.pick?.rule,'DRAW_OR_OVER25')
@@ -78,6 +93,13 @@ test('Over 1.5 board starts on 3+ goals streak Yes 1.20-1.40',()=>{
   assert.equal(r.pick?.selection,'Over 1.5')
   assert.equal(r.pick?.odds,1.22)
   assert.match(r.pick.whyText,/3\+ goals streak Yes is 1\.20/)
+})
+
+test('Over 1.5 shorter than 1.20 steps to Over 2.5',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:1.28,over15:1.08,under35:1.55,streak:1.24,awayO05:1.60}))
+  assert.equal(r.pick?.rule,'STREAK_OVER15')
+  assert.equal(r.pick?.selection,'Over 2.5')
+  assert.equal(r.pick?.odds,1.28)
 })
 
 test('2-in-a-row streak Yes 1.20-1.40 opens Over 1.5 when 3+ is outside the window',()=>{
