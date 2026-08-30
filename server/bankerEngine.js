@@ -1,61 +1,117 @@
-import {FINISHED,FORM_SAMPLE} from './config.js'
-import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
+import {FINISHED} from './config.js'
 import {isSrlMatch} from './redFlags.js'
 
-const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
-const round2=v=>Math.round(Number(v)*100)/100
-const pct=(hits,total)=>total?Math.round(hits*1000/total)/10:null
-const finished=f=>FINISHED.has(String(f?.fixture?.status?.short||'').toUpperCase())
-
+export const BANKER_ENGINE='banker-totals-v1'
 export const BANKER_RULES=Object.freeze({
-  homeRedFlagPPG:1.0,
-  straightHomeMinPPG:2.5,
-  straightHomeMinGF:2.5,
-  straightHomeMaxGA:1.2,
-  straightHomeMinFactors:2,
-  straightAwayMaxPPG:1.0,
-  straightAwayMinGA:2.0,
-  straightAwayMinLossRate:60,
-  notWinHomeMinPPG:1.5,
-  notWinAwayMaxPPG:1.0,
-  notWinAwayMinGA:2.5,
-  notWinAwayMinLossRate:80,
-  notWinAwayMinFactors:1,
-  awayStrengthMinPPG:1.5,
-  awayStrengthMinGF:2.0,
-  awayStrengthMinGA:1.0,
-  balancedPPG:1.5,
-  balancedAttack:2.0,
-  topFive:5,
-  leagueMinMatches:20,
-  highLeagueOver25:56,
-  highLeagueAvgGoals:2.8,
-  lowLeagueMaxOver25:50,
-  lowLeagueMaxAvgGoals:2.6,
-  drawHeavyMinRate:30
+  boardOver25Max:2.05,
+  oppOver05FavWinMin:1.70,
+  oppTeamTotalOver25Max:1.50,
+  under35Fav2PlusMin:1.60,
+  bothTeamTotalMax:1.30,
+  drawOrOver25MatchMax:1.50,
+  drawOrOver25TypicalMax:1.35,
+  streakYesMin:1.25,
+  streakYesMax:1.40,
+  over15Max:1.30,
+  streakUnder35Min:1.40,
+  topFive:5
 })
 
-function profile(fixtures,teamId,venue){
-  const rows=(fixtures||[]).filter(f=>finished(f)).slice(0,FORM_SAMPLE)
-  let points=0,gf=0,ga=0,wins=0,draws=0,losses=0
-  for(const f of rows){
-    const h=Number(f?.goals?.home),a=Number(f?.goals?.away)
-    if(!finite(h)||!finite(a))continue
-    const own=venue==='home'?h:a,opp=venue==='home'?a:h
-    gf+=own;ga+=opp
-    if(own>opp){wins++;points+=3}else if(own===opp){draws++;points+=1}else losses++
+const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
+const num=v=>finite(v)?Number(v):null
+const text=v=>String(v??'').trim()
+const norm=s=>text(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
+const px=v=>finite(v)?+Number(v).toFixed(2):null
+const finished=f=>FINISHED.has(String(f?.fixture?.status?.short||'').toUpperCase())
+
+function oddOf(markets,key,names){
+  for(const market of markets||[]){
+    if(market?.marketKey!==key)continue
+    for(const name of names){
+      const hit=(market.outcomes||[]).find(o=>norm(o?.name)===norm(name))
+      const price=num(hit?.odd)
+      if(price)return price
+    }
   }
-  const played=wins+draws+losses
+  return null
+}
+
+function scanOdd(markets,test){
+  for(const market of markets||[]){
+    for(const outcome of market.outcomes||[]){
+      const price=num(outcome?.odd)
+      if(!price)continue
+      if(test(norm(market.marketKey),norm(market.market),norm(outcome.name),outcome,market))return price
+    }
+  }
+  return null
+}
+
+function isStreakName(key,market,name){
+  const blob=`${key} ${market} ${name}`
+  return /goal(?:s)? streak/.test(blob)
+    ||/streak 2/.test(blob)
+    ||/streak 3/.test(blob)
+    ||/3 streak/.test(blob)
+    ||/2 (?:goal )?streak/.test(blob)
+    ||/consecutive goals/.test(blob)
+    ||/goals? in a row/.test(blob)
+    ||/2\+ goals in a row/.test(blob)
+    ||key==='goals-streak-2'
+    ||key==='goals-streak-3'
+    ||key==='goals streak 2'
+    ||key==='60010'
+}
+
+function teamGoalOdd(markets,side,line,teamName){
+  const key=side==='home'?'home-team-goals':'away-team-goals'
+  const direct=oddOf(markets,key,[`Over ${line}`,`O ${line}`])
+  if(direct)return direct
+  const wanted=norm(teamName)
+  return scanOdd(markets,(marketKey,market,name)=>{
+    if(!/over/.test(name)||!name.includes(String(line)))return false
+    if(marketKey===key)return true
+    if(marketKey!=='team-goals'&&!/team goals/.test(market)&&!/team total/.test(market))return false
+    if(side==='home'&&(/home/.test(name)||(wanted&&name.includes(wanted))))return true
+    if(side==='away'&&(/away/.test(name)||(wanted&&name.includes(wanted))))return true
+    return false
+  })
+}
+
+export function extractBankerOdds(fixture){
+  const markets=fixture?.marketOdds||[]
+  const homeName=fixture?.home?.name||''
+  const awayName=fixture?.away?.name||''
+  const homeWin=oddOf(markets,'match-winner',['Home','1'])
+  const awayWin=oddOf(markets,'match-winner',['Away','2'])
+  const draw=oddOf(markets,'match-winner',['Draw','X'])
+  const over15=oddOf(markets,'total-goals',['Over 1.5','O 1.5'])
+  const over25=oddOf(markets,'total-goals',['Over 2.5','O 2.5'])
+  const under35=oddOf(markets,'total-goals',['Under 3.5','U 3.5'])
+  const homeO05=teamGoalOdd(markets,'home',0.5,homeName)
+  const awayO05=teamGoalOdd(markets,'away',0.5,awayName)
+  const homeO15=teamGoalOdd(markets,'home',1.5,homeName)
+  const awayO15=teamGoalOdd(markets,'away',1.5,awayName)
+  let streak=scanOdd(markets,(key,market,name)=>isStreakName(key,market,name)&&/yes/.test(name))
+  if(!streak)streak=oddOf(markets,'goals-streak-2',['Yes'])
+  const drawOrOver25=scanOdd(markets,(key,market,name)=>{
+    const blob=`${key} ${market} ${name}`
+    return /draw/.test(blob)&&/over/.test(blob)&&/2\.5/.test(blob)
+  })
+  let favourite=null
+  if(homeWin&&awayWin){
+    if(homeWin<awayWin)favourite='home'
+    else if(awayWin<homeWin)favourite='away'
+  }else if(homeWin&&!awayWin)favourite='home'
+  else if(awayWin&&!homeWin)favourite='away'
+  const favWin=favourite==='home'?homeWin:favourite==='away'?awayWin:null
+  const oppWin=favourite==='home'?awayWin:favourite==='away'?homeWin:null
+  const oppO05=favourite==='home'?awayO05:favourite==='away'?homeO05:null
+  const favO15=favourite==='home'?homeO15:favourite==='away'?awayO15:null
   return{
-    played,
-    ready:played>=FORM_SAMPLE,
-    ppg:played?round2(points/played):null,
-    avgGF:played?round2(gf/played):null,
-    avgGA:played?round2(ga/played):null,
-    winRate:played?pct(wins,played):null,
-    drawRate:played?pct(draws,played):null,
-    lossRate:played?pct(losses,played):null,
-    record:`${wins}W ${draws}D ${losses}L`
+    favourite,homeWin,awayWin,draw,favWin,oppWin,
+    over15,over25,under35,streakYes:streak,drawOrOver25,
+    homeO05,awayO05,homeO15,awayO15,oppO05,favO15
   }
 }
 
@@ -66,143 +122,171 @@ export function buildLeagueScoringProfile(history=[]){
     const h=Number(f.goals.home),a=Number(f.goals.away),t=h+a
     goals+=t;if(h===a)draws++;if(t>2.5)over25++
   }
-  const matches=rows.length,avgGoals=matches?round2(goals/matches):null,drawRate=matches?pct(draws,matches):null,over25Rate=matches?pct(over25,matches):null
+  const matches=rows.length
+  const avgGoals=matches?Math.round(goals*100/matches)/100:null
+  const drawRate=matches?Math.round(draws*1000/matches)/10:null
+  const over25Rate=matches?Math.round(over25*1000/matches)/10:null
   let className='insufficient'
-  if(matches>=BANKER_RULES.leagueMinMatches){
-    if(Number(over25Rate)>=BANKER_RULES.highLeagueOver25||Number(avgGoals)>=BANKER_RULES.highLeagueAvgGoals)className='high-scoring'
-    else if(Number(over25Rate)<BANKER_RULES.lowLeagueMaxOver25&&Number(avgGoals)<=BANKER_RULES.lowLeagueMaxAvgGoals&&Number(drawRate)>=BANKER_RULES.drawHeavyMinRate)className='low-scoring-draw-heavy'
+  if(matches>=20){
+    if(Number(over25Rate)>=56||Number(avgGoals)>=2.8)className='high-scoring'
+    else if(Number(over25Rate)<50&&Number(avgGoals)<=2.6&&Number(drawRate)>=30)className='low-scoring-draw-heavy'
     else className='neutral'
   }
   return{class:className,matches,avgGoals,drawRate,over25Rate}
 }
 
-function sameTopFive(f){
-  const hp=Number(f?.homeSplit?.position),ap=Number(f?.awaySplit?.position)
+function bothTopFive(f){
+  const hp=num(f?.homeSplit?.position),ap=num(f?.awaySplit?.position)
   return finite(hp)&&finite(ap)&&hp<=BANKER_RULES.topFive&&ap<=BANKER_RULES.topFive
 }
 
-function basePick(f,home,away,leagueProfile){
+function publishedFavWin(f,odds){
+  const price=px(odds.favWin)
+  if(!price||!odds.favourite)return null
+  return odds.favourite==='home'
+    ?{market:'match-winner',selection:'Home',displaySelection:`${f.home.name} to Win`,odds:price,family:'1X2'}
+    :{market:'match-winner',selection:'Away',displaySelection:`${f.away.name} to Win`,odds:price,family:'1X2'}
+}
+
+function publishedFav2Plus(f,odds){
+  const price=px(odds.favO15)
+  if(!price||!odds.favourite)return null
+  return odds.favourite==='home'
+    ?{market:'home-team-goals',selection:'Over 1.5',displaySelection:`${f.home.name} 2+`,odds:price,family:'Team Goals'}
+    :{market:'away-team-goals',selection:'Over 1.5',displaySelection:`${f.away.name} 2+`,odds:price,family:'Team Goals'}
+}
+
+function publishedOver(line,price){
+  const odd=px(price)
+  if(!odd)return null
+  return{market:'total-goals',selection:`Over ${line}`,displaySelection:`Over ${line}`,odds:odd,family:'Goals'}
+}
+
+function publishedDraw(odds){
+  const price=px(odds.draw)
+  if(!price)return null
+  return{market:'match-winner',selection:'Draw',displaySelection:'1X2 \u00b7 Draw',odds:price,family:'1X2'}
+}
+
+function publishedDrawOrOver25(odds){
+  const combo=px(odds.drawOrOver25)
+  if(combo)return{market:'draw-or-over-25',selection:'Draw or Over 2.5',displaySelection:'Draw or Over 2.5',odds:combo,family:'Combo'}
+  const over=px(odds.over25),draw=px(odds.draw)
+  const overOk=finite(over)&&over<=BANKER_RULES.drawOrOver25TypicalMax
+  const drawOk=finite(draw)&&draw<=BANKER_RULES.drawOrOver25TypicalMax
+  if(overOk&&!drawOk)return publishedOver(2.5,over)
+  if(drawOk&&!overOk)return publishedDraw(odds)
+  if(overOk&&drawOk)return over<=draw?publishedOver(2.5,over):publishedDraw(odds)
+  if(finite(over)&&over<BANKER_RULES.drawOrOver25MatchMax)return publishedOver(2.5,over)
+  return null
+}
+
+function pack(f,odds,rule,published,reasons){
   return{
     fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
-    home:f.home.name,away:f.away.name,homeId:f.home?.id??null,awayId:f.away?.id??null,homeLogo:f.home.logo||null,awayLogo:f.away.logo||null,
+    home:f.home?.name,away:f.away?.name,homeId:f.home?.id??null,awayId:f.away?.id??null,
+    homeLogo:f.home?.logo||null,awayLogo:f.away?.logo||null,
     homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,
-    metrics:{home,away,league:leagueProfile},
-    engine:'banker-rules-v3-transition-safe'
+    market:published.market,selection:published.selection,displaySelection:published.displaySelection,
+    pick:published.displaySelection,odds:published.odds,family:published.family,
+    rule,engine:BANKER_ENGINE,favourite:odds.favourite||null,
+    reasons,why:reasons,whyText:reasons.join(' '),
+    oddsBook:{
+      favWin:px(odds.favWin),oppWin:px(odds.oppWin),draw:px(odds.draw),
+      over15:px(odds.over15),over25:px(odds.over25),under35:px(odds.under35),
+      oppO05:px(odds.oppO05),homeO05:px(odds.homeO05),awayO05:px(odds.awayO05),
+      favO15:px(odds.favO15),streakYes:px(odds.streakYes)
+    },
+    sportyEventId:f.sportyEventId||null
   }
 }
 
-function candidate(rule,market,selection,displaySelection,priority,reasons,ruleMeta={}){
-  return{rule,market,selection,displaySelection,priority,reasons,ruleMeta}
-}
-
-function countPassed(checks){return checks.filter(x=>x.ok).length}
-function passedLabels(checks){return checks.filter(x=>x.ok).map(x=>x.label)}
-function isRedirectGoal(c){return c.market==='total-goals'&&(c.selection==='Over 1.5'||c.selection==='Over 2.5')}
-
-export function evaluateBankerFixture(f,{ignoreTransition=false}={}){
+export function evaluateBankerFixture(f){
   if(isSrlMatch(f))return{pick:null,skip:'srl'}
-  if(f?.statsReady===false)return{pick:null,skip:'no-stats'}
-  const home=profile(f?.home?.fixtures,f?.home?.id,'home'),away=profile(f?.away?.fixtures,f?.away?.id,'away'),leagueProfile=f?.bankerLeagueProfile||{class:'insufficient'}
-  if(!home.ready||!away.ready)return{pick:null,skip:'incomplete-5+5'}
-  if(f?.earlySeason===true)return{pick:null,skip:'early-season'}
-  if(Number(home.ppg)<BANKER_RULES.homeRedFlagPPG)return{pick:null,skip:'home-under-1-ppg'}
-  if(sameTopFive(f))return{pick:null,skip:'both-top-five'}
+  const odds=extractBankerOdds(f)
+  const over25=num(odds.over25)
+  const oppO05=num(odds.oppO05)
+  const homeO05=num(odds.homeO05)
+  const awayO05=num(odds.awayO05)
+  const under35=num(odds.under35)
+  const over15=num(odds.over15)
+  const streak=num(odds.streakYes)
+  const onBoard=finite(over25)&&over25<=BANKER_RULES.boardOver25Max
 
-  const transitionProfiles={
-    home:buildTransitionProfile(f?.home?.fixtures,f?.home?.id),
-    away:buildTransitionProfile(f?.away?.fixtures,f?.away?.id)
-  }
-  const winTransition=ignoreTransition?null:evaluateTransitionSafety({stronger:transitionProfiles.home,weaker:transitionProfiles.away,mode:'win',strongerName:f.home.name,weakerName:f.away.name})
-  const notLoseTransition=ignoreTransition?null:evaluateTransitionSafety({stronger:transitionProfiles.home,weaker:transitionProfiles.away,mode:'not-lose',strongerName:f.home.name,weakerName:f.away.name})
-  let leakRedirect=false
-  const candidates=[]
-
-  const straightHomeChecks=[
-    {key:'home-ppg',ok:Number(home.ppg)>=BANKER_RULES.straightHomeMinPPG,label:`PPG ${home.ppg} ≥ 2.50`},
-    {key:'home-gf',ok:Number(home.avgGF)>=BANKER_RULES.straightHomeMinGF,label:`GF avg ${home.avgGF} ≥ 2.50`},
-    {key:'home-ga',ok:Number(home.avgGA)<BANKER_RULES.straightHomeMaxGA,label:`GA avg ${home.avgGA} < 1.20`}
-  ]
-  const straightAwayChecks=[
-    {key:'away-ppg',ok:Number(away.ppg)<BANKER_RULES.straightAwayMaxPPG,label:`Away PPG ${away.ppg} < 1.00`},
-    {key:'away-ga',ok:Number(away.avgGA)>=BANKER_RULES.straightAwayMinGA,label:`Away GA avg ${away.avgGA} ≥ 2.00`},
-    {key:'away-loss',ok:Number(away.lossRate)>=BANKER_RULES.straightAwayMinLossRate,label:`Away loss rate ${away.lossRate}% ≥ 60%`}
-  ]
-  const straightHomeFactorCount=countPassed(straightHomeChecks)
-  const straightAwayAllPass=straightAwayChecks.every(x=>x.ok)
-  if(!ignoreTransition&&straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass&&winTransition?.redirectGoals)leakRedirect=true
-
-  if(straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass&&(ignoreTransition||winTransition?.allowed))candidates.push(candidate(
-    'HOME_STRAIGHT_WIN','match-winner','Home',`${f.home.name} Straight Win`,100,
-    [
-      `Home qualifies on ${straightHomeFactorCount}/3 strength factors: ${passedLabels(straightHomeChecks).join(' · ')}`,
-      `Away weakness is non-negotiable and all 3 factors pass: ${passedLabels(straightAwayChecks).join(' · ')}`,
-      ...(winTransition?.allowed?[`Transition safety passed: score-first, lead-hold, opponent concede-first/stay-down and comeback checks.`]:[])
-    ],
-    {homeFactorsPassed:straightHomeFactorCount,homeFactorsRequired:BANKER_RULES.straightHomeMinFactors,awayFactorsPassed:3,awayFactorsRequired:3,transitionSafety:winTransition}
-  ))
-
-  const notWinAwayChecks=[
-    {key:'away-ppg',ok:Number(away.ppg)<BANKER_RULES.notWinAwayMaxPPG,label:`Away PPG ${away.ppg} < 1.00`},
-    {key:'away-ga',ok:Number(away.avgGA)>=BANKER_RULES.notWinAwayMinGA,label:`Away GA avg ${away.avgGA} ≥ 2.50`},
-    {key:'away-loss',ok:Number(away.lossRate)>=BANKER_RULES.notWinAwayMinLossRate,label:`Away loss rate ${away.lossRate}% ≥ 80%`}
-  ]
-  const notWinAwayFactorCount=countPassed(notWinAwayChecks)
-  const notWinHomePass=Number(home.ppg)>=BANKER_RULES.notWinHomeMinPPG
-  if(!ignoreTransition&&notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors&&notLoseTransition?.redirectGoals)leakRedirect=true
-
-  if(notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors&&(ignoreTransition||notLoseTransition?.allowed))candidates.push(candidate(
-    'AWAY_TEAM_NOT_TO_WIN','double-chance','Home or Draw',`${f.away.name} Not to Win`,90,
-    [
-      `Home PPG ${home.ppg} ≥ 1.50 is the mandatory constant`,
-      `Away qualifies on ${notWinAwayFactorCount}/3 weakness factors: ${passedLabels(notWinAwayChecks).join(' · ')}`,
-      ...(notLoseTransition?.allowed?[`Transition safety passed before the not-to-lose decision.`]:[])
-    ],
-    {homePPGMandatory:true,awayFactorsPassed:notWinAwayFactorCount,awayFactorsRequired:BANKER_RULES.notWinAwayMinFactors,transitionSafety:notLoseTransition}
-  ))
-
-  const bothBalanced=Number(home.ppg)>=BANKER_RULES.balancedPPG&&Number(away.ppg)>=BANKER_RULES.balancedPPG
-  const oneStrongAttack=Number(home.avgGF)>=BANKER_RULES.balancedAttack||Number(away.avgGF)>=BANKER_RULES.balancedAttack
-  if(bothBalanced&&oneStrongAttack){
-    if(leagueProfile.class==='high-scoring')candidates.push(candidate(
-      'BALANCED_HIGH_SCORING_OVER25','total-goals','Over 2.5','Over 2.5 Total Goals',80,
-      [`Both teams have at least 1.50 split PPG (${home.ppg} / ${away.ppg})`,`At least one attack averages 2.00+ goals (${home.avgGF} / ${away.avgGF})`,`League is high-scoring: O2.5 ${leagueProfile.over25Rate}%, avg goals ${leagueProfile.avgGoals}`]
-    ))
-    else if(leagueProfile.class==='low-scoring-draw-heavy')candidates.push(candidate(
-      'BALANCED_LOW_SCORING_OVER15','total-goals','Over 1.5','Over 1.5 Total Goals',75,
-      [`Both teams have at least 1.50 split PPG (${home.ppg} / ${away.ppg})`,`At least one attack averages 2.00+ goals (${home.avgGF} / ${away.avgGF})`,`League is low-scoring/draw-heavy, so the line is reduced to Over 1.5`]
-    ))
+  if(onBoard&&finite(homeO05)&&finite(awayO05)&&homeO05<BANKER_RULES.bothTeamTotalMax&&awayO05<BANKER_RULES.bothTeamTotalMax&&over25<BANKER_RULES.drawOrOver25MatchMax){
+    const published=publishedDrawOrOver25(odds)
+    if(published){
+      return{pick:pack(f,odds,'DRAW_OR_OVER25',published,[
+        `Both team totals Over 0.5 are under ${BANKER_RULES.bothTeamTotalMax.toFixed(2)} (${px(homeO05)} / ${px(awayO05)}).`,
+        `Match Over 2.5 is ${px(over25)} (under ${BANKER_RULES.drawOrOver25MatchMax.toFixed(2)}).`,
+        `Published ${published.displaySelection} @ ${published.odds}.`
+      ]),skip:null,odds}
+    }
   }
 
-  if(Number(away.ppg)>=BANKER_RULES.awayStrengthMinPPG&&Number(away.avgGF)>=BANKER_RULES.awayStrengthMinGF&&Number(away.avgGA)>=BANKER_RULES.awayStrengthMinGA)candidates.push(candidate(
-    'AWAY_STRENGTH_OVER15','total-goals','Over 1.5','Over 1.5 Total Goals',70,
-    [`Away split PPG ${away.ppg} ≥ 1.50`,`Away scores ${away.avgGF} per match ≥ 2.00`,`Away concedes ${away.avgGA} per match ≥ 1.00`]
-  ))
-
-  let pool=candidates
-  if(!ignoreTransition&&leakRedirect){
-    pool=candidates.filter(isRedirectGoal).map(c=>({...c,ruleMeta:{...c.ruleMeta,transitionRedirect:{reason:'stronger-team-leaks-over-80',stronger:transitionProfiles.home,weaker:transitionProfiles.away}}}))
-    if(!pool.length)return{pick:null,skip:'transition-goal-redirect-unqualified'}
-  }
-  if(!pool.length){
-    const transitionFailed=!ignoreTransition&&(
-      (straightHomeFactorCount>=BANKER_RULES.straightHomeMinFactors&&straightAwayAllPass&&!winTransition?.allowed)||
-      (notWinHomePass&&notWinAwayFactorCount>=BANKER_RULES.notWinAwayMinFactors&&!notLoseTransition?.allowed)
-    )
-    return{pick:null,skip:transitionFailed?'transition-safety-failed':'no-rule-qualified'}
+  if(onBoard&&finite(oppO05)&&oppO05>BANKER_RULES.oppOver05FavWinMin){
+    const published=publishedFavWin(f,odds)
+    if(published){
+      return{pick:pack(f,odds,'OPP_O05_FAV_WIN',published,[
+        `Board filter: Over 2.5 is ${px(over25)} \u2264 ${BANKER_RULES.boardOver25Max.toFixed(2)}.`,
+        `Opponent team total Over 0.5 is ${px(oppO05)} > ${BANKER_RULES.oppOver05FavWinMin.toFixed(2)}.`,
+        `Favourite to win: ${published.displaySelection} @ ${published.odds}.`
+      ]),skip:null,odds}
+    }
+    return{pick:null,skip:'missing-fav-win-odds',odds}
   }
 
-  pool.sort((a,b)=>b.priority-a.priority)
-  const winner=pool[0]
-  return{pick:{...basePick(f,home,away,leagueProfile),...winner,alsoQualified:pool.slice(1).map(x=>x.rule)},skip:null}
+  if(onBoard&&finite(oppO05)&&oppO05<BANKER_RULES.oppTeamTotalOver25Max){
+    const published=publishedOver(2.5,over25)
+    if(published){
+      return{pick:pack(f,odds,'OPP_TT_OVER25',published,[
+        `Board filter: Over 2.5 is ${px(over25)} \u2264 ${BANKER_RULES.boardOver25Max.toFixed(2)}.`,
+        `Opponent team total Over 0.5 is ${px(oppO05)} < ${BANKER_RULES.oppTeamTotalOver25Max.toFixed(2)}.`,
+        `Total goals Over 2.5 @ ${published.odds}.`
+      ]),skip:null,odds}
+    }
+  }
+
+  if(onBoard&&finite(under35)&&under35>BANKER_RULES.under35Fav2PlusMin){
+    const published=publishedFav2Plus(f,odds)
+    if(published){
+      return{pick:pack(f,odds,'U35_FAV_2PLUS',published,[
+        `Board filter: Over 2.5 is ${px(over25)} \u2264 ${BANKER_RULES.boardOver25Max.toFixed(2)}.`,
+        `Under 3.5 is ${px(under35)} > ${BANKER_RULES.under35Fav2PlusMin.toFixed(2)}.`,
+        `Favourite to score 2+: ${published.displaySelection} @ ${published.odds}.`
+      ]),skip:null,odds}
+    }
+    return{pick:null,skip:'missing-fav-2plus-odds',odds}
+  }
+
+  const streakWindow=finite(streak)&&streak>=BANKER_RULES.streakYesMin&&streak<=BANKER_RULES.streakYesMax
+  const over15Cheap=finite(over15)&&over15<BANKER_RULES.over15Max
+  const under35Open=finite(under35)&&under35>BANKER_RULES.streakUnder35Min
+  if(streakWindow&&over15Cheap&&under35Open){
+    if(bothTopFive(f))return{pick:null,skip:'both-top-five',odds}
+    const published=publishedOver(1.5,over15)
+    if(published){
+      return{pick:pack(f,odds,'STREAK_OVER15',published,[
+        `Goals streak Yes is ${px(streak)} (${BANKER_RULES.streakYesMin.toFixed(2)}\u2013${BANKER_RULES.streakYesMax.toFixed(2)}).`,
+        `Over 1.5 is ${px(over15)} < ${BANKER_RULES.over15Max.toFixed(2)}.`,
+        `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`,
+        'Top-5 vs Top-5 is blocked for this route.'
+      ]),skip:null,odds}
+    }
+  }
+
+  if(!finite(over25))return{pick:null,skip:'missing-over25',odds}
+  if(!onBoard)return{pick:null,skip:'over25-above-board-max',odds}
+  return{pick:null,skip:'no-rule-qualified',odds}
 }
 
 export function buildBankerRules(fixtures=[]){
   const picks=[],skipCounts={}
-  for(const f of fixtures){
+  for(const f of fixtures||[]){
     const result=evaluateBankerFixture(f)
     if(result.pick)picks.push(result.pick)
     else skipCounts[result.skip]=(skipCounts[result.skip]||0)+1
   }
-  picks.sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)||b.priority-a.priority)
-  return{picks,meta:{engine:'banker-rules-v3-transition-safe',count:picks.length,skips:skipCounts,rules:BANKER_RULES}}
+  picks.sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(a.odds)-Number(b.odds))
+  return{picks,meta:{engine:BANKER_ENGINE,count:picks.length,skips:skipCounts,rules:BANKER_RULES}}
 }
