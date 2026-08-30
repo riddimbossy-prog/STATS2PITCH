@@ -10,7 +10,7 @@ export const BANKER_RULES=Object.freeze({
   bothTeamTotalMax:1.30,
   drawOrOver25MatchMax:1.50,
   drawOrOver25TypicalMax:1.35,
-  streakYesMin:1.25,
+  streakYesMin:1.20,
   streakYesMax:1.40,
   over15Max:1.30,
   streakUnder35Min:1.40,
@@ -47,20 +47,19 @@ function scanOdd(markets,test){
   return null
 }
 
-function isStreakName(key,market,name){
+function isThreePlusStreak(key,market,name){
   const blob=`${key} ${market} ${name}`
-  return /goal(?:s)? streak/.test(blob)
-    ||/streak 2/.test(blob)
-    ||/streak 3/.test(blob)
+  if(/2\s*\+/.test(blob)&&!/3\s*\+/.test(blob))return false
+  if(/streak 2/.test(blob)||/2 streak/.test(blob)||key==='goals-streak-2')return false
+  return /3\s*\+\s*goals?\s*streak/.test(blob)
+    ||/goals?\s*streak\s*3/.test(blob)
+    ||/3\s*\+\s*streak/.test(blob)
+    ||/streak\s*3/.test(blob)
     ||/3 streak/.test(blob)
-    ||/2 (?:goal )?streak/.test(blob)
-    ||/consecutive goals/.test(blob)
-    ||/goals? in a row/.test(blob)
-    ||/2\+ goals in a row/.test(blob)
-    ||key==='goals-streak-2'
+    ||/3\+ goals in a row/.test(blob)
+    ||/three plus goals?/.test(blob)
     ||key==='goals-streak-3'
-    ||key==='goals streak 2'
-    ||key==='60010'
+    ||key==='goals streak 3'
 }
 
 function teamGoalOdd(markets,side,line,teamName){
@@ -94,8 +93,8 @@ export function extractBankerOdds(fixture){
   const awayO15=teamGoalOdd(markets,'away',1.5,awayName)
   const homeO25=teamGoalOdd(markets,'home',2.5,homeName)
   const awayO25=teamGoalOdd(markets,'away',2.5,awayName)
-  let streak=scanOdd(markets,(key,market,name)=>isStreakName(key,market,name)&&/yes/.test(name))
-  if(!streak)streak=oddOf(markets,'goals-streak-2',['Yes'])
+  let streak=scanOdd(markets,(key,market,name)=>isThreePlusStreak(key,market,name)&&/yes/.test(name))
+  if(!streak)streak=oddOf(markets,'goals-streak-3',['Yes'])
   const drawOrOver25=scanOdd(markets,(key,market,name)=>{
     const blob=`${key} ${market} ${name}`
     return /draw/.test(blob)&&/over/.test(blob)&&/2\.5/.test(blob)
@@ -279,7 +278,7 @@ export function evaluateBankerFixture(f){
     const published=publishedOver(1.5,over15)
     if(published){
       return{pick:pack(f,odds,'STREAK_OVER15',published,[
-        `Goals streak Yes is ${px(streak)} (${BANKER_RULES.streakYesMin.toFixed(2)}-${BANKER_RULES.streakYesMax.toFixed(2)}).`,
+        `Over 1.5 board: 3+ goals streak Yes is ${px(streak)} (${BANKER_RULES.streakYesMin.toFixed(2)}-${BANKER_RULES.streakYesMax.toFixed(2)}).`,
         `Over 1.5 is ${px(over15)} < ${BANKER_RULES.over15Max.toFixed(2)}.`,
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`,
         'Top-5 vs Top-5 is blocked for this route.'
@@ -287,6 +286,8 @@ export function evaluateBankerFixture(f){
     }
   }
 
+  if(!onBoard&&finite(streak)&&!streakWindow)return{pick:null,skip:'streak-3plus-outside-window',odds}
+  if(!onBoard&&!finite(streak)&&finite(over15))return{pick:null,skip:'missing-3plus-streak',odds}
   if(!finite(boardTeamOver25))return{pick:null,skip:'missing-team-over25',odds}
   if(!onBoard)return{pick:null,skip:'team-over25-above-board-max',odds}
   return{pick:null,skip:'no-rule-qualified',odds}
