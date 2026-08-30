@@ -14,26 +14,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/conceptD.css?v=5.7.0">
+  <link rel="stylesheet" href="/conceptD.css?v=5.7.1">
   <link rel="stylesheet" href="/mobile2026.css?v=5.7.0">
   <link rel="stylesheet" href="/fontPlus2.css?v=5.7.0">
-<style>html.s2p-booting{background:#000}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#000}.mobile-nav,.mobile-nav.bankers-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))!important}@media(max-width:430px){.mobile-nav span{font-size:9px!important}}</style>
+<style>html.s2p-booting{background:#000}.s2p-boot-fallback{display:none!important}.s2p-boot-video{opacity:1!important}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#000}.mobile-nav,.mobile-nav.bankers-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))!important}@media(max-width:430px){.mobile-nav span{font-size:9px!important}}</style>
 </head>
 <body data-view="all">
   <div id="boot" class="s2p-boot" role="status" aria-live="polite" aria-label="Loading Stats2Pitch">
-    <div class="s2p-boot-fallback" aria-hidden="true">
-      <svg viewBox="0 0 220 150">
-        <rect x="18" y="12" width="184" height="126" rx="2"/>
-        <line x1="18" y1="75" x2="202" y2="75"/>
-        <circle cx="110" cy="75" r="22"/>
-        <rect x="18" y="42" width="32" height="66"/>
-        <rect x="18" y="54" width="16" height="42"/>
-        <rect x="170" y="42" width="32" height="66"/>
-        <rect x="186" y="54" width="16" height="42"/>
-      </svg>
-      <b>2</b>
-    </div>
-    <video class="s2p-boot-video" autoplay muted loop playsinline preload="auto" poster="/assets/s2p-boot.jpg?v=5.7.0">
+    <video class="s2p-boot-video" autoplay muted loop playsinline preload="auto">
       <source src="/assets/s2p-boot.mp4?v=5.7.0" type="video/mp4">
     </video>
   </div>
