@@ -57,9 +57,17 @@ function isThreePlusStreak(key,market,name){
     ||/streak\s*3/.test(blob)
     ||/3 streak/.test(blob)
     ||/3\+ goals in a row/.test(blob)
+    ||/3 or more goals in a row/.test(blob)
     ||/three plus goals?/.test(blob)
     ||key==='goals-streak-3'
     ||key==='goals streak 3'
+}
+
+function isTwoPlusStreak(key,market,name){
+  const blob=`${key} ${market} ${name}`
+  return key==='goals-streak-2'
+    ||/2 or more goals in a row/.test(blob)
+    ||/goals? streak/.test(blob)
 }
 
 function teamGoalOdd(markets,side,line,teamName){
@@ -75,6 +83,15 @@ function teamGoalOdd(markets,side,line,teamName){
     if(side==='away'&&(/away/.test(name)||(wanted&&name.includes(wanted))))return true
     return false
   })
+}
+
+function streakYesOdd(markets){
+  let streak=scanOdd(markets,(key,market,name)=>isThreePlusStreak(key,market,name)&&/yes/.test(name))
+  if(!streak)streak=oddOf(markets,'goals-streak-3',['Yes'])
+  if(finite(streak)&&streak>=BANKER_RULES.streakYesMin&&streak<=BANKER_RULES.streakYesMax)return streak
+  let two=scanOdd(markets,(key,market,name)=>isTwoPlusStreak(key,market,name)&&/yes/.test(name))
+  if(!two)two=oddOf(markets,'goals-streak-2',['Yes'])
+  return two||streak||null
 }
 
 export function extractBankerOdds(fixture){
@@ -93,8 +110,7 @@ export function extractBankerOdds(fixture){
   const awayO15=teamGoalOdd(markets,'away',1.5,awayName)
   const homeO25=teamGoalOdd(markets,'home',2.5,homeName)
   const awayO25=teamGoalOdd(markets,'away',2.5,awayName)
-  let streak=scanOdd(markets,(key,market,name)=>isThreePlusStreak(key,market,name)&&/yes/.test(name))
-  if(!streak)streak=oddOf(markets,'goals-streak-3',['Yes'])
+  const streak=streakYesOdd(markets)
   const drawOrOver25=scanOdd(markets,(key,market,name)=>{
     const blob=`${key} ${market} ${name}`
     return /draw/.test(blob)&&/over/.test(blob)&&/2\.5/.test(blob)
