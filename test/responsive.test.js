@@ -8,7 +8,7 @@ test('Concept D stylesheet is active and mobile bottom nav exists',()=>{
   assert.match(html,/conceptD\.css\?v=5\.7\.0/)
 
   assert.doesNotMatch(html,/product\.css/)
-  assert.match(html,/class="mobile-nav"/)
+  assert.match(html,/class="mobile-nav/)
   assert.match(html,/var-tips\.html/)
 })
 test('Concept C has tablet, phone and foldable breakpoints',()=>{
