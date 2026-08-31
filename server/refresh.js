@@ -2,7 +2,7 @@ import {sportyFixturesByDate} from './sportyBet.js'
 import {teamLastX,leagueFormPack,matchGoalEvents,nid,overallSample,hasMatchStats,teamVersus} from './sportyStats.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard} from './engine.js'
-import {buildBankerRules,buildLeagueScoringProfile,evaluateBankerFixture} from './bankerEngine.js'
+import {buildBankerRules,buildLeagueScoringProfile,evaluateBankerFixture,buildOverallTable} from './bankerEngine.js'
 import {buildOver25Profile} from './over25.js'
 import {saveBoard,listBoards} from './store.js'
 import {buildLearningProfiles} from './learning.js'
@@ -10,7 +10,7 @@ import {SCHEDULED,FORM_SAMPLE} from './config.js'
 import {h2hSnapshot,last5Overall,teamStats} from './pickWhy.js'
 
 
-const jobs=new Map(),leagueCache=new Map(),teamCache=new Map(),splitCache=new Map(),eventCache=new Map()
+const jobs=new Map(),leagueCache=new Map(),teamCache=new Map(),splitCache=new Map(),standingCache=new Map(),eventCache=new Map()
 
 async function mapLimit(items,limit,fn){
   const out=new Array(items.length);let i=0
@@ -47,6 +47,7 @@ function lastNVenue(rows,teamId,venue,n=FORM_SAMPLE){return(rows||[]).filter(f=>
 function ppgFor(rows,teamId,venue){let pts=0,played=0;for(const f of rows){const h=Number(f?.goals?.home),a=Number(f?.goals?.away);if(!Number.isFinite(h)||!Number.isFinite(a))continue;const own=venue==='home'?h:a,opp=venue==='home'?a:h;played++;pts+=own>opp?3:own===opp?1:0}return played?pts/played:0}
 function splitTable(history,venue){const ids=new Map();for(const f of history||[]){const t=venue==='home'?f?.teams?.home:f?.teams?.away;if(t?.id)ids.set(String(t.id),{id:t.id,name:t.name||''})}const rows=[];for(const t of ids.values()){const sample=lastNVenue(history,t.id,venue);if(sample.length<FORM_SAMPLE)continue;rows.push({...t,ppg:ppgFor(sample,t.id,venue),played:sample.length})}rows.sort((a,b)=>b.ppg-a.ppg||String(a.name).localeCompare(String(b.name)));return new Map(rows.map((r,i)=>[String(r.id),{position:i+1,size:rows.length,ppg:+r.ppg.toFixed(2),played:r.played,sampleReady:true,venue}]))}
 function cachedSplitTable(leagueId,season,venue,history){const key=`${leagueId}|${season}|${venue}|${FORM_SAMPLE}`;if(!splitCache.has(key))splitCache.set(key,splitTable(history,venue));return splitCache.get(key)}
+function cachedOverallTable(leagueId,season,history){const key=`${leagueId}|${season}|overall`;if(!standingCache.has(key))standingCache.set(key,buildOverallTable(history));return standingCache.get(key)}
 async function learningProfiles(){try{const end=new Date(),start=new Date(end.getTime()-60*86400000),rows=await listBoards(start.toISOString().slice(0,10),end.toISOString().slice(0,10));return buildLearningProfiles(rows.map(x=>x.payload).filter(Boolean),20)}catch{return[]}}
 
 async function enrichHistoryFixture(row){
@@ -139,11 +140,14 @@ export async function refreshNow(date,onProgress=()=>{}){
       const earlySeason=(currentHomeFixtures.length>0&&currentHomeFixtures.length<FORM_SAMPLE)||(currentAwayFixtures.length>0&&currentAwayFixtures.length<FORM_SAMPLE)
       const homeSplit=formReady?cachedSplitTable(leagueId,season,'home',history).get(String(homeId))||null:null
       const awaySplit=formReady?cachedSplitTable(leagueId,season,'away',history).get(String(awayId))||null:null
+      const table=cachedOverallTable(leagueId,season,current)
+      const homeStanding=table.get(String(homeId))||null
+      const awayStanding=table.get(String(awayId))||null
       const marketOdds=verifiedMarkets({sportyMarkets:f?.sporty?.markets,fixture:f})
       if(marketOdds.length)statsVerified++
       const over25Profile=buildOver25Profile(mergeUnique(current,previous,history),homeId,awayId)
       const h2h=h2hSnapshot(versusRows.length?versusRows:history,homeId,awayId)
-      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures,lastMatches:lastMatchesHome},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures,lastMatches:lastMatchesAway},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,marketOdds,formReady,statsReady,sportyEventId:f?.sporty?.eventId||null,sportyGameId:f?.sporty?.gameId||null,feed,leagueHistoryReady:current.length+previous.length>0,h2h,homeStats:teamStats(last5Overall(lastMatchesHome,homeId)),awayStats:teamStats(last5Overall(lastMatchesAway,awayId))}
+      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures,lastMatches:lastMatchesHome},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures,lastMatches:lastMatchesAway},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,homeStanding,awayStanding,marketOdds,formReady,statsReady,sportyEventId:f?.sporty?.eventId||null,sportyGameId:f?.sporty?.gameId||null,feed,leagueHistoryReady:current.length+previous.length>0,h2h,homeStats:teamStats(last5Overall(lastMatchesHome,homeId)),awayStats:teamStats(last5Overall(lastMatchesAway,awayId))}
 
       if(!statsReady){
         done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures,skippedNoStats})

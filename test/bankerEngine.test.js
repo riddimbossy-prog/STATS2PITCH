@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {evaluateBankerFixture,buildLeagueScoringProfile,BANKER_ENGINE} from '../server/bankerEngine.js'
+import {evaluateBankerFixture,buildLeagueScoringProfile,buildOverallTable,BANKER_ENGINE} from '../server/bankerEngine.js'
 
 function outcome(name,odd){return{name,odd}}
 function markets({homeWin=1.45,awayWin=4.20,draw=3.80,over15=1.22,over25=1.72,under35=1.55,homeO05=1.18,awayO05=1.85,homeO15=1.55,awayO15=2.40,homeO25=1.85,awayO25=3.10,streak=1.32,streak2=null}={}){
@@ -21,6 +21,8 @@ function fixture(odds={},extra={}){
     home:{id:1,name:'Home FC'},away:{id:2,name:'Away FC'},
     homeSplit:{position:extra.hpos??7,size:12,sampleReady:true},
     awaySplit:{position:extra.apos??10,size:12,sampleReady:true},
+    homeStanding:{position:extra.hstand??8,size:12,played:5},
+    awayStanding:{position:extra.astand??9,size:12,played:5},
     marketOdds:markets(odds),
     ...extra.rest
   }
@@ -34,7 +36,7 @@ test('engine id is banker-totals-v1',()=>{
 test('board starts only when a team total Over 2.5 is 2.05 or shorter',()=>{
   const r=evaluateBankerFixture(fixture({homeO25:2.20,awayO25:2.40,over25:1.70,over15:1.40,under35:1.30,streak:null,awayO05:1.90}))
   assert.equal(r.pick,null)
-  assert.equal(r.skip,'team-over25-above-board-max')
+  assert.equal(r.skip,'missing-3plus-streak')
 })
 
 test('a single side at 2.05 is enough to enter the board',()=>{
@@ -76,8 +78,8 @@ test('Under 3.5 above 1.60 publishes favourite 2+',()=>{
 test('favourite 2+ shorter than 1.20 steps to Over 1.5',()=>{
   const r=evaluateBankerFixture(fixture({over25:1.90,awayO05:1.60,under35:1.75,homeO15:1.12,homeO25:1.18,over15:1.26,homeO25:1.95}))
   assert.equal(r.pick?.rule,'U35_FAV_2PLUS')
-  assert.equal(r.pick?.selection,'Over 1.5')
-  assert.equal(r.pick?.odds,1.26)
+  assert.equal(r.pick?.displaySelection,'Home FC 3+')
+  assert.equal(r.pick?.odds,1.95)
 })
 
 test('both team totals under 1.30 and match Over 2.5 under 1.50 publishes Over 2.5 or Draw',()=>{
@@ -92,7 +94,7 @@ test('Over 1.5 board starts on 3+ goals streak No 1.20-1.40',()=>{
   assert.equal(r.pick?.rule,'STREAK_OVER15')
   assert.equal(r.pick?.selection,'Over 1.5')
   assert.equal(r.pick?.odds,1.22)
-  assert.match(r.pick.whyText,/3\+ goals streak No is 1\.20/)
+  assert.match(r.pick.whyText,/3\+ goals streak No is 1\.2/)
 })
 
 test('Over 1.5 shorter than 1.20 steps to Over 2.5',()=>{
@@ -114,10 +116,31 @@ test('streak No below 1.20 does not publish Over 1.5',()=>{
   assert.equal(r.skip,'streak-3plus-outside-window')
 })
 
-test('streak Over 1.5 never publishes when both split tables are top 5',()=>{
-  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:2,apos:4}))
+test('streak Over 1.5 never publishes when both overall table places are top 5',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:10,apos:1,hstand:5,astand:2}))
   assert.equal(r.pick,null)
   assert.equal(r.skip,'both-top-five')
+})
+
+test('venue-split top 5 does not block Over 1.5 when the league table is not Top-5 vs Top-5',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:2,apos:4,hstand:10,astand:8}))
+  assert.equal(r.pick?.rule,'STREAK_OVER15')
+  assert.match(r.pick.whyText,/10th vs Away FC 8th/)
+  assert.doesNotMatch(r.pick.whyText,/is blocked/)
+})
+
+test('overall table ranks current-season points then goal difference',()=>{
+  const ft=id=>({fixture:{id,status:{short:'FT'}}})
+  const rows=[
+    {...ft(1),teams:{home:{id:1,name:'Leaders'},away:{id:2,name:'Second'}},goals:{home:2,away:0}},
+    {...ft(2),teams:{home:{id:2,name:'Second'},away:{id:3,name:'Third'}},goals:{home:1,away:0}},
+    {...ft(3),teams:{home:{id:1,name:'Leaders'},away:{id:3,name:'Third'}},goals:{home:1,away:1}}
+  ]
+  const table=buildOverallTable(rows)
+  assert.equal(table.get('1').position,1)
+  assert.equal(table.get('1').points,4)
+  assert.equal(table.get('2').position,2)
+  assert.equal(table.get('3').position,3)
 })
 
 test('favourite can be the away side',()=>{

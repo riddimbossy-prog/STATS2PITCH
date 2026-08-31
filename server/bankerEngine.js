@@ -153,9 +153,51 @@ export function buildLeagueScoringProfile(history=[]){
   return{class:className,matches,avgGoals,drawRate,over25Rate}
 }
 
+function ordinal(n){
+  const i=Math.round(Number(n))
+  if(!Number.isFinite(i))return '—'
+  const k=i%100,s=i%10
+  const suf=k>=11&&k<=13?'th':s===1?'st':s===2?'nd':s===3?'rd':'th'
+  return `${i}${suf}`
+}
+
+export function buildOverallTable(history=[]){
+  const teams=new Map()
+  const bump=(t,gf,ga,pts)=>{
+    if(t?.id===undefined||t?.id===null)return
+    const k=String(t.id)
+    const row=teams.get(k)||{id:t.id,name:t.name||'',played:0,points:0,gf:0,ga:0}
+    row.played++;row.gf+=gf;row.ga+=ga;row.points+=pts
+    if(!row.name&&t.name)row.name=t.name
+    teams.set(k,row)
+  }
+  for(const f of history||[]){
+    const done=['FT','AET','PEN'].includes(String(f?.fixture?.status?.short||'').toUpperCase())
+    if(!done)continue
+    const h=Number(f?.goals?.home),a=Number(f?.goals?.away)
+    if(!Number.isFinite(h)||!Number.isFinite(a))continue
+    bump(f?.teams?.home,h,a,h>a?3:h===a?1:0)
+    bump(f?.teams?.away,a,h,a>h?3:a===h?1:0)
+  }
+  const rows=[...teams.values()].map(r=>({...r,gd:r.gf-r.ga}))
+  rows.sort((a,b)=>b.points-a.points||b.gd-a.gd||b.gf-a.gf||String(a.name).localeCompare(String(b.name)))
+  return new Map(rows.map((r,i)=>[String(r.id),{position:i+1,size:rows.length,played:r.played,points:r.points,gd:r.gd,gf:r.gf,ga:r.ga,name:r.name}]))
+}
+
+function tablePos(f,side){
+  return num(f?.[side==='home'?'homeStanding':'awayStanding']?.position)
+}
+
 function bothTopFive(f){
-  const hp=num(f?.homeSplit?.position),ap=num(f?.awaySplit?.position)
+  const hp=tablePos(f,'home'),ap=tablePos(f,'away')
   return finite(hp)&&finite(ap)&&hp<=BANKER_RULES.topFive&&ap<=BANKER_RULES.topFive
+}
+
+function tableReason(f){
+  const hp=tablePos(f,'home'),ap=tablePos(f,'away')
+  const home=text(f?.home?.name||'Home'),away=text(f?.away?.name||'Away')
+  if(finite(hp)&&finite(ap))return `League table: ${home} ${ordinal(hp)} vs ${away} ${ordinal(ap)} — not Top-5 vs Top-5.`
+  return 'League table places were not both confirmed, so Top-5 vs Top-5 did not apply.'
 }
 
 function publishedFavWin(f,odds){
@@ -233,6 +275,7 @@ function pack(f,odds,rule,published,reasons){
     home:f.home?.name,away:f.away?.name,homeId:f.home?.id??null,awayId:f.away?.id??null,
     homeLogo:f.home?.logo||null,awayLogo:f.away?.logo||null,
     homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,
+    homeStanding:f.homeStanding||null,awayStanding:f.awayStanding||null,
     market:published.market,selection:published.selection,displaySelection:published.displaySelection,
     pick:published.displaySelection,odds:published.odds,family:published.family,
     rule,engine:BANKER_ENGINE,favourite:odds.favourite||null,
@@ -330,7 +373,7 @@ export function evaluateBankerFixture(f){
         `Over 1.5 board: 3+ goals streak No is ${px(streak)} (${BANKER_RULES.streakNoMin.toFixed(2)}-${BANKER_RULES.streakNoMax.toFixed(2)}).`,
         `Over 1.5 is ${px(over15)} < ${BANKER_RULES.over15Max.toFixed(2)}.`,
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`,
-        'Top-5 vs Top-5 is blocked for this route.'
+        tableReason(f)
       ])
     }
   }
