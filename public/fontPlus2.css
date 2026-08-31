@@ -37,3 +37,31 @@ html, body { font-size: 19px !important; }
 .perf-tone, .perf-callout-kicker { font-size: 12px !important; }
 .empty { font-size: 16px !important; }
 .close { font-size: 16px !important; }
+
+/* Settled peanut: keep the published card and recolor the purple shape. */
+.card.won .teams::before,
+.card.won .crest-matchup::before {
+  background:
+    radial-gradient(circle at 20% 46%, rgba(255,255,255,.28), transparent 38%),
+    linear-gradient(90deg, #15803d 0%, #22c55e 48%, #4ade80 100%) !important;
+}
+.card.lost .teams::before,
+.card.lost .crest-matchup::before {
+  background:
+    radial-gradient(circle at 20% 46%, rgba(255,255,255,.22), transparent 38%),
+    linear-gradient(90deg, #991b1b 0%, #ef4444 48%, #f87171 100%) !important;
+}
+.card.void .teams::before,
+.card.void .crest-matchup::before,
+.card.postponed .teams::before,
+.card.postponed .crest-matchup::before {
+  background:
+    radial-gradient(circle at 20% 46%, rgba(255,255,255,.16), transparent 38%),
+    linear-gradient(90deg, #4b5563 0%, #6b7280 48%, #9ca3af 100%) !important;
+}
+.card.void .match-mid-score,
+.card.postponed .match-mid-score,
+.match-mid-score.postponed {
+  background: rgba(107, 114, 128, .42) !important;
+  color: #e5e7eb !important;
+}
