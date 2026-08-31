@@ -10,8 +10,8 @@ export const BANKER_RULES=Object.freeze({
   bothTeamTotalMax:1.30,
   drawOrOver25MatchMax:1.50,
   drawOrOver25TypicalMax:1.35,
-  streakYesMin:1.20,
-  streakYesMax:1.40,
+  streakNoMin:1.20,
+  streakNoMax:1.40,
   over15Max:1.30,
   streakUnder35Min:1.40,
   minPublishOdds:1.20,
@@ -86,13 +86,10 @@ function teamGoalOdd(markets,side,line,teamName){
   })
 }
 
-function streakYesOdd(markets){
-  let streak=scanOdd(markets,(key,market,name)=>isThreePlusStreak(key,market,name)&&/yes/.test(name))
-  if(!streak)streak=oddOf(markets,'goals-streak-3',['Yes'])
-  if(finite(streak)&&streak>=BANKER_RULES.streakYesMin&&streak<=BANKER_RULES.streakYesMax)return streak
-  let two=scanOdd(markets,(key,market,name)=>isTwoPlusStreak(key,market,name)&&/yes/.test(name))
-  if(!two)two=oddOf(markets,'goals-streak-2',['Yes'])
-  return two||streak||null
+function streakNoOdd(markets){
+  let streak=scanOdd(markets,(key,market,name)=>isThreePlusStreak(key,market,name)&&(name==='no'||/(^| )no($| )/.test(name)))
+  if(!streak)streak=oddOf(markets,'goals-streak-3',['No'])
+  return streak||null
 }
 
 export function extractBankerOdds(fixture){
@@ -111,7 +108,7 @@ export function extractBankerOdds(fixture){
   const awayO15=teamGoalOdd(markets,'away',1.5,awayName)
   const homeO25=teamGoalOdd(markets,'home',2.5,homeName)
   const awayO25=teamGoalOdd(markets,'away',2.5,awayName)
-  const streak=streakYesOdd(markets)
+  const streak=streakNoOdd(markets)
   const drawOrOver25=scanOdd(markets,(key,market,name)=>{
     const blob=`${key} ${market} ${name}`
     return /draw/.test(blob)&&/over/.test(blob)&&/2\.5/.test(blob)
@@ -131,7 +128,7 @@ export function extractBankerOdds(fixture){
   const boardTeamOver25=teamOver25Prices.length?Math.min(...teamOver25Prices):null
   return{
     favourite,homeWin,awayWin,draw,favWin,oppWin,
-    over15,over25,under35,streakYes:streak,drawOrOver25,
+    over15,over25,under35,streakNo:streak,streakYes:streak,drawOrOver25,
     homeO05,awayO05,homeO15,awayO15,homeO25,awayO25,oppO05,favO15,favO25,boardTeamOver25
   }
 }
@@ -245,7 +242,7 @@ function pack(f,odds,rule,published,reasons){
       over15:px(odds.over15),over25:px(odds.over25),under35:px(odds.under35),
       oppO05:px(odds.oppO05),homeO05:px(odds.homeO05),awayO05:px(odds.awayO05),
       favO15:px(odds.favO15),homeO25:px(odds.homeO25),awayO25:px(odds.awayO25),
-      favO25:px(odds.favO25),boardTeamOver25:px(odds.boardTeamOver25),streakYes:px(odds.streakYes)
+      favO25:px(odds.favO25),boardTeamOver25:px(odds.boardTeamOver25),streakNo:px(odds.streakNo),streakYes:px(odds.streakNo)
     },
     sportyEventId:f.sportyEventId||null
   }
@@ -271,7 +268,7 @@ export function evaluateBankerFixture(f){
   const awayO05=num(odds.awayO05)
   const under35=num(odds.under35)
   const over15=num(odds.over15)
-  const streak=num(odds.streakYes)
+  const streak=num(odds.streakNo??odds.streakYes)
   const boardTeamOver25=num(odds.boardTeamOver25)
   const onBoard=finite(boardTeamOver25)&&boardTeamOver25<=BANKER_RULES.boardTeamOver25Max
 
@@ -322,7 +319,7 @@ export function evaluateBankerFixture(f){
     return{pick:null,skip:'missing-fav-2plus-odds',odds}
   }
 
-  const streakWindow=finite(streak)&&streak>=BANKER_RULES.streakYesMin&&streak<=BANKER_RULES.streakYesMax
+  const streakWindow=finite(streak)&&streak>=BANKER_RULES.streakNoMin&&streak<=BANKER_RULES.streakNoMax
   const over15Cheap=finite(over15)&&over15<BANKER_RULES.over15Max
   const under35Open=finite(under35)&&under35>BANKER_RULES.streakUnder35Min
   if(streakWindow&&over15Cheap&&under35Open){
@@ -330,7 +327,7 @@ export function evaluateBankerFixture(f){
     const published=publishedOver(1.5,over15)
     if(published){
       return emit(f,odds,'STREAK_OVER15',published,[
-        `Over 1.5 board: 3+ goals streak Yes is ${px(streak)} (${BANKER_RULES.streakYesMin.toFixed(2)}-${BANKER_RULES.streakYesMax.toFixed(2)}).`,
+        `Over 1.5 board: 3+ goals streak No is ${px(streak)} (${BANKER_RULES.streakNoMin.toFixed(2)}-${BANKER_RULES.streakNoMax.toFixed(2)}).`,
         `Over 1.5 is ${px(over15)} < ${BANKER_RULES.over15Max.toFixed(2)}.`,
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`,
         'Top-5 vs Top-5 is blocked for this route.'
