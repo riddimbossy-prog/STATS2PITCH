@@ -89,12 +89,24 @@ function statusOf(ev){
   if(/walkover/.test(raw))return{short:'WO',long:ev.matchStatus||'Walkover'}
   if(/not[\s_-]*start|upcoming|ns\b/.test(raw)||code===0)return{short:'NS',long:ev.matchStatus||'Not started'}
   if(/end|finish|close|complete|\bft\b/.test(raw)||code===3)return{short:'FT',long:ev.matchStatus||'Match Finished'}
-  if(/live|1st|2nd|half|\bht\b|pause|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
+  if(/\bh1\b|1st|first.?half/.test(raw)||String(ev?.period)==='1')return{short:'1H',long:ev.matchStatus||'1st half'}
+  if(/\bht\b|half.?time|pause/.test(raw))return{short:'HT',long:ev.matchStatus||'Half time'}
+  if(/\bh2\b|2nd|second.?half/.test(raw)||String(ev?.period)==='2')return{short:'2H',long:ev.matchStatus||'2nd half'}
+  if(/extra.?time|\bet\b/.test(raw))return{short:'ET',long:ev.matchStatus||'Extra time'}
+  if(/live|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
   const goals=scoreOf(ev)
   if(Number.isFinite(Number(goals?.home))&&Number.isFinite(Number(goals?.away))&&code>=3)return{short:'FT',long:ev.matchStatus||'Match Finished'}
   return{short:'NS',long:ev.matchStatus||ev.matchStatus||'Not started'}
 }
 
+function parsePair(blob){
+  const m=String(blob??'').match(/(\d+)\s*[-:]\s*(\d+)/)
+  return m?{home:Number(m[1]),away:Number(m[2])}:null
+}
+function halfScoreOf(ev){
+  const gs=Array.isArray(ev?.gameScore)?ev.gameScore:[]
+  return parsePair(gs[0])||null
+}
 function scoreOf(ev){
   const pairs=[
     [ev?.homeScore,ev?.awayScore],
@@ -107,10 +119,7 @@ function scoreOf(ev){
     const home=Number(h),away=Number(a)
     if(Number.isFinite(home)&&Number.isFinite(away))return{home,away}
   }
-  const blob=String(ev?.setScore||ev?.score||'')
-  const m=blob.match(/(\d+)\s*[-:]\s*(\d+)/)
-  if(m)return{home:Number(m[1]),away:Number(m[2])}
-  return{home:null,away:null}
+  return parsePair(ev?.setScore||ev?.score||ev?.availableScore)||{home:null,away:null}
 }
 
 export function sportyEventToFixture(ev,tournament={}){
@@ -125,7 +134,7 @@ export function sportyEventToFixture(ev,tournament={}){
   const fixtureId=nid(ev?.eventId)||nid(ev?.gameId)
   const leagueId=nid(tour?.id)||nid(tournament?.id)||tour?.id||tournament?.id||null
   return applyEventIcons({
-    fixture:{id:fixtureId,date:kick,status:{short:status.short,long:status.long},timestamp:ev?.estimateStartTime||null},
+    fixture:{id:fixtureId,date:kick,status:{short:status.short,long:status.long,elapsed:liveClock(ev)},timestamp:ev?.estimateStartTime||null,clock:liveClock(ev)},
     league:{
       id:leagueId,
       name:tour?.name||tournament?.name||'',
@@ -137,7 +146,7 @@ export function sportyEventToFixture(ev,tournament={}){
       away:{id:awayId,name:ev?.awayTeamName||'',logo:ev?.awayTeamIcon||crest(awayId)}
     },
     goals,
-    score:{fulltime:goals},
+    score:{fulltime:goals,halftime:halfScoreOf(ev)},
     sporty:{
       eventId:ev?.eventId||null,
       gameId:ev?.gameId||null,
@@ -146,13 +155,21 @@ export function sportyEventToFixture(ev,tournament={}){
   },ev)
 }
 
-function flattenPage(data){
+function liveClock(ev){
+  const played=String(ev?.playedSeconds||ev?.playedTime||'').trim()
+  const period=String(ev?.matchStatus||'').trim().toUpperCase()
+  if(played&&period)return `${played} ${period}`
+  return played||period||null
+}
+function flattenTours(data){
+  const tours=Array.isArray(data)?data:Array.isArray(data?.tournaments)?data.tournaments:[]
   const out=[]
-  for(const tour of data?.tournaments||[]){
+  for(const tour of tours){
     for(const ev of tour?.events||[])out.push(sportyEventToFixture(ev,tour))
   }
   return out
 }
+function flattenPage(data){return flattenTours(data)}
 
 async function call(path,params={}){
   const url=new URL(`${BASE}${path}`)
@@ -235,6 +252,16 @@ export async function sportyFixturesByDate(date){
   const day=rows.filter(f=>accraDate(f?.fixture?.timestamp)===want)
   await hydrateSportyCrests(day)
   return day
+}
+
+export async function sportyLiveEvents(){
+  const data=await call(`/api/${COUNTRY}/factsCenter/liveOrPrematchEvents`,{sportId:SPORT,marketId:'1'})
+  const rows=flattenTours(data).filter(f=>{
+    const short=String(f?.fixture?.status?.short||'')
+    return ['LIVE','1H','HT','2H','ET','BT','P','INT'].includes(short)
+  })
+  console.log(`SportyBet live: ${rows.length} in-play football events`)
+  return rows
 }
 
 export async function sportyEvent(eventId){
