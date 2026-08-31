@@ -19,7 +19,7 @@ const cors={
 }
 const json=(body:unknown,status=200,cache='no-store')=>new Response(JSON.stringify(body),{status,headers:{...cors,'Content-Type':'application/json; charset=utf-8','Cache-Control':cache}})
 const dateOk=(v:string|null)=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))
-const finite=(v:any)=>Number.isFinite(Number(v))
+const finite=(v:any)=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
 const norm=(s:any)=>String(s??'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
 const FINISHED=new Set(['FT','AET','PEN'])
 
@@ -221,10 +221,14 @@ function sportyStatus(ev:any){
   if(/live|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
   return{short:'NS',long:ev.matchStatus||'Not started'}
 }
+function parsePair(blob:any){
+  const m=String(blob??'').match(/(\d+)\s*[-:]\s*(\d+)/)
+  return m?{home:Number(m[1]),away:Number(m[2])}:null
+}
 function sportyScore(ev:any){
-  const pairs=[[ev?.homeScore,ev?.awayScore],[ev?.setScore?.home,ev?.setScore?.away],[ev?.score?.home,ev?.score?.away]]
-  for(const [h,a] of pairs){const home=Number(h),away=Number(a);if(Number.isFinite(home)&&Number.isFinite(away))return{home,away}}
-  return{home:null,away:null}
+  const pairs=[[ev?.homeScore,ev?.awayScore],[ev?.setScore?.home,ev?.setScore?.away],[ev?.score?.home,ev?.score?.away],[ev?.homeGoal,ev?.awayGoal]]
+  for(const [h,a] of pairs){const home=Number(h),away=Number(a);if(h!==null&&h!==undefined&&h!==''&&a!==null&&a!==undefined&&a!==''&&Number.isFinite(home)&&Number.isFinite(away))return{home,away}}
+  return parsePair(ev?.setScore||ev?.score||ev?.availableScore)||{home:null,away:null}
 }
 function accraDate(ms:any){
   if(!Number.isFinite(Number(ms)))return ''
