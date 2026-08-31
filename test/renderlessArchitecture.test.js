@@ -21,3 +21,11 @@ test('GitHub Pages plus Supabase production path includes results, admin and set
   assert.match(admin,/Stats2Pitch Admin/)
   assert.equal(cname.trim(),'www.stats2pitch.com')
 })
+
+test('results API overlays SportyBet live events onto all published boards',async()=>{
+  const [edge,server]=await Promise.all([read('supabase/functions/stats2pitch-api/index.ts'),read('server/index.js')])
+  assert.match(edge,/liveOrPrematchEvents/)
+  assert.match(edge,/dailyBankers,bankers/)
+  assert.match(server,/sportyLiveEvents/)
+  assert.match(server,/dailyBankers,bankers/)
+})

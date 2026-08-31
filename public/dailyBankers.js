@@ -8,7 +8,7 @@ const VIEW='bankers'
 const cfg=window.__STATS2PITCH_CONFIG__||{}
 const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
 const anon=String(cfg.supabaseAnonKey||'')
-const state={date:new URLSearchParams(location.search).get('date')||isoToday(),board:null,status:'all',kind:'all',country:'all',league:'all',market:'all'}
+const state={date:new URLSearchParams(location.search).get('date')||isoToday(),board:null,resultData:null,status:'all',kind:'all',country:'all',league:'all',market:'all',timer:null}
 
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
 function team(name,img,side){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${esc(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span></div>`}
@@ -20,10 +20,12 @@ function kickClock(v){const d=new Date(v);if(Number.isNaN(d.getTime()))return'TB
 function oddStr(r){const n=Number(r.odds);return Number.isFinite(n)?n.toFixed(2):'—'}
 function decided(o){return ['won','lost','void','postponed'].includes(String(o||''))}
 function outcomeLabel(o){return({won:'WON',lost:'LOST',void:'VOID',postponed:'POSTPONED'})[o]||'SETTLED'}
-function resultFor(r){return state.board?.results?.[String(r.fixtureId)]||null}
+function liveResultRow(r){const id=String(r.fixtureId);for(const bag of ['dailyBankers','bankers','picks']){const hit=(state.resultData?.[bag]||[]).find(x=>String(x.fixtureId)===id);if(hit?.result)return hit.result}return null}
+function resultFor(r){const live=liveResultRow(r),stored=state.board?.results?.[String(r.fixtureId)]||null;if(live&&decided(live.outcome))return live;if(live&&live.matchState==='live')return live;if(stored&&decided(stored.outcome))return stored;return live||stored}
 function stateFor(r){const x=resultFor(r);if(x?.matchState)return x.matchState;if(x?.live===true||String(x?.status||'').toUpperCase()==='LIVE')return'live';if(decided(x?.outcome)||x?.finished)return'settled';return kickoffMs(r)>Date.now()?'upcoming':'pending'}
 function scoreFor(r){const s=stateFor(r);if(s!=='live'&&s!=='settled')return null;if(resultFor(r)?.outcome==='postponed')return null;const x=resultFor(r);const h=x?.homeScore??x?.home?.score,a=x?.awayScore??x?.away?.score;return h!==null&&h!==undefined&&a!==null&&a!==undefined?{home:h,away:a}:null}
-function statusBadge(r){const x=resultFor(r),s=stateFor(r);if(s==='live')return`<span class="match-badge live">LIVE${x?.minute?` · ${esc(x.minute)}′`:''}</span>`;if(s==='settled'){const o=x?.outcome||'pending';return`<span class="match-badge ${esc(o)}">${outcomeLabel(o)}</span>`}return`<span class="match-badge upcoming">UPCOMING</span>`}
+function clockText(x){const clock=String(x?.minute||x?.clock||'').trim();if(clock)return clock;const st=String(x?.status||x?.statusLong||'').trim().toUpperCase();if(st==='1H'||st==='H1')return'H1';if(st==='HT')return'HT';if(st==='2H'||st==='H2')return'2H';return''}
+function statusBadge(r){const x=resultFor(r),s=stateFor(r);if(s==='live'){const clock=clockText(x);return`<span class="match-badge live">${clock?esc(clock):'LIVE'}</span>`}if(s==='settled'){const o=x?.outcome||'pending';return`<span class="match-badge ${esc(o)}">${outcomeLabel(o)}</span>`}return`<span class="match-badge upcoming">UPCOMING</span>`}
 function pickResult(r){const x=resultFor(r);return decided(x?.outcome)?`<span class="pick-result ${esc(x.outcome)}">${outcomeLabel(x.outcome)}</span>`:''}
 function topResult(r){const x=resultFor(r);return decided(x?.outcome)?`<span class="m-result ${esc(x.outcome)}">${outcomeLabel(x.outcome)}</span>`:''}
 function pickLabel(r){return String(r.displaySelection||r.pick||r.selection||'Selection')}
@@ -196,17 +198,21 @@ async function hopIfEmpty(){
   return false
 }
 
+function startPolling(){clearInterval(state.timer);if(state.date!==isoToday())return;state.timer=setInterval(async()=>{try{state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`);render()}catch{}},20000)}
 async function load(){
   renderDates()
   const cached=readBoardCache(state.date,VIEW)
   if(cached){state.board=cached;render();bootDone()}
   else{skeleton();$('#status').textContent='Loading…'}
   try{
-    const board=await bankerApi(state.date)
+    const [board,res]=await Promise.all([bankerApi(state.date), api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)])
     state.board=board
+    state.resultData=res
     writeBoardCache(state.date,VIEW,board)
+    const loadedDate=state.date
     await hopIfEmpty()
-    render();bootDone()
+    if(state.date!==loadedDate){state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)}
+    render();startPolling();bootDone()
   }catch(e){
     if(cached)return
     $('#status').textContent='Unavailable'
@@ -230,3 +236,4 @@ $('#refresh')?.addEventListener('click',load)
 $('#notifyBell')?.addEventListener('click',load)
 $('#profileBtn')?.addEventListener('click',()=>document.body.classList.toggle('filters-open'))
 load()
+window.addEventListener('beforeunload',()=>clearInterval(state.timer))

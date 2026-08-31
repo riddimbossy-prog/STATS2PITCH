@@ -183,17 +183,29 @@ function snapshotState(date:string,row:{board:any,generatedAt:string}|null){
 function normalizeFixture(x:any){
   const status=String(x?.fixture?.status?.short||x?.status||'').toUpperCase(),finished=FINISHED.has(status),live=['1H','HT','2H','ET','BT','P','INT','LIVE'].includes(status),cancelled=['CANC','ABD','AWD','WO'].includes(status),postponed=status==='PST'
   const full=x?.score?.fulltime||{},half=x?.score?.halftime||{}
+  const homeScore=finite(full?.home)?Number(full.home):finite(x?.goals?.home)?Number(x.goals.home):finite(x?.home?.score)?Number(x.home.score):finite(x?.homeScore)?Number(x.homeScore):null
+  const awayScore=finite(full?.away)?Number(full.away):finite(x?.goals?.away)?Number(x.goals.away):finite(x?.away?.score)?Number(x.away.score):finite(x?.awayScore)?Number(x.awayScore):null
+  const homeName=x?.teams?.home?.name||x?.homeName||''
+  const awayName=x?.teams?.away?.name||x?.awayName||''
+  const clock=x?.fixture?.clock??x?.fixture?.status?.elapsed??x?.clock??x?.minute??null
   return{
-    fixtureId:x?.fixture?.id??x?.fixtureId,status,statusLong:x?.fixture?.status?.long||x?.statusLong||'',minute:x?.fixture?.status?.elapsed??x?.minute??null,kickoff:x?.fixture?.date||x?.kickoff,
+    fixtureId:x?.fixture?.id??x?.fixtureId,status,statusLong:x?.fixture?.status?.long||x?.statusLong||'',minute:clock,clock,kickoff:x?.fixture?.date||x?.kickoff,
     league:x?.league?.name||'',country:x?.league?.country||'',
-    home:{id:x?.teams?.home?.id,name:x?.teams?.home?.name||'',logo:x?.teams?.home?.logo||null,score:finite(full?.home)?Number(full.home):finite(x?.goals?.home)?Number(x.goals.home):finite(x?.home?.score)?Number(x.home.score):finite(x?.homeScore)?Number(x.homeScore):null},
-    away:{id:x?.teams?.away?.id,name:x?.teams?.away?.name||'',logo:x?.teams?.away?.logo||null,score:finite(full?.away)?Number(full.away):finite(x?.goals?.away)?Number(x.goals.away):finite(x?.away?.score)?Number(x.away.score):finite(x?.awayScore)?Number(x.awayScore):null},
+    home:{id:x?.teams?.home?.id,name:homeName,logo:x?.teams?.home?.logo||null,score:homeScore},
+    away:{id:x?.teams?.away?.id,name:awayName,logo:x?.teams?.away?.logo||null,score:awayScore},
+    homeName,awayName,homeScore,awayScore,
     halftime:{home:finite(half?.home)?Number(half.home):finite(x?.htHome)?Number(x.htHome):null,away:finite(half?.away)?Number(half.away):finite(x?.htAway)?Number(x.htAway):null},
     finished,live,cancelled,postponed,matchState:finished?'settled':live?'live':(cancelled||postponed)?'settled':'upcoming'
   }
 }
 function nid(raw:any){const m=String(raw??'').match(/(\d+)$/);return m?Number(m[1]):null}
 function crest(id:any){return id?`https://img.sportradar.com/ls/crest/big/${id}.png`:null}
+function liveClock(ev:any){
+  const played=String(ev?.playedSeconds||ev?.playedTime||'').trim()
+  const period=String(ev?.matchStatus||'').trim().toUpperCase()
+  if(played&&period)return `${played} ${period}`
+  return played||period||null
+}
 function sportyStatus(ev:any){
   const raw=String(ev?.matchStatus||'').toLowerCase(),code=Number(ev?.status)
   if(/postpon/.test(raw))return{short:'PST',long:ev.matchStatus||'Postponed'}
@@ -202,7 +214,11 @@ function sportyStatus(ev:any){
   if(/walkover/.test(raw))return{short:'WO',long:ev.matchStatus||'Walkover'}
   if(/not[\s_-]*start|upcoming|ns\b/.test(raw)||code===0)return{short:'NS',long:ev.matchStatus||'Not started'}
   if(/end|finish|close|complete|\bft\b/.test(raw)||code===3)return{short:'FT',long:ev.matchStatus||'Match Finished'}
-  if(/live|1st|2nd|half|\bht\b|pause|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
+  if(/\bh1\b|1st|first.?half/.test(raw)||String(ev?.period)==='1')return{short:'1H',long:ev.matchStatus||'1st half'}
+  if(/\bht\b|half.?time|pause/.test(raw))return{short:'HT',long:ev.matchStatus||'Half time'}
+  if(/\bh2\b|2nd|second.?half/.test(raw)||String(ev?.period)==='2')return{short:'2H',long:ev.matchStatus||'2nd half'}
+  if(/extra.?time|\bet\b/.test(raw))return{short:'ET',long:ev.matchStatus||'Extra time'}
+  if(/live|in.?play/.test(raw)||code===1||code===2)return{short:'LIVE',long:ev.matchStatus||'Live'}
   return{short:'NS',long:ev.matchStatus||'Not started'}
 }
 function sportyScore(ev:any){
@@ -219,14 +235,45 @@ function sportyToFixture(ev:any,tournament:any={}){
   const status=sportyStatus(ev),goals=sportyScore(ev),kick=Number.isFinite(Number(ev?.estimateStartTime))?new Date(Number(ev.estimateStartTime)).toISOString():null
   const homeId=nid(ev?.homeTeamId),awayId=nid(ev?.awayTeamId)
   return{
-    fixture:{id:nid(ev?.eventId)||nid(ev?.gameId),date:kick,status:{short:status.short,long:status.long},timestamp:ev?.estimateStartTime||null},
+    fixture:{id:nid(ev?.eventId)||nid(ev?.gameId),date:kick,status:{short:status.short,long:status.long,elapsed:liveClock(ev)},timestamp:ev?.estimateStartTime||null,clock:liveClock(ev)},
     league:{id:nid(tour?.id)||tour?.id||null,name:tour?.name||'',country:category?.name||tournament?.categoryName||''},
     teams:{home:{id:homeId,name:ev?.homeTeamName||'',logo:ev?.homeTeamIcon||crest(homeId)},away:{id:awayId,name:ev?.awayTeamName||'',logo:ev?.awayTeamIcon||crest(awayId)}},
     goals,score:{fulltime:goals,halftime:{}}
   }
 }
+function sportyHeaders(){return{Accept:'application/json, text/plain, */*',Origin:SPORTYBET_BASE,Referer:`${SPORTYBET_BASE}/${SPORTYBET_COUNTRY}/sport/football/today`,Clientid:'web',Platform:'web','User-Agent':'Mozilla/5.0'}}
+function flattenSporty(data:any){
+  const tours=Array.isArray(data)?data:Array.isArray(data?.tournaments)?data.tournaments:[]
+  const out:any[]=[]
+  for(const tour of tours)for(const ev of tour?.events||[])out.push(sportyToFixture(ev,tour))
+  return out
+}
+async function sportyLiveEvents(){
+  const url=new URL(`${SPORTYBET_BASE}/api/${SPORTYBET_COUNTRY}/factsCenter/liveOrPrematchEvents`)
+  url.searchParams.set('sportId','sr:sport:1');url.searchParams.set('marketId','1')
+  const response=await fetch(url,{headers:sportyHeaders()}),body=await response.json().catch(()=>null)
+  if(!response.ok||body?.bizCode!==10000)return[]
+  return flattenSporty(body?.data).filter((f:any)=>['LIVE','1H','HT','2H','ET','BT','P','INT'].includes(String(f?.fixture?.status?.short||'')))
+}
+function keyName(s:any){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
+function mergeLive(map:Map<string,any>,liveRows:any[],published:any[]){
+  const byName=new Map<string,string>()
+  for(const p of published||[]){
+    const k=keyName(p?.home)+'|'+keyName(p?.away)
+    if(k!=='|')byName.set(k,String(p.fixtureId))
+  }
+  for(const f of liveRows||[]){
+    const n=f?.matchState?f:normalizeFixture(f)
+    const id=String(n.fixtureId||'')
+    if(id&&id!=='undefined'&&id!=='null')map.set(id,n)
+    const k=keyName(n.homeName||n.home?.name)+'|'+keyName(n.awayName||n.away?.name)
+    const alias=byName.get(k)
+    if(alias&&alias!==id)map.set(alias,n)
+  }
+  return map
+}
 async function liveScores(date:string){
-  const headers={Accept:'application/json, text/plain, */*',Origin:SPORTYBET_BASE,Referer:`${SPORTYBET_BASE}/${SPORTYBET_COUNTRY}/sport/football/today`,Clientid:'web',Platform:'web','User-Agent':'Mozilla/5.0'}
+  const headers=sportyHeaders()
   const out:any[]=[]
   let page=1,total=1
   while(page<=total&&page<=20){
@@ -242,8 +289,19 @@ async function liveScores(date:string){
     page++
   }
   try{
+    const live=await sportyLiveEvents()
+    const byId=new Map(out.map((f:any)=>[String(f?.fixture?.id||''),f]))
+    for(const f of live){
+      const id=String(f?.fixture?.id||'')
+      if(id&&id!=='undefined'&&id!=='null')byId.set(id,f)
+      else out.push(f)
+    }
+    out.length=0
+    out.push(...byId.values())
+  }catch{}
+  try{
     const row=await snapshot(date)
-    const picks=[...(row?.board?.bestPicks||[]),...(row?.board?.varTips||[]),...(row?.board?.filterTips||[]),...(row?.board?.goalsBankers||[])]
+    const picks=[...(row?.board?.bestPicks||[]),...(row?.board?.varTips||[]),...(row?.board?.filterTips||[]),...(row?.board?.goalsBankers||[]),...(row?.board?.dailyBankers||[]),...(row?.board?.safestBankers||[]),...(row?.board?.valueBankers||[]),...(row?.board?.bankers||[])]
     const have=new Set(out.map(f=>String(f?.fixture?.id||'')))
     const missing=picks.map((p:any)=>p?.fixtureId).filter((id:any)=>id!=null&&!have.has(String(id)))
     for(const id of missing.slice(0,80)){
@@ -348,14 +406,17 @@ Deno.serve(async req=>{
     }
     if(route==='/results'&&req.method==='GET'){
       const date=requestedDate(url),row=await snapshot(date),board=row?.board||emptyBoard(date)
+      const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
       let fixtures:any[]=[];try{fixtures=await liveScores(date)}catch{}
-      const map=new Map(fixtures.map(f=>[String(f.fixtureId),f])),stored=board?.results||{}
+      const map=mergeLive(new Map(),fixtures,published),stored=board?.results||{}
       const withResult=(rows:any[])=>compactResultRows((rows||[]).map((p:any)=>({...p,result:attachResult(p,map.get(String(p.fixtureId)),stored[String(p.fixtureId)])})))
       const picks=withResult(board?.bestPicks)
       const varTips=withResult(board?.varTips)
       const filterTips=withResult(board?.filterTips)
       const goalsBankers=withResult(board?.goalsBankers)
-      return json({date,picks,varTips,filterTips,goalsBankers})
+      const dailyBankers=withResult(board?.dailyBankers)
+      const bankers=withResult([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])])
+      return json({date,picks,varTips,filterTips,goalsBankers,dailyBankers,bankers})
     }
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}
     if(route==='/performance'&&req.method==='GET'){
