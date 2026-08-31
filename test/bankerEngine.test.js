@@ -21,8 +21,8 @@ function fixture(odds={},extra={}){
     home:{id:1,name:'Home FC'},away:{id:2,name:'Away FC'},
     homeSplit:{position:extra.hpos??7,size:12,sampleReady:true},
     awaySplit:{position:extra.apos??10,size:12,sampleReady:true},
-    homeStanding:{position:extra.hstand??8,size:12,played:5},
-    awayStanding:{position:extra.astand??9,size:12,played:5},
+    homeStanding:{position:extra.hstand??8,size:extra.hsize??12,played:5},
+    awayStanding:{position:extra.astand??9,size:extra.asize??12,played:5},
     marketOdds:markets(odds),
     ...extra.rest
   }
@@ -122,10 +122,25 @@ test('streak Over 1.5 never publishes when both overall table places are top 5',
   assert.equal(r.skip,'both-top-five')
 })
 
+test('streak Over 1.5 never publishes when both overall table places are bottom 4',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:2,apos:4,hstand:11,astand:10,hsize:12,asize:12}))
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'both-bottom-four')
+})
+
+test('one side in the bottom 4 does not block Over 1.5',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hstand:12,astand:8,hsize:12,asize:12}))
+  assert.equal(r.pick?.rule,'STREAK_OVER15')
+  assert.match(r.pick.whyText,/12th vs Away FC 8th/)
+  assert.match(r.pick.whyText,/Bottom-4 vs Bottom-4/)
+  assert.doesNotMatch(r.pick.whyText,/is blocked/)
+})
+
 test('venue-split top 5 does not block Over 1.5 when the league table is not Top-5 vs Top-5',()=>{
   const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:2,apos:4,hstand:10,astand:8}))
   assert.equal(r.pick?.rule,'STREAK_OVER15')
   assert.match(r.pick.whyText,/10th vs Away FC 8th/)
+  assert.match(r.pick.whyText,/not Top-5 vs Top-5 or Bottom-4 vs Bottom-4/)
   assert.doesNotMatch(r.pick.whyText,/is blocked/)
 })
 

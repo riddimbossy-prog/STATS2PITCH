@@ -15,7 +15,8 @@ export const BANKER_RULES=Object.freeze({
   over15Max:1.30,
   streakUnder35Min:1.40,
   minPublishOdds:1.20,
-  topFive:5
+  topFive:5,
+  bottomFour:4
 })
 
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
@@ -188,16 +189,28 @@ function tablePos(f,side){
   return num(f?.[side==='home'?'homeStanding':'awayStanding']?.position)
 }
 
+function tableSize(f,side){
+  return num(f?.[side==='home'?'homeStanding':'awayStanding']?.size)
+}
+
 function bothTopFive(f){
   const hp=tablePos(f,'home'),ap=tablePos(f,'away')
   return finite(hp)&&finite(ap)&&hp<=BANKER_RULES.topFive&&ap<=BANKER_RULES.topFive
 }
 
+function inBottomFour(position,size){
+  return finite(position)&&finite(size)&&size>=BANKER_RULES.bottomFour&&position>size-BANKER_RULES.bottomFour
+}
+
+function bothBottomFour(f){
+  return inBottomFour(tablePos(f,'home'),tableSize(f,'home'))&&inBottomFour(tablePos(f,'away'),tableSize(f,'away'))
+}
+
 function tableReason(f){
   const hp=tablePos(f,'home'),ap=tablePos(f,'away')
   const home=text(f?.home?.name||'Home'),away=text(f?.away?.name||'Away')
-  if(finite(hp)&&finite(ap))return `League table: ${home} ${ordinal(hp)} vs ${away} ${ordinal(ap)} — not Top-5 vs Top-5.`
-  return 'League table places were not both confirmed, so Top-5 vs Top-5 did not apply.'
+  if(finite(hp)&&finite(ap))return `League table: ${home} ${ordinal(hp)} vs ${away} ${ordinal(ap)} — not Top-5 vs Top-5 or Bottom-4 vs Bottom-4.`
+  return 'League table places were not both confirmed, so Top-5 vs Top-5 and Bottom-4 vs Bottom-4 did not apply.'
 }
 
 function publishedFavWin(f,odds){
@@ -367,6 +380,7 @@ export function evaluateBankerFixture(f){
   const under35Open=finite(under35)&&under35>BANKER_RULES.streakUnder35Min
   if(streakWindow&&over15Cheap&&under35Open){
     if(bothTopFive(f))return{pick:null,skip:'both-top-five',odds}
+    if(bothBottomFour(f))return{pick:null,skip:'both-bottom-four',odds}
     const published=publishedOver(1.5,over15)
     if(published){
       return emit(f,odds,'STREAK_OVER15',published,[
