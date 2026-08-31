@@ -4,7 +4,7 @@ import {join,extname,normalize} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {loadBoard,listBoards,clearBoard} from './store.js'
 import {startRefresh,refreshStatus} from './refresh.js'
-import {sportyEventFixtures,sportyFixturesByDate} from './sportyBet.js'
+import {sportyEventFixtures,sportyFixturesByDate,sportyLiveEvents} from './sportyBet.js'
 import {gismoMatches} from './sportyStats.js'
 import {normalizeFixtureStatus,resolveResult} from './settlement.js'
 import {buildLearningProfiles} from './learning.js'
@@ -20,17 +20,36 @@ const addDays=(date,n)=>{const d=new Date(`${date}T12:00:00Z`);d.setUTCDate(d.ge
 const send=(res,status,body,cache='no-store')=>{const s=typeof body==='string'?body:JSON.stringify(body);res.writeHead(status,{'Content-Type':typeof body==='string'?'text/plain; charset=utf-8':'application/json; charset=utf-8','Cache-Control':cache});res.end(s)}
 async function json(req){let s='';for await(const c of req)s+=c;return s?JSON.parse(s):{}}
 function performance(boards){const summary={picks:0,won:0,lost:0,void:0,pending:0,winRate:0},groups=new Map();for(const b of boards)for(const p of b?.bestPicks||[]){const r=b?.results?.[String(p.fixtureId)],o=r?.outcome||'pending';summary.picks++;if(o==='won')summary.won++;else if(o==='lost')summary.lost++;else if(o==='void'||o==='postponed')summary.void++;else summary.pending++;if(!['won','lost'].includes(o))continue;for(const dimension of ['market','country','league','confidence']){const value=dimension==='confidence'?(Number(p?.consensus)===100?'100%':`${Number(p?.consensus)||0}%`):String(p?.[dimension]||'Unknown'),k=`${dimension}|${value}`,g=groups.get(k)||{dimension,value,picks:0,won:0,lost:0};g.picks++;if(o==='won')g.won++;else g.lost++;groups.set(k,g)}}const decided=summary.won+summary.lost;summary.winRate=decided?Math.round(summary.won*1000/decided)/10:0;return{summary,groups:[...groups.values()].map(g=>({...g,winRate:Math.round(g.won*1000/g.picks)/10})).sort((a,b)=>b.picks-a.picks)}}
+function keyName(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
+function mergeLive(map,liveRows,published){
+  const byName=new Map()
+  for(const p of published||[]){
+    const k=keyName(p.home)+'|'+keyName(p.away)
+    if(k!=='|')byName.set(k,String(p.fixtureId))
+  }
+  for(const f of liveRows||[]){
+    const n=normalizeFixtureStatus(f)
+    const id=String(n.fixtureId||'')
+    if(id&&id!=='undefined'&&id!=='null')map.set(id,n)
+    const k=keyName(n.homeName)+'|'+keyName(n.awayName)
+    const alias=byName.get(k)
+    if(alias&&alias!==id)map.set(alias,n)
+  }
+  return map
+}
 async function resultPayload(date){
-  const board=await loadBoard(date)||{bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],results:{}}
-  const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[])]
-  const eventIds=published.map(p=>p.sportyEventId).filter(Boolean)
+  const board=await loadBoard(date)||{bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],dailyBankers:[],bankers:[],safestBankers:[],valueBankers:[],results:{}}
+  const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
+  const eventIds=published.map(p=>p.sportyEventId||p.eventId).filter(Boolean)
   let fixtures=[]
   try{if(eventIds.length)fixtures=await sportyEventFixtures(eventIds)}catch{}
   if(!fixtures.length){try{fixtures=await sportyFixturesByDate(date)}catch{}}
   const have=new Set(fixtures.map(f=>String(f?.fixture?.id||'')))
   const missing=published.map(p=>p.fixtureId).filter(id=>id!=null&&!have.has(String(id)))
   if(missing.length){try{fixtures=fixtures.concat(await gismoMatches(missing))}catch{}}
-  const map=new Map(fixtures.map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]}))
+  let live=[]
+  try{live=await sportyLiveEvents()}catch(error){console.warn('SportyBet live overlay:',error?.message||error)}
+  const map=mergeLive(new Map(fixtures.map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]})),live,published)
   const stored=board.results||{}
   const pending=p=>({outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'})
   const withResult=p=>({...p,result:resolveResult(p,map.get(String(p.fixtureId)),stored[String(p.fixtureId)])||pending(p)})
@@ -38,7 +57,9 @@ async function resultPayload(date){
   const varTips=compactResultRows((board.varTips||[]).map(withResult))
   const filterTips=compactResultRows((board.filterTips||[]).map(withResult))
   const goalsBankers=compactResultRows((board.goalsBankers||[]).map(withResult))
-  return{date,picks,varTips,filterTips,goalsBankers,fixtures:[...map.values()]}
+  const dailyBankers=compactResultRows((board.dailyBankers||[]).map(withResult))
+  const bankers=compactResultRows([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])].map(withResult))
+  return{date,picks,varTips,filterTips,goalsBankers,dailyBankers,bankers,fixtures:[...map.values()]}
 }
 async function api(req,res,url){
   if(url.pathname==='/api/health')return send(res,200,{ok:true,engineVersion:ENGINE_VERSION,version:'4.0.0'})
@@ -54,7 +75,7 @@ async function api(req,res,url){
   if(url.pathname==='/api/results'){
     const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today()
     const r=await resultPayload(date)
-    return send(res,200,{date:r.date,picks:r.picks,varTips:r.varTips,filterTips:r.filterTips,goalsBankers:r.goalsBankers})
+    return send(res,200,{date:r.date,picks:r.picks,varTips:r.varTips,filterTips:r.filterTips,goalsBankers:r.goalsBankers,dailyBankers:r.dailyBankers,bankers:r.bankers})
   }
   if(url.pathname==='/api/live-scores'){const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today();const r=await resultPayload(date);return send(res,200,{date,fixtures:r.fixtures||[]})}
   if(url.pathname==='/api/performance'){const days=Math.max(1,Math.min(90,Number(url.searchParams.get('days')||30))),to=today(),from=addDays(to,-days+1),rows=await listBoards(from,to),boards=rows.map(x=>x.payload).filter(Boolean);return send(res,200,{days,...performance(boards),learning:buildLearningProfiles(boards)})}
