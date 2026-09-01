@@ -40,8 +40,8 @@ function fixture(odds={},extra={}){
   const form=extra.noForm?{home:[],away:[]}:extra.form||supportingForm(extra.formOpts||{})
   return{
     fixtureId:'fx',league:'Test League',country:'Test',kickoff:'2026-08-20T18:00:00Z',
-    home:{id:1,name:'Home FC',fixtures:form.home,lastMatches:form.home},
-    away:{id:2,name:'Away FC',fixtures:form.away,lastMatches:form.away},
+    home:{id:1,name:'Home FC',fixtures:form.home,formHistory:form.home,lastMatches:form.home},
+    away:{id:2,name:'Away FC',fixtures:form.away,formHistory:form.away,lastMatches:form.away},
     homeSplit:{position:extra.hpos??7,size:12,sampleReady:true},
     awaySplit:{position:extra.apos??10,size:12,sampleReady:true},
     homeStanding:{position:extra.hstand??8,size:extra.hsize??12,played:5},
@@ -241,4 +241,17 @@ test('confirmLast5 requires 3 of last 5 and 60% of the average',()=>{
   const weak=confirmLast5({home:{id:1,name:'Home FC',fixtures:supportingForm({homeHits:2,awayHits:2}).home},away:{id:2,name:'Away FC',fixtures:supportingForm({homeHits:2,awayHits:2}).away}},published,null)
   assert.equal(weak.ok,false)
   assert.equal(weak.skip,'form-confirm')
+})
+
+test('confirmLast5 uses formHistory last 5 against the longer average',()=>{
+  const recent=supportingForm({homeHits:4,awayHits:4,n:5})
+  const olderHome=supportingForm({homeHits:10,awayHits:10,n:10}).home.map((row,i)=>({...row,fixture:{...row.fixture,id:400+i,date:`2026-06-${String(20-i).padStart(2,'0')}T15:00:00Z`}}))
+  const olderAway=supportingForm({homeHits:10,awayHits:10,n:10}).away.map((row,i)=>({...row,fixture:{...row.fixture,id:500+i,date:`2026-06-${String(20-i).padStart(2,'0')}T15:00:00Z`}}))
+  const published={market:'total-goals',selection:'Over 2.5',displaySelection:'Over 2.5'}
+  const ok=confirmLast5({
+    home:{id:1,name:'Home FC',fixtures:recent.home.slice(0,5),formHistory:[...recent.home,...olderHome]},
+    away:{id:2,name:'Away FC',fixtures:recent.away.slice(0,5),formHistory:[...recent.away,...olderAway]}
+  },published,null)
+  assert.equal(ok.ok,true)
+  assert.match(ok.reasons.join(' '),/average/)
 })
