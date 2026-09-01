@@ -50,8 +50,9 @@ jobs:
           const cfg={
             supabaseUrl:normalize(process.env.SUPABASE_URL),
             supabaseAnonKey:process.env.SUPABASE_ANON_KEY,
+            allowPublicSignup:true,
             functionName:'stats2pitch-api',
-            version:'4.0.0'
+            version:'4.0.2'
           }
           fs.writeFileSync('_site/runtime-config.js',`window.__STATS2PITCH_CONFIG__=${JSON.stringify(cfg)}\n`)
           NODE

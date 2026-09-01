@@ -42,3 +42,13 @@ if(nav){
   nav.addEventListener('click',blockNavNav,true)
   nav.addEventListener('touchend',blockNavNav,true)
 }
+
+;(function bootAuthGate(){
+  if(document.querySelector('link[data-s2p-auth]'))return
+  const link=document.createElement('link')
+  link.rel='stylesheet'
+  link.href='/auth.css?v=5.13.0'
+  link.dataset.s2pAuth='1'
+  document.head.appendChild(link)
+  import('/gate.js?v=5.13.0').catch(()=>{})
+})()
