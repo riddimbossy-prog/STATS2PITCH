@@ -86,11 +86,31 @@ export function resolveResult(pick,fixture,stored){
   return live||stored||{outcome:'pending',matchState:Date.parse(pick?.kickoff)>Date.now()?'upcoming':'pending'}
 }
 
+export function boardPicks(board){
+  const seen=new Set(),out=[]
+  for(const pick of [
+    ...(board?.bestPicks||[]),
+    ...(board?.varTips||[]),
+    ...(board?.filterTips||[]),
+    ...(board?.goalsBankers||[]),
+    ...(board?.dailyBankers||[]),
+    ...(board?.safestBankers||[]),
+    ...(board?.valueBankers||[]),
+    ...(board?.bankers||[])
+  ]){
+    const key=`${pick?.fixtureId}|${pick?.market}|${String(pick?.selection||'').trim()}`
+    if(seen.has(key))continue
+    seen.add(key)
+    out.push(pick)
+  }
+  return out
+}
+
 export function settleBoard(board,fixtures=[]){
   const map=new Map((fixtures||[]).map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]}))
   const prior=board?.results||{}
   const results={...prior}
-  for(const pick of [...(board?.bestPicks||[]),...(board?.varTips||[]),...(board?.filterTips||[]),...(board?.goalsBankers||[]),...(board?.dailyBankers||[]),...(board?.bankers||[])]){
+  for(const pick of boardPicks(board)){
     const key=String(pick.fixtureId),fixture=map.get(key)
     if(!fixture)continue
     results[key]=resolveResult(pick,fixture,prior[key])

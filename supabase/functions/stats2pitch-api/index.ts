@@ -347,6 +347,7 @@ function settle(p:any,f:any){
   else if(market==='double-chance'){if(sel==='1x'||sel.includes('home or draw'))outcome=win(h>=a);else if(sel==='x2'||sel.includes('draw or away'))outcome=win(a>=h);else if(sel==='12'||sel.includes('home or away'))outcome=win(h!==a)}
   else if(market==='draw-no-bet'){if(h===a)outcome='void';else if(sel==='home'||sel==='1')outcome=win(h>a);else if(sel==='away'||sel==='2')outcome=win(a>h)}
   else if(market==='both-teams-score'){const yes=h>0&&a>0;if(sel==='yes')outcome=win(yes);else if(sel==='no')outcome=win(!yes)}
+  else if(market==='draw-or-over-25'){outcome=win(h===a||(h+a)>2.5)}
   else if(market==='total-goals'){const q=ou(p?.selection);if(q){const t=h+a;outcome=win(q.side==='over'?t>q.line:t<q.line,t===q.line)}}
   else if(market==='home-team-goals'){const q=ou(p?.selection);if(q)outcome=win(q.side==='over'?h>q.line:h<q.line,h===q.line)}
   else if(market==='away-team-goals'){const q=ou(p?.selection);if(q)outcome=win(q.side==='over'?a>q.line:a<q.line,a===q.line)}

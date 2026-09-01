@@ -58,18 +58,30 @@ function applyBankerPage(board){
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
 function stampPick(p,at){return{...p,publishedAt:p?.publishedAt||at,proofKey:p?.proofKey||proofKey(p)}}
 function mergeRows(oldRows,freshRows,now,existing){
-  const oldMap=new Map((Array.isArray(oldRows)?oldRows:[]).map(p=>[String(p.fixtureId),p]))
+  const oldList=Array.isArray(oldRows)?oldRows:[]
+  const freshList=Array.isArray(freshRows)?freshRows:[]
+  const freshMap=new Map(freshList.map(p=>[String(p?.fixtureId),p]))
   const out=[]
-  for(const p of Array.isArray(freshRows)?freshRows:[]){
-    const old=oldMap.get(String(p.fixtureId))
-    const stamped=stampPick(p,old&&old.proofKey===proofKey(p)?(old.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now):now)
+  const seen=new Set()
+  for(const old of oldList){
+    const id=String(old?.fixtureId??'')
+    if(!id||seen.has(id))continue
+    const fresh=freshMap.get(id)
+    const stamped=stampPick(old,old.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)
     out.push({
       ...stamped,
-      homeLogo:preferLogo(stamped.homeLogo,old?.homeLogo),
-      awayLogo:preferLogo(stamped.awayLogo,old?.awayLogo),
-      homeId:stamped.homeId??old?.homeId??null,
-      awayId:stamped.awayId??old?.awayId??null
+      homeLogo:preferLogo(fresh?.homeLogo,stamped.homeLogo,old.homeLogo),
+      awayLogo:preferLogo(fresh?.awayLogo,stamped.awayLogo,old.awayLogo),
+      homeId:stamped.homeId??fresh?.homeId??old.homeId??null,
+      awayId:stamped.awayId??fresh?.awayId??old.awayId??null
     })
+    seen.add(id)
+  }
+  for(const p of freshList){
+    const id=String(p?.fixtureId??'')
+    if(!id||seen.has(id))continue
+    out.push(stampPick(p,now))
+    seen.add(id)
   }
   return out.sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
 }
@@ -91,16 +103,26 @@ function mergePublished(existing,incoming){
   const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
   const filterTips=mergeRows(existing?.filterTips,incoming?.filterTips,now,existing)
   const goalsBankers=mergeRows(existing?.goalsBankers,incoming?.goalsBankers,now,existing)
+  const bankers=mergeRows(existing?.bankers,incoming?.bankers,now,existing)
   return attachCrests({
     ...incoming,
     bestPicks,
     varTips,
     filterTips,
     goalsBankers,
+    bankers,
     results:{...(existing?.results||{}),...(incoming?.results||{})},
     resultSummary:incoming?.resultSummary||existing?.resultSummary||null,
     availableMarkets:[...new Set([...(incoming?.availableMarkets||[]),...bestPicks.map(x=>x.market).filter(Boolean)])].sort(),
-    meta:{...(incoming?.meta||{}),firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,publishedPicks:bestPicks.length,varTipsCount:varTips.length,filterTipsCount:filterTips.length,goalsBankersCount:goalsBankers.length}
+    meta:{
+      ...(incoming?.meta||{}),
+      firstPublishedAt:existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now,
+      publishedPicks:bestPicks.length,
+      varTipsCount:varTips.length,
+      filterTipsCount:filterTips.length,
+      goalsBankersCount:goalsBankers.length,
+      bankerRulesCount:bankers.length
+    }
   })
 }
 export async function loadBoard(date,{allowVersionMismatch=false}={}){
@@ -118,7 +140,6 @@ export async function listBoards(fromDate,toDate){
   return await request(path)
 }
 export async function saveBoard(date,board,{preservePublished=true}={}){
-  board=applyBankerPage(board)
   const existing=preservePublished?await loadBoard(date,{allowVersionMismatch:true}).catch(()=>null):null
   if(preservePublished&&existing&&incomingFeedEmpty(board)&&countTips(existing)>0){
     const kept={
@@ -133,7 +154,8 @@ export async function saveBoard(date,board,{preservePublished=true}={}){
     if(configured())await request('/rest/v1/prediction_snapshots?on_conflict=snapshot_date',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:{snapshot_date:date,generated_at:new Date().toISOString(),payload:kept}})
     return kept
   }
-  const finalBoard=attachCrests(preservePublished?mergePublished(existing,board):board)
+  const merged=preservePublished?mergePublished(existing,board):board
+  const finalBoard=attachCrests(applyBankerPage(merged))
   memory.set(date,finalBoard)
   if(configured())await request('/rest/v1/prediction_snapshots?on_conflict=snapshot_date',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:{snapshot_date:date,generated_at:new Date().toISOString(),payload:finalBoard}})
   return finalBoard

@@ -31,3 +31,41 @@ test('empty upstream feed does not wipe an existing board, even if engine versio
   assert.equal(loaded.bestPicks.length,1)
   await clearBoard(date)
 })
+
+test('a late refresh keeps already-published picks and Daily Bankers', async()=>{
+  const date='2099-03-04'
+  await clearBoard(date)
+  const morning={
+    bestPicks:[{fixtureId:'10',market:'total-goals',selection:'Over 1.5',kickoff:`${date}T12:00:00Z`}],
+    varTips:[{fixtureId:'11',market:'match-winner',selection:'Home',kickoff:`${date}T12:00:00Z`}],
+    filterTips:[],
+    goalsBankers:[],
+    bankers:[
+      {fixtureId:'10',market:'total-goals',selection:'Over 1.5',displaySelection:'Over 1.5',family:'Goals',rule:'STREAK_OVER15',kickoff:`${date}T12:00:00Z`},
+      {fixtureId:'12',market:'both-teams-score',selection:'Yes',displaySelection:'BTTS · Yes',family:'BTTS',rule:'GG_BOTH_TT',kickoff:`${date}T15:00:00Z`}
+    ],
+    results:{'10':{outcome:'won',matchState:'settled',homeScore:2,awayScore:1}},
+    availableMarkets:['total-goals'],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',sourceFixtures:80,scheduledFixtures:80,publishedPicks:1}
+  }
+  await saveBoard(date,morning,{preservePublished:false})
+  const late={
+    bestPicks:[{fixtureId:'13',market:'total-goals',selection:'Over 2.5',kickoff:`${date}T20:00:00Z`}],
+    varTips:[],
+    filterTips:[],
+    goalsBankers:[],
+    bankers:[{fixtureId:'13',market:'total-goals',selection:'Over 2.5',displaySelection:'Over 2.5',family:'Goals',rule:'STREAK_OVER15',kickoff:`${date}T20:00:00Z`}],
+    results:{},
+    availableMarkets:['total-goals'],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',sourceFixtures:8,scheduledFixtures:1,generatedAt:`${date}T21:00:00Z`}
+  }
+  const kept=await saveBoard(date,late)
+  assert.equal(kept.bestPicks.map(p=>String(p.fixtureId)).sort().join(','),'10,13')
+  assert.equal(kept.varTips.length,1)
+  assert.equal(kept.varTips[0].fixtureId,'11')
+  assert.equal(kept.bankers.map(p=>String(p.fixtureId)).sort().join(','),'10,12,13')
+  assert.equal(kept.safestBankers.length,3)
+  assert.equal(kept.dailyBankers.length,3)
+  assert.equal(kept.results['10'].outcome,'won')
+  await clearBoard(date)
+})

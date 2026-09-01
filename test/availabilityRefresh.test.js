@@ -32,7 +32,7 @@ test('public board drops internals and keeps only the requested view',()=>{
   assert.equal(all.bestPicks.length,1)
   assert.equal(all.varTips.length,0)
   assert.equal(all.priority.length,0)
-  assert.equal(all.bankers.length,0)
+  assert.equal(all.bankers.length,1)
   assert.equal(all.meta.diagnostics,undefined)
   const varBoard=publicBoard(board,'var')
   assert.equal(varBoard.varTips.length,1)
@@ -48,9 +48,12 @@ test('result rows compact to fixture id and outcome only',()=>{
 })
 
 test('settle job includes Goals Bankers',async()=>{
-  const src=await read('scripts/settleResults.js')
-  assert.match(src,/goalsBankers/)
+  const [src,engine]=await Promise.all([read('scripts/settleResults.js'),read('server/settlement.js')])
+  assert.match(src,/boardPicks/)
   assert.match(src,/postponed/)
+  assert.match(engine,/goalsBankers/)
+  assert.match(engine,/safestBankers/)
+  assert.match(engine,/valueBankers/)
 })
 
 test('public boards show won lost void and postponed',async()=>{

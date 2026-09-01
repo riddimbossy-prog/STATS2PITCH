@@ -10,6 +10,9 @@ test('supported markets settle correctly',()=>{
   assert.equal(settlePick({market:'match-winner',selection:'Home'},finished(2,0)).outcome,'won')
   assert.equal(settlePick({market:'draw-no-bet',selection:'Home'},finished(1,1)).outcome,'void')
   assert.equal(settlePick({market:'both-teams-score',selection:'Yes'},finished(2,1)).outcome,'won')
+  assert.equal(settlePick({market:'draw-or-over-25',selection:'Draw or Over 2.5'},finished(1,1)).outcome,'won')
+  assert.equal(settlePick({market:'draw-or-over-25',selection:'Draw or Over 2.5'},finished(2,1)).outcome,'won')
+  assert.equal(settlePick({market:'draw-or-over-25',selection:'Draw or Over 2.5'},finished(1,0)).outcome,'lost')
   assert.equal(settlePick({market:'total-goals',selection:'Under 3.5'},finished(2,1)).outcome,'won')
   assert.equal(settlePick({market:'away-team-goals',selection:'Over 0.5'},finished(2,1)).outcome,'won')
   assert.equal(settlePick({market:'first-half-goals',selection:'Over 0.5'},finished(2,1,1,0)).outcome,'won')
@@ -19,6 +22,20 @@ test('board settlement produces summary',()=>{
   const board={bestPicks:[{fixtureId:10,market:'match-winner',selection:'Home'}]}
   const raw={fixture:{id:10,status:{short:'FT'}},teams:{home:{name:'A'},away:{name:'B'}},goals:{home:1,away:0},score:{fulltime:{home:1,away:0},halftime:{home:1,away:0}}}
   assert.equal(settleBoard(board,[raw]).resultSummary.won,1)
+})
+
+test('safest Daily Bankers settle even when dailyBankers is empty',()=>{
+  const board={
+    safestBankers:[{fixtureId:14,market:'both-teams-score',selection:'Yes'}],
+    valueBankers:[{fixtureId:15,market:'total-goals',selection:'Over 2.5'}]
+  }
+  const raw=[
+    {fixture:{id:14,status:{short:'FT'}},goals:{home:1,away:1},score:{fulltime:{home:1,away:1}}},
+    {fixture:{id:15,status:{short:'FT'}},goals:{home:2,away:1},score:{fulltime:{home:2,away:1}}}
+  ]
+  const next=settleBoard(board,raw)
+  assert.equal(next.results['14'].outcome,'won')
+  assert.equal(next.results['15'].outcome,'won')
 })
 
 test('postponed matches settle as postponed, cancelled as void',()=>{

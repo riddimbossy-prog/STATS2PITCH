@@ -1,7 +1,7 @@
 import {sportyEventFixtures,sportyFixturesByDate} from '../server/sportyBet.js'
 import {gismoMatches} from '../server/sportyStats.js'
 import {listBoards,saveBoard} from '../server/store.js'
-import {settleBoard} from '../server/settlement.js'
+import {settleBoard,boardPicks} from '../server/settlement.js'
 
 const lookback=Math.max(1,Math.min(90,Number(process.env.RESULT_LOOKBACK_DAYS||45)))
 const end=new Date(),start=new Date(end.getTime()-(lookback-1)*86400000)
@@ -10,7 +10,7 @@ const rows=await listBoards(from,to)
 let updated=0,skipped=0,failed=0
 for(const row of rows){
   const date=row.snapshot_date,board=row.payload
-  const picks=[...(board?.bestPicks||[]),...(board?.varTips||[]),...(board?.filterTips||[]),...(board?.goalsBankers||[]),...(board?.dailyBankers||[])]
+  const picks=boardPicks(board)
   if(!picks.length){skipped++;continue}
   const fullySettled=picks.every(p=>['won','lost','void','postponed'].includes(board?.results?.[String(p.fixtureId)]?.outcome))
   if(fullySettled){skipped++;continue}
