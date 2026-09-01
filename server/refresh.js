@@ -44,6 +44,16 @@ async function getTeamHistory(teamId){
 }
 function mergeUnique(...groups){const map=new Map();for(const rows of groups)for(const f of rows||[]){const key=String(f?.fixture?.id??`${f?.fixture?.date}|${f?.teams?.home?.id}|${f?.teams?.away?.id}`);if(!map.has(key))map.set(key,f)}return[...map.values()]}
 function lastNVenue(rows,teamId,venue,n=FORM_SAMPLE){return(rows||[]).filter(f=>{const done=['FT','AET','PEN'].includes(String(f?.fixture?.status?.short||'').toUpperCase());if(!done)return false;return venue==='home'?String(f?.teams?.home?.id)===String(teamId):String(f?.teams?.away?.id)===String(teamId)}).sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0)).slice(0,n)}
+function compactScoreRow(f){
+  return{
+    fixture:{id:f?.fixture?.id,date:f?.fixture?.date,status:{short:String(f?.fixture?.status?.short||'FT')}},
+    teams:{home:{id:f?.teams?.home?.id,name:f?.teams?.home?.name||''},away:{id:f?.teams?.away?.id,name:f?.teams?.away?.name||''}},
+    goals:{home:f?.goals?.home,away:f?.goals?.away}
+  }
+}
+function venueFormHistory(rows,teamId,venue,n=15){
+  return lastNVenue(rows,teamId,venue,n).map(compactScoreRow)
+}
 function ppgFor(rows,teamId,venue){let pts=0,played=0;for(const f of rows){const h=Number(f?.goals?.home),a=Number(f?.goals?.away);if(!Number.isFinite(h)||!Number.isFinite(a))continue;const own=venue==='home'?h:a,opp=venue==='home'?a:h;played++;pts+=own>opp?3:own===opp?1:0}return played?pts/played:0}
 function splitTable(history,venue){const ids=new Map();for(const f of history||[]){const t=venue==='home'?f?.teams?.home:f?.teams?.away;if(t?.id)ids.set(String(t.id),{id:t.id,name:t.name||''})}const rows=[];for(const t of ids.values()){const sample=lastNVenue(history,t.id,venue);if(sample.length<FORM_SAMPLE)continue;rows.push({...t,ppg:ppgFor(sample,t.id,venue),played:sample.length})}rows.sort((a,b)=>b.ppg-a.ppg||String(a.name).localeCompare(String(b.name)));return new Map(rows.map((r,i)=>[String(r.id),{position:i+1,size:rows.length,ppg:+r.ppg.toFixed(2),played:r.played,sampleReady:true,venue}]))}
 function cachedSplitTable(leagueId,season,venue,history){const key=`${leagueId}|${season}|${venue}|${FORM_SAMPLE}`;if(!splitCache.has(key))splitCache.set(key,splitTable(history,venue));return splitCache.get(key)}
@@ -133,6 +143,8 @@ export async function refreshNow(date,onProgress=()=>{}){
       const statsReady=hasMatchStats(lastMatchesHome,homeId,lastMatchesAway,awayId)
       if(!statsReady)skippedNoStats++
       let homeFixtures=venueSample(history,homeId,'home'),awayFixtures=venueSample(history,awayId,'away')
+      const homeFormHistory=venueFormHistory(history,homeId,'home',15)
+      const awayFormHistory=venueFormHistory(history,awayId,'away',15)
       if(homeFixtures.length<FORM_SAMPLE)fallbackTeams++
       if(awayFixtures.length<FORM_SAMPLE)fallbackTeams++
       const formReady=homeFixtures.length>=FORM_SAMPLE&&awayFixtures.length>=FORM_SAMPLE
@@ -147,7 +159,7 @@ export async function refreshNow(date,onProgress=()=>{}){
       if(marketOdds.length)statsVerified++
       const over25Profile=buildOver25Profile(mergeUnique(current,previous,history),homeId,awayId)
       const h2h=h2hSnapshot(versusRows.length?versusRows:history,homeId,awayId)
-      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures,lastMatches:lastMatchesHome},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures,lastMatches:lastMatchesAway},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,homeStanding,awayStanding,marketOdds,formReady,statsReady,sportyEventId:f?.sporty?.eventId||null,sportyGameId:f?.sporty?.gameId||null,feed,leagueHistoryReady:current.length+previous.length>0,h2h,homeStats:teamStats(last5Overall(lastMatchesHome,homeId)),awayStats:teamStats(last5Overall(lastMatchesAway,awayId))}
+      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures,formHistory:homeFormHistory,lastMatches:lastMatchesHome},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures,formHistory:awayFormHistory,lastMatches:lastMatchesAway},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,homeStanding,awayStanding,marketOdds,formReady,statsReady,sportyEventId:f?.sporty?.eventId||null,sportyGameId:f?.sporty?.gameId||null,feed,leagueHistoryReady:current.length+previous.length>0,h2h,homeStats:teamStats(last5Overall(lastMatchesHome,homeId)),awayStats:teamStats(last5Overall(lastMatchesAway,awayId))}
 
       if(!statsReady){
         done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures,skippedNoStats})
