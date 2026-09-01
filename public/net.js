@@ -3,6 +3,26 @@ const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
 const anon=String(cfg.supabaseAnonKey||'')
 const fn=String(cfg.functionName||'stats2pitch-api')
 const BOARD_CACHE_MS=12*60*1000
+const TOKEN_KEY='s2p_access_token'
+const REFRESH_KEY='s2p_refresh_token'
+
+let releaseAuthGate
+export const whenAuthed=new Promise(resolve=>{releaseAuthGate=resolve})
+export function releaseAuth(){try{releaseAuthGate()}catch{}}
+
+export function getToken(){try{return localStorage.getItem(TOKEN_KEY)||''}catch{return ''}}
+export function saveSession(x){
+  try{
+    if(x?.access_token)localStorage.setItem(TOKEN_KEY,x.access_token)
+    if(x?.refresh_token)localStorage.setItem(REFRESH_KEY,x.refresh_token)
+  }catch{}
+}
+export function clearSession(){
+  try{
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(REFRESH_KEY)
+  }catch{}
+}
 
 export function endpoint(path){
   if(!base)throw new Error('Service unavailable')
@@ -10,13 +30,23 @@ export function endpoint(path){
 }
 
 export async function api(path,options={}){
-  const {cache='no-store',...rest}=options
+  const {cache='no-store',skipAuthWait=false,...rest}=options
+  if(!skipAuthWait)await whenAuthed
+  const token=getToken()
   const res=await fetch(endpoint(path),{
     ...rest,
-    headers:{apikey:anon,Authorization:`Bearer ${anon}`,...(rest.headers||{})},
+    headers:{
+      apikey:anon,
+      Authorization:`Bearer ${token||anon}`,
+      ...(rest.headers||{})
+    },
     cache
   })
   const body=await res.json().catch(()=>null)
+  if(res.status===401){
+    clearSession()
+    throw new Error('Sign in required')
+  }
   if(!res.ok)throw new Error('Unable to load this right now')
   return body
 }
