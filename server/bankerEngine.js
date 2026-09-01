@@ -15,8 +15,13 @@ export const BANKER_RULES=Object.freeze({
   over15Max:1.30,
   streakUnder35Min:1.40,
   minPublishOdds:1.20,
+  ggYesMax:1.50,
+  gg2NoMin:1.30,
   topFive:5,
-  bottomFour:4
+  bottomFour:4,
+  formSample:5,
+  formMinPct:60,
+  formAvgMinPct:60
 })
 
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))
@@ -93,6 +98,15 @@ function streakNoOdd(markets){
   return streak||null
 }
 
+function gg2NoOdd(markets){
+  const direct=oddOf(markets,'both-teams-score-2',['No'])
+  if(direct)return direct
+  return scanOdd(markets,(key,market,name)=>{
+    const blob=`${key} ${market} ${name}`
+    return (/gg.?ng.?2|gg 2|btts 2|both teams.*2/.test(blob)||key==='both-teams-score-2'||key==='60000')&&/\bno\b/.test(name)
+  })
+}
+
 export function extractBankerOdds(fixture){
   const markets=fixture?.marketOdds||[]
   const homeName=fixture?.home?.name||''
@@ -110,6 +124,8 @@ export function extractBankerOdds(fixture){
   const homeO25=teamGoalOdd(markets,'home',2.5,homeName)
   const awayO25=teamGoalOdd(markets,'away',2.5,awayName)
   const streak=streakNoOdd(markets)
+  const ggYes=oddOf(markets,'both-teams-score',['Yes','GG'])
+  const gg2No=gg2NoOdd(markets)
   const drawOrOver25=scanOdd(markets,(key,market,name)=>{
     const blob=`${key} ${market} ${name}`
     return /draw/.test(blob)&&/over/.test(blob)&&/2\.5/.test(blob)
@@ -129,7 +145,7 @@ export function extractBankerOdds(fixture){
   const boardTeamOver25=teamOver25Prices.length?Math.min(...teamOver25Prices):null
   return{
     favourite,homeWin,awayWin,draw,favWin,oppWin,
-    over15,over25,under35,streakNo:streak,streakYes:streak,drawOrOver25,
+    over15,over25,under35,streakNo:streak,streakYes:streak,drawOrOver25,ggYes,gg2No,
     homeO05,awayO05,homeO15,awayO15,homeO25,awayO25,oppO05,favO15,favO25,boardTeamOver25
   }
 }
@@ -211,6 +227,101 @@ function tableReason(f){
   const home=text(f?.home?.name||'Home'),away=text(f?.away?.name||'Away')
   if(finite(hp)&&finite(ap))return `League table: ${home} ${ordinal(hp)} vs ${away} ${ordinal(ap)} — not Top-5 vs Top-5 or Bottom-4 vs Bottom-4.`
   return 'League table places were not both confirmed, so Top-5 vs Top-5 and Bottom-4 vs Bottom-4 did not apply.'
+}
+
+function venueRows(fixtures,teamId,venue){
+  return (fixtures||[]).filter(row=>{
+    if(!finished(row))return false
+    const hid=String(row?.teams?.home?.id??''),aid=String(row?.teams?.away?.id??'')
+    const id=String(teamId??'')
+    if(!id)return false
+    return venue==='home'?hid===id:aid===id
+  }).sort((a,b)=>Date.parse(b?.fixture?.date||0)-Date.parse(a?.fixture?.date||0))
+}
+
+function hitRate(rows,venue,test){
+  let played=0,hits=0
+  for(const row of rows||[]){
+    const h=num(row?.goals?.home),a=num(row?.goals?.away)
+    if(h===null||a===null)continue
+    const own=venue==='home'?h:a,opp=venue==='home'?a:h
+    played++
+    if(test({h,a,own,opp,total:h+a}))hits++
+  }
+  return{played,hits,rate:played?Math.round(hits*100/played):null}
+}
+
+function publishedTest(published,side,favourite){
+  const market=String(published?.market||'')
+  const sel=String(published?.selection||'')
+  if(market==='both-teams-score')return /yes|gg/.test(norm(sel))?x=>x.h>0&&x.a>0:x=>!(x.h>0&&x.a>0)
+  if(market==='total-goals'){
+    if(sel==='Over 1.5')return x=>x.total>1.5
+    if(sel==='Over 2.5')return x=>x.total>2.5
+    if(sel==='Under 3.5')return x=>x.total<3.5
+  }
+  if(market==='draw-or-over-25')return x=>x.h===x.a||x.total>2.5
+  if(market==='match-winner'){
+    if(sel==='Draw'||sel==='X')return x=>x.h===x.a
+    const want=sel==='Home'||(favourite==='home'&&sel!=='Away')?'home':'away'
+    if(side!==want)return null
+    return x=>x.own>x.opp
+  }
+  if(market==='home-team-goals'){
+    if(side!=='home')return null
+    if(sel==='Over 1.5')return x=>x.own>=2
+    if(sel==='Over 2.5')return x=>x.own>=3
+  }
+  if(market==='away-team-goals'){
+    if(side!=='away')return null
+    if(sel==='Over 1.5')return x=>x.own>=2
+    if(sel==='Over 2.5')return x=>x.own>=3
+  }
+  return x=>x.total>1.5
+}
+
+function formLabel(published){
+  const market=String(published?.market||'')
+  const sel=String(published?.displaySelection||published?.selection||'this pick')
+  if(market==='both-teams-score')return 'BTTS'
+  if(market==='draw-or-over-25')return 'Draw or Over 2.5'
+  if(market==='match-winner'&&(sel==='Draw'||published?.selection==='Draw'))return 'Draw'
+  return sel
+}
+
+export function confirmLast5(f,published,favourite){
+  const sample=BANKER_RULES.formSample
+  const minPct=BANKER_RULES.formMinPct
+  const avgMin=BANKER_RULES.formAvgMinPct
+  const homeId=f?.home?.id,awayId=f?.away?.id
+  const homeAll=venueRows(f?.home?.fixtures||f?.home?.lastMatches,homeId,'home')
+  const awayAll=venueRows(f?.away?.fixtures||f?.away?.lastMatches,awayId,'away')
+  const sides=[
+    {side:'home',label:text(f?.home?.name||'Home'),venue:'home',all:homeAll,test:publishedTest(published,'home',favourite)},
+    {side:'away',label:text(f?.away?.name||'Away'),venue:'away',all:awayAll,test:publishedTest(published,'away',favourite)}
+  ].filter(row=>typeof row.test==='function')
+  if(!sides.length)return{ok:false,skip:'form-sample',reasons:['Last 5 form could not be matched to this market.']}
+  const reasons=[]
+  for(const row of sides){
+    const last=hitRate(row.all.slice(0,sample),row.venue,row.test)
+    const avg=hitRate(row.all,row.venue,row.test)
+    if(last.played<sample)return{ok:false,skip:'form-sample',reasons:[`${row.label} last ${sample} ${row.venue} games are incomplete (${last.played}/${sample}).`]}
+    const ofAvg=finite(avg.rate)&&avg.rate>0?Math.round(last.rate*100/avg.rate):null
+    if(last.rate<minPct)return{ok:false,skip:'form-confirm',reasons:[`${row.label} last ${sample}: ${formLabel(published)} in ${last.hits}/${last.played} (${last.rate}%) — below ${minPct}%.`]}
+    if(finite(avg.rate)&&avg.played>sample&&avg.rate<avgMin)return{ok:false,skip:'form-avg',reasons:[`${row.label} average ${formLabel(published)} is ${avg.rate}% over ${avg.played} ${row.venue} games — below ${avgMin}%.`]}
+    if(ofAvg!=null&&ofAvg<BANKER_RULES.formAvgMinPct)return{ok:false,skip:'form-avg',reasons:[`${row.label} last ${sample} is ${last.rate}% vs average ${avg.rate}% (${ofAvg}% of average) — below ${BANKER_RULES.formAvgMinPct}%.`]}
+    const avgBit=finite(avg.rate)?`, average ${avg.rate}% over ${avg.played}`:''
+    const matchBit=ofAvg!=null?` — last 5 is ${ofAvg}% of the average`:''
+    reasons.push(`${row.label} last ${sample} ${row.venue}: ${formLabel(published)} in ${last.hits}/${last.played} (${last.rate}%${avgBit})${matchBit}. Clears ${minPct}%.`)
+  }
+  return{ok:true,skip:null,reasons}
+}
+
+function publishedGg(odds){
+  const price=px(odds.ggYes)
+  if(!price||price<BANKER_RULES.minPublishOdds||price>=BANKER_RULES.ggYesMax)return null
+  if(finite(odds.gg2No)&&odds.gg2No<=BANKER_RULES.gg2NoMin)return null
+  return{market:'both-teams-score',selection:'Yes',displaySelection:'BTTS · Yes',odds:price,family:'BTTS'}
 }
 
 function publishedFavWin(f,odds){
@@ -298,7 +409,8 @@ function pack(f,odds,rule,published,reasons){
       over15:px(odds.over15),over25:px(odds.over25),under35:px(odds.under35),
       oppO05:px(odds.oppO05),homeO05:px(odds.homeO05),awayO05:px(odds.awayO05),
       favO15:px(odds.favO15),homeO25:px(odds.homeO25),awayO25:px(odds.awayO25),
-      favO25:px(odds.favO25),boardTeamOver25:px(odds.boardTeamOver25),streakNo:px(odds.streakNo),streakYes:px(odds.streakNo)
+      favO25:px(odds.favO25),boardTeamOver25:px(odds.boardTeamOver25),streakNo:px(odds.streakNo),streakYes:px(odds.streakNo),
+      ggYes:px(odds.ggYes),gg2No:px(odds.gg2No)
     },
     sportyEventId:f.sportyEventId||null
   }
@@ -312,7 +424,16 @@ function emit(f,odds,rule,published,reasons){
   const chosen=liftToFloor(f,odds,published)
   if(!chosen.published)return{pick:null,skip:'odds-below-floor',odds}
   if(chosen.lifted)reasons.push(`Qualified price ${chosen.from.displaySelection} @ ${chosen.from.odds} was under ${BANKER_RULES.minPublishOdds.toFixed(2)}. Next available: ${chosen.published.displaySelection} @ ${chosen.published.odds}.`)
+  const form=confirmLast5(f,chosen.published,odds.favourite)
+  if(!form.ok)return{pick:null,skip:form.skip,odds,form}
+  reasons.push(...form.reasons)
   return{pick:pack(f,odds,rule,chosen.published,reasons),skip:null,odds}
+}
+
+function take(out,state){
+  if(out?.pick)return out
+  if(out?.skip&&String(out.skip).startsWith('form')){state.formSkip=out.skip;return null}
+  return out
 }
 
 export function evaluateBankerFixture(f){
@@ -327,52 +448,68 @@ export function evaluateBankerFixture(f){
   const streak=num(odds.streakNo??odds.streakYes)
   const boardTeamOver25=num(odds.boardTeamOver25)
   const onBoard=finite(boardTeamOver25)&&boardTeamOver25<=BANKER_RULES.boardTeamOver25Max
+  const bothScore=finite(homeO05)&&finite(awayO05)&&homeO05<BANKER_RULES.bothTeamTotalMax&&awayO05<BANKER_RULES.bothTeamTotalMax
+  const state={formSkip:null}
 
-  if(onBoard&&finite(homeO05)&&finite(awayO05)&&homeO05<BANKER_RULES.bothTeamTotalMax&&awayO05<BANKER_RULES.bothTeamTotalMax&&finite(over25)&&over25<BANKER_RULES.drawOrOver25MatchMax){
+  if(bothScore){
+    const gg=publishedGg(odds)
+    if(gg){
+      const out=take(emit(f,odds,'GG_BOTH_TT',gg,[
+        `GG board: both team totals Over 0.5 are under ${BANKER_RULES.bothTeamTotalMax.toFixed(2)} (${px(homeO05)} / ${px(awayO05)}).`,
+        `BTTS Yes is ${px(odds.ggYes)} (under ${BANKER_RULES.ggYesMax.toFixed(2)}).`,
+        finite(odds.gg2No)?`GG 2+ No is ${px(odds.gg2No)} (over ${BANKER_RULES.gg2NoMin.toFixed(2)}).`:`GG 2+ No was not required because it was not on the board.`
+      ]),state)
+      if(out)return out
+    }
+  }
+
+  if(onBoard&&bothScore&&finite(over25)&&over25<BANKER_RULES.drawOrOver25MatchMax){
     const published=publishedDrawOrOver25(odds)
     if(published){
-      return emit(f,odds,'DRAW_OR_OVER25',published,[
+      const out=take(emit(f,odds,'DRAW_OR_OVER25',published,[
         boardReason(odds),
         `Both team totals Over 0.5 are under ${BANKER_RULES.bothTeamTotalMax.toFixed(2)} (${px(homeO05)} / ${px(awayO05)}).`,
         `Match Over 2.5 is ${px(over25)} (under ${BANKER_RULES.drawOrOver25MatchMax.toFixed(2)}).`,
         `Qualified ${published.displaySelection} @ ${published.odds}.`
-      ])
+      ]),state)
+      if(out)return out
     }
   }
 
   if(onBoard&&finite(oppO05)&&oppO05>BANKER_RULES.oppOver05FavWinMin){
     const published=publishedFavWin(f,odds)
     if(published){
-      return emit(f,odds,'OPP_O05_FAV_WIN',published,[
+      const out=take(emit(f,odds,'OPP_O05_FAV_WIN',published,[
         boardReason(odds),
         `Opponent team total Over 0.5 is ${px(oppO05)} > ${BANKER_RULES.oppOver05FavWinMin.toFixed(2)}.`,
         `Favourite to win: ${published.displaySelection} @ ${published.odds}.`
-      ])
-    }
-    return{pick:null,skip:'missing-fav-win-odds',odds}
+      ]),state)
+      if(out)return out
+    }else return{pick:null,skip:'missing-fav-win-odds',odds}
   }
 
   if(onBoard&&finite(oppO05)&&oppO05<BANKER_RULES.oppTeamTotalOver25Max){
     const published=publishedOver(2.5,over25)
     if(published){
-      return emit(f,odds,'OPP_TT_OVER25',published,[
+      const out=take(emit(f,odds,'OPP_TT_OVER25',published,[
         boardReason(odds),
         `Opponent team total Over 0.5 is ${px(oppO05)} < ${BANKER_RULES.oppTeamTotalOver25Max.toFixed(2)}.`,
         `Total goals Over 2.5 @ ${published.odds}.`
-      ])
+      ]),state)
+      if(out)return out
     }
   }
 
   if(onBoard&&finite(under35)&&under35>BANKER_RULES.under35Fav2PlusMin){
     const published=publishedFav2Plus(f,odds)
     if(published){
-      return emit(f,odds,'U35_FAV_2PLUS',published,[
+      const out=take(emit(f,odds,'U35_FAV_2PLUS',published,[
         boardReason(odds),
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.under35Fav2PlusMin.toFixed(2)}.`,
         `Favourite to score 2+: ${published.displaySelection} @ ${published.odds}.`
-      ])
-    }
-    return{pick:null,skip:'missing-fav-2plus-odds',odds}
+      ]),state)
+      if(out)return out
+    }else return{pick:null,skip:'missing-fav-2plus-odds',odds}
   }
 
   const streakWindow=finite(streak)&&streak>=BANKER_RULES.streakNoMin&&streak<=BANKER_RULES.streakNoMax
@@ -383,12 +520,13 @@ export function evaluateBankerFixture(f){
     if(bothBottomFour(f))return{pick:null,skip:'both-bottom-four',odds}
     const published=publishedOver(1.5,over15)
     if(published){
-      return emit(f,odds,'STREAK_OVER15',published,[
+      const out=take(emit(f,odds,'STREAK_OVER15',published,[
         `Over 1.5 board: 3+ goals streak No is ${px(streak)} (${BANKER_RULES.streakNoMin.toFixed(2)}-${BANKER_RULES.streakNoMax.toFixed(2)}).`,
         `Over 1.5 is ${px(over15)} < ${BANKER_RULES.over15Max.toFixed(2)}.`,
         `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`,
         tableReason(f)
-      ])
+      ]),state)
+      if(out)return out
     }
   }
 
@@ -396,7 +534,7 @@ export function evaluateBankerFixture(f){
   if(!onBoard&&!finite(streak)&&finite(over15))return{pick:null,skip:'missing-3plus-streak',odds}
   if(!finite(boardTeamOver25))return{pick:null,skip:'missing-team-over25',odds}
   if(!onBoard)return{pick:null,skip:'team-over25-above-board-max',odds}
-  return{pick:null,skip:'no-rule-qualified',odds}
+  return{pick:null,skip:state.formSkip||'no-rule-qualified',odds}
 }
 
 export function buildBankerRules(fixtures=[]){

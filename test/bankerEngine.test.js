@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {evaluateBankerFixture,buildLeagueScoringProfile,buildOverallTable,BANKER_ENGINE} from '../server/bankerEngine.js'
+import {evaluateBankerFixture,buildLeagueScoringProfile,buildOverallTable,confirmLast5,BANKER_ENGINE} from '../server/bankerEngine.js'
 
 function outcome(name,odd){return{name,odd}}
-function markets({homeWin=1.45,awayWin=4.20,draw=3.80,over15=1.22,over25=1.72,under35=1.55,homeO05=1.18,awayO05=1.85,homeO15=1.55,awayO15=2.40,homeO25=1.85,awayO25=3.10,streak=1.32,streak2=null}={}){
+function markets({homeWin=1.45,awayWin=4.20,draw=3.80,over15=1.22,over25=1.72,under35=1.55,homeO05=1.18,awayO05=1.85,homeO15=1.55,awayO15=2.40,homeO25=1.85,awayO25=3.10,streak=1.32,streak2=null,ggYes=null,gg2No=null}={}){
   const rows=[
     {marketKey:'match-winner',market:'1X2',outcomes:[outcome('Home',homeWin),outcome('Draw',draw),outcome('Away',awayWin)]},
     {marketKey:'total-goals',market:'Total Goals',outcomes:[outcome('Over 1.5',over15),outcome('Over 2.5',over25),outcome('Under 3.5',under35)]},
@@ -12,13 +12,36 @@ function markets({homeWin=1.45,awayWin=4.20,draw=3.80,over15=1.22,over25=1.72,un
   ]
   if(streak!=null)rows.push({marketKey:'goals-streak-3',market:'3+ Goals Streak',outcomes:[outcome('No',streak)]})
   if(streak2!=null)rows.push({marketKey:'goals-streak-2',market:'Goals Streak',outcomes:[outcome('Yes',streak2)]})
+  if(ggYes!=null)rows.push({marketKey:'both-teams-score',market:'GG/NG',outcomes:[outcome('Yes',ggYes),outcome('No',2.80)]})
+  if(gg2No!=null)rows.push({marketKey:'both-teams-score-2',market:'GG/NG 2+',outcomes:[outcome('Yes',3.10),outcome('No',gg2No)]})
   return rows
 }
 
+function played(id,homeId,awayId,hg,ag,day){
+  return{
+    fixture:{id,date:`2026-08-${String(day).padStart(2,'0')}T15:00:00Z`,status:{short:'FT'}},
+    teams:{home:{id:homeId,name:String(homeId)},away:{id:awayId,name:String(awayId)}},
+    goals:{home:hg,away:ag}
+  }
+}
+
+function supportingForm({homeHits=4,awayHits=4,n=5,homeScore=[3,1],awayScore=[1,3],miss=[0,0]}={}){
+  const home=[],away=[]
+  for(let i=0;i<n;i++){
+    const h=i<homeHits?homeScore:miss
+    const a=i<awayHits?awayScore:miss
+    home.push(played(10+i,1,90+i,h[0],h[1],20-i))
+    away.push(played(50+i,80+i,2,a[0],a[1],20-i))
+  }
+  return{home,away}
+}
+
 function fixture(odds={},extra={}){
+  const form=extra.noForm?{home:[],away:[]}:extra.form||supportingForm(extra.formOpts||{})
   return{
     fixtureId:'fx',league:'Test League',country:'Test',kickoff:'2026-08-20T18:00:00Z',
-    home:{id:1,name:'Home FC'},away:{id:2,name:'Away FC'},
+    home:{id:1,name:'Home FC',fixtures:form.home,lastMatches:form.home},
+    away:{id:2,name:'Away FC',fixtures:form.away,lastMatches:form.away},
     homeSplit:{position:extra.hpos??7,size:12,sampleReady:true},
     awaySplit:{position:extra.apos??10,size:12,sampleReady:true},
     homeStanding:{position:extra.hstand??8,size:extra.hsize??12,played:5},
@@ -50,6 +73,7 @@ test('opponent Over 0.5 above 1.70 publishes favourite win',()=>{
   assert.equal(r.pick?.market,'match-winner')
   assert.equal(r.pick?.selection,'Home')
   assert.equal(r.pick?.odds,1.40)
+  assert.match(r.pick.whyText,/last 5 home: Home FC to Win in 4\/5/)
 })
 
 test('favourite win shorter than 1.20 steps to favourite 2+',()=>{
@@ -87,6 +111,17 @@ test('both team totals under 1.30 and match Over 2.5 under 1.50 publishes Over 2
   assert.equal(r.pick?.rule,'DRAW_OR_OVER25')
   assert.equal(r.pick?.selection,'Over 2.5')
   assert.equal(r.pick?.odds,1.32)
+})
+
+test('GG publishes when both sides are priced to score and BTTS Yes is under 1.50',()=>{
+  const r=evaluateBankerFixture(fixture({over25:1.80,homeO05:1.18,awayO05:1.22,ggYes:1.38,gg2No:1.45,homeO25:1.90,awayO05:1.22}))
+  assert.equal(r.pick?.rule,'GG_BOTH_TT')
+  assert.equal(r.pick?.market,'both-teams-score')
+  assert.equal(r.pick?.selection,'Yes')
+  assert.equal(r.pick?.displaySelection,'BTTS · Yes')
+  assert.equal(r.pick?.odds,1.38)
+  assert.match(r.pick.whyText,/BTTS in 4\/5/)
+  assert.match(r.pick.whyText,/Clears 60%/)
 })
 
 test('Over 1.5 board starts on 3+ goals streak No 1.20-1.40',()=>{
@@ -169,4 +204,41 @@ test('league profile still recognises a high-scoring sample',()=>{
   const rows=[]
   for(let i=0;i<20;i++)rows.push({fixture:{status:{short:'FT'}},goals:{home:i%2?2:3,away:1}})
   assert.equal(buildLeagueScoringProfile(rows).class,'high-scoring')
+})
+
+test('last 5 below 60% blocks the selected tip',()=>{
+  const r=evaluateBankerFixture(fixture({homeWin:1.40,awayWin:5.00,homeO25:1.80,awayO05:1.85,under35:1.40},{formOpts:{homeHits:2,awayHits:2}}))
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'form-confirm')
+})
+
+test('missing last 5 sample blocks the selected tip',()=>{
+  const r=evaluateBankerFixture(fixture({homeWin:1.40,awayWin:5.00,homeO25:1.80,awayO05:1.85,under35:1.40},{noForm:true}))
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'form-sample')
+})
+
+test('last 5 must also match at least 60% of the average',()=>{
+  const recent=supportingForm({homeHits:4,awayHits:4,n:5,homeScore:[3,1],awayScore:[1,3],miss:[0,0]})
+  const olderHome=supportingForm({homeHits:0,awayHits:0,n:5,homeScore:[3,1],awayScore:[1,3],miss:[0,0]}).home.map((row,i)=>({...row,fixture:{...row.fixture,id:200+i,date:`2026-07-${String(20-i).padStart(2,'0')}T15:00:00Z`}}))
+  const olderAway=supportingForm({homeHits:0,awayHits:0,n:5,homeScore:[3,1],awayScore:[1,3],miss:[0,0]}).away.map((row,i)=>({...row,fixture:{...row.fixture,id:300+i,date:`2026-07-${String(20-i).padStart(2,'0')}T15:00:00Z`}}))
+  const r=evaluateBankerFixture(fixture({homeWin:1.40,awayWin:5.00,homeO25:1.80,awayO05:1.85,under35:1.40},{form:{home:[...recent.home,...olderHome],away:[...recent.away,...olderAway]}}))
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'form-avg')
+})
+
+test('GG last 5 BTTS below 60% is not published',()=>{
+  const r=evaluateBankerFixture(fixture({over25:1.80,homeO05:1.18,awayO05:1.22,ggYes:1.38,gg2No:1.45,homeO25:1.90},{formOpts:{homeHits:2,awayHits:2,homeScore:[3,1],awayScore:[1,3],miss:[1,0]}}))
+  assert.equal(r.pick,null)
+  assert.ok(r.skip==='form-confirm'||r.skip==='form-avg'||r.skip==='no-rule-qualified'||String(r.skip).startsWith('form'))
+})
+
+test('confirmLast5 requires 3 of last 5 and 60% of the average',()=>{
+  const form=supportingForm({homeHits:4,awayHits:4})
+  const published={market:'total-goals',selection:'Over 2.5',displaySelection:'Over 2.5'}
+  const ok=confirmLast5({home:{id:1,name:'Home FC',fixtures:form.home},away:{id:2,name:'Away FC',fixtures:form.away}},published,null)
+  assert.equal(ok.ok,true)
+  const weak=confirmLast5({home:{id:1,name:'Home FC',fixtures:supportingForm({homeHits:2,awayHits:2}).home},away:{id:2,name:'Away FC',fixtures:supportingForm({homeHits:2,awayHits:2}).away}},published,null)
+  assert.equal(weak.ok,false)
+  assert.equal(weak.skip,'form-confirm')
 })

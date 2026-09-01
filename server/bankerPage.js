@@ -4,7 +4,7 @@ export function toBankerPageRows(picks=[]){
   const safest=[],value=[]
   for(const pick of picks||[]){
     const kind=pick.rule==='OPP_TT_OVER25'||pick.rule==='DRAW_OR_OVER25'?'value':'safest'
-    const marketName=pick.family==='1X2'?'Match winner':pick.family==='Team Goals'?'Team goals':pick.family==='Combo'?'Combo':String(pick.market||'').replaceAll('-',' ')
+    const marketName=pick.family==='1X2'?'Match winner':pick.family==='Team Goals'?'Team goals':pick.family==='Combo'?'Combo':pick.family==='BTTS'?'Both teams to score':String(pick.market||'').replaceAll('-',' ')
     const row={
       ...pick,
       kind,
