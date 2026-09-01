@@ -14,6 +14,7 @@ export const BANKER_RULES=Object.freeze({
   streakNoMax:1.40,
   over15Max:1.30,
   streakUnder35Min:1.40,
+  bumpMinOdds:1.20,
   ggYesMax:1.50,
   gg2NoMin:1.30,
   topFive:5,
@@ -403,8 +404,29 @@ function boardReason(odds){
   return `Board filter: team total Over 2.5 is ${px(odds.boardTeamOver25)} (home ${px(odds.homeO25)} / away ${px(odds.awayO25)}), max ${BANKER_RULES.boardTeamOver25Max.toFixed(2)}.`
 }
 
+function bumpCandidate(f,odds,published){
+  const sel=String(published?.selection||'')
+  const fam=String(published?.family||'')
+  if(fam==='1X2'&&(sel==='Home'||sel==='Away'))return publishedFav2Plus(f,odds)
+  if(fam==='Team Goals'&&sel==='Over 1.5')return publishedFav3Plus(f,odds)
+  if(fam==='Goals'&&sel==='Over 1.5')return publishedOver(2.5,odds.over25)
+  return null
+}
+
 function emit(f,odds,rule,published,reasons){
   if(!published)return{pick:null,skip:'odds-below-floor',odds}
+  if(Number(published.odds)<BANKER_RULES.bumpMinOdds){
+    const bump=bumpCandidate(f,odds,published)
+    if(bump&&Number(bump.odds)>=BANKER_RULES.bumpMinOdds){
+      const bumpForm=confirmLast5(f,bump,odds.favourite)
+      if(bumpForm.ok){
+        reasons.push(`Qualified ${published.displaySelection} @ ${published.odds} is under ${BANKER_RULES.bumpMinOdds.toFixed(2)}. Last 5 form confirms ${bump.displaySelection}, so ${bump.displaySelection} @ ${bump.odds} is published.`)
+        reasons.push(...bumpForm.reasons)
+        return{pick:pack(f,odds,rule,bump,reasons,bumpForm),skip:null,odds}
+      }
+      reasons.push(`${bump.displaySelection} last 5 did not confirm the bump, so ${published.displaySelection} @ ${published.odds} stays.`)
+    }
+  }
   const form=confirmLast5(f,published,odds.favourite)
   if(!form.ok)return{pick:null,skip:form.skip,odds,form}
   reasons.push(...form.reasons)
