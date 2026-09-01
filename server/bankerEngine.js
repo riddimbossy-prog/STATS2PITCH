@@ -14,7 +14,6 @@ export const BANKER_RULES=Object.freeze({
   streakNoMax:1.40,
   over15Max:1.30,
   streakUnder35Min:1.40,
-  minPublishOdds:1.20,
   ggYesMax:1.50,
   gg2NoMin:1.30,
   topFive:5,
@@ -322,7 +321,7 @@ export function confirmLast5(f,published,favourite){
 
 function publishedGg(odds){
   const price=px(odds.ggYes)
-  if(!price||price<BANKER_RULES.minPublishOdds||price>=BANKER_RULES.ggYesMax)return null
+  if(!price||price>=BANKER_RULES.ggYesMax)return null
   if(finite(odds.gg2No)&&odds.gg2No<=BANKER_RULES.gg2NoMin)return null
   return{market:'both-teams-score',selection:'Yes',displaySelection:'BTTS · Yes',odds:price,family:'BTTS'}
 }
@@ -376,26 +375,6 @@ function publishedDrawOrOver25(odds){
   return null
 }
 
-function nextAvailableSteps(f,odds,published){
-  const sel=String(published?.selection||'')
-  const fam=String(published?.family||'')
-  if(fam==='1X2'&&(sel==='Home'||sel==='Away'))return [publishedFav2Plus(f,odds),publishedOver(1.5,odds.over15),publishedFav3Plus(f,odds),publishedOver(2.5,odds.over25)]
-  if(fam==='Team Goals'&&sel==='Over 1.5')return [publishedFav3Plus(f,odds),publishedOver(1.5,odds.over15),publishedOver(2.5,odds.over25)]
-  if(fam==='Goals'&&sel==='Over 1.5')return [publishedOver(2.5,odds.over25)]
-  if(sel==='Over 2.5'||fam==='Combo')return [publishedDraw(odds),publishedFav2Plus(f,odds)]
-  return [publishedFav2Plus(f,odds),publishedOver(1.5,odds.over15),publishedOver(2.5,odds.over25)]
-}
-
-function liftToFloor(f,odds,published){
-  if(!published)return{published:null,lifted:false,from:null}
-  if(Number(published.odds)>=BANKER_RULES.minPublishOdds)return{published,lifted:false,from:null}
-  const from={...published}
-  for(const next of nextAvailableSteps(f,odds,published)){
-    if(next&&Number(next.odds)>=BANKER_RULES.minPublishOdds)return{published:next,lifted:true,from}
-  }
-  return{published:null,lifted:true,from}
-}
-
 function pack(f,odds,rule,published,reasons,form=null){
   return{
     fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
@@ -425,13 +404,11 @@ function boardReason(odds){
 }
 
 function emit(f,odds,rule,published,reasons){
-  const chosen=liftToFloor(f,odds,published)
-  if(!chosen.published)return{pick:null,skip:'odds-below-floor',odds}
-  if(chosen.lifted)reasons.push(`Qualified price ${chosen.from.displaySelection} @ ${chosen.from.odds} was under ${BANKER_RULES.minPublishOdds.toFixed(2)}. Next available: ${chosen.published.displaySelection} @ ${chosen.published.odds}.`)
-  const form=confirmLast5(f,chosen.published,odds.favourite)
+  if(!published)return{pick:null,skip:'odds-below-floor',odds}
+  const form=confirmLast5(f,published,odds.favourite)
   if(!form.ok)return{pick:null,skip:form.skip,odds,form}
   reasons.push(...form.reasons)
-  return{pick:pack(f,odds,rule,chosen.published,reasons,form),skip:null,odds}
+  return{pick:pack(f,odds,rule,published,reasons,form),skip:null,odds}
 }
 
 function take(out,state){

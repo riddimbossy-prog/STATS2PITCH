@@ -69,3 +69,65 @@ test('a late refresh keeps already-published picks and Daily Bankers', async()=>
   assert.equal(kept.results['10'].outcome,'won')
   await clearBoard(date)
 })
+
+test('pre-match refresh republishes overlapping bankers at the new engine price', async()=>{
+  const date='2099-05-06'
+  await clearBoard(date)
+  const morning={
+    bestPicks:[],
+    varTips:[],
+    filterTips:[],
+    goalsBankers:[],
+    bankers:[{fixtureId:'20',market:'total-goals',selection:'Over 2.5',displaySelection:'Over 2.5',odds:1.54,family:'Goals',rule:'STREAK_OVER15',kickoff:`${date}T18:00:00Z`,publishedAt:`${date}T00:55:00Z`}],
+    results:{},
+    availableMarkets:['total-goals'],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',sourceFixtures:40,scheduledFixtures:40,generatedAt:`${date}T00:55:00Z`}
+  }
+  await saveBoard(date,morning,{preservePublished:false})
+  const later={
+    bestPicks:[],
+    varTips:[],
+    filterTips:[],
+    goalsBankers:[],
+    bankers:[{fixtureId:'20',market:'total-goals',selection:'Over 1.5',displaySelection:'Over 1.5',odds:1.16,family:'Goals',rule:'STREAK_OVER15',kickoff:`${date}T18:00:00Z`}],
+    results:{},
+    availableMarkets:['total-goals'],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',sourceFixtures:40,scheduledFixtures:40,generatedAt:`${date}T06:00:00Z`}
+  }
+  const kept=await saveBoard(date,later)
+  assert.equal(kept.bankers.length,1)
+  assert.equal(kept.bankers[0].selection,'Over 1.5')
+  assert.equal(kept.bankers[0].odds,1.16)
+  assert.equal(kept.bankers[0].publishedAt,`${date}T00:55:00Z`)
+  await clearBoard(date)
+})
+
+test('after kickoff the published market stays even if the engine would change it', async()=>{
+  const date='2020-05-06'
+  await clearBoard(date)
+  const morning={
+    bestPicks:[],
+    varTips:[],
+    filterTips:[],
+    goalsBankers:[],
+    bankers:[{fixtureId:'21',market:'total-goals',selection:'Over 2.5',displaySelection:'Over 2.5',odds:1.54,family:'Goals',rule:'STREAK_OVER15',kickoff:`${date}T12:00:00Z`,publishedAt:`${date}T00:55:00Z`}],
+    results:{},
+    availableMarkets:['total-goals'],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',sourceFixtures:40,scheduledFixtures:40,generatedAt:`${date}T00:55:00Z`}
+  }
+  await saveBoard(date,morning,{preservePublished:false})
+  const later={
+    bestPicks:[],
+    varTips:[],
+    filterTips:[],
+    goalsBankers:[],
+    bankers:[{fixtureId:'21',market:'total-goals',selection:'Over 1.5',displaySelection:'Over 1.5',odds:1.16,family:'Goals',rule:'STREAK_OVER15',kickoff:`${date}T12:00:00Z`}],
+    results:{},
+    availableMarkets:['total-goals'],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',sourceFixtures:8,scheduledFixtures:1,generatedAt:`${date}T18:00:00Z`}
+  }
+  const kept=await saveBoard(date,later)
+  assert.equal(kept.bankers[0].selection,'Over 2.5')
+  assert.equal(kept.bankers[0].odds,1.54)
+  await clearBoard(date)
+})

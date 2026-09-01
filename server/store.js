@@ -57,6 +57,11 @@ function applyBankerPage(board){
 }
 const proofKey=p=>`${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
 function stampPick(p,at){return{...p,publishedAt:p?.publishedAt||at,proofKey:p?.proofKey||proofKey(p)}}
+function kickoffPassed(row,now){
+  const ko=Date.parse(row?.kickoff||'')
+  const ts=Date.parse(now||'')
+  return Number.isFinite(ko)&&Number.isFinite(ts)&&ko<=ts
+}
 function mergeRows(oldRows,freshRows,now,existing){
   const oldList=Array.isArray(oldRows)?oldRows:[]
   const freshList=Array.isArray(freshRows)?freshRows:[]
@@ -67,7 +72,10 @@ function mergeRows(oldRows,freshRows,now,existing){
     const id=String(old?.fixtureId??'')
     if(!id||seen.has(id))continue
     const fresh=freshMap.get(id)
-    const stamped=stampPick(old,old.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now)
+    const publishedAt=old.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now
+    const useFresh=Boolean(fresh)&&!kickoffPassed(old,now)
+    const base=useFresh?fresh:old
+    const stamped=stampPick(base,publishedAt)
     out.push({
       ...stamped,
       homeLogo:preferLogo(fresh?.homeLogo,stamped.homeLogo,old.homeLogo),
