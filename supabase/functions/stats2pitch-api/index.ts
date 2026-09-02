@@ -1,1 +1,2 @@
-RESTORE_FROM_LOCAL_FILE_stats2pitch-api-index.ts
+const ELITE_FEED_TOKEN=Deno.env.get('STATS2PITCH_ELITE_FEED_TOKEN')||''
+const ENGINE_VERSION='stats2pitch-v5-var-tips'
