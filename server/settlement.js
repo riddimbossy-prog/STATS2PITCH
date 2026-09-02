@@ -62,8 +62,12 @@ export function settlePick(pick,fixture){
     const yes=h>0&&a>0
     if(sel==='yes')outcome=result(yes)
     else if(sel==='no')outcome=result(!yes)
-  }else if(market==='draw-or-over-25'){
+  }else if(market==='draw-or-over-25'||sel==='draw or over 2.5'){
     outcome=result(h===a||(h+a)>2.5)
+  }else if(market==='draw-or-under-25'||sel==='draw or under 2.5'){
+    outcome=result(h===a||(h+a)<2.5)
+  }else if(market==='draw-or-gg'||sel==='draw or gg'){
+    outcome=result(h===a||(h>0&&a>0))
   }else if(market==='total-goals'){
     const p=ou(pick?.selection);if(p)outcome=result(p.side==='over'?h+a>p.line:h+a<p.line,h+a===p.line)
   }else if(market==='home-team-goals'){
