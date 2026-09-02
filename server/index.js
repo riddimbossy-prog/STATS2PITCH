@@ -6,7 +6,7 @@ import {loadBoard,listBoards,clearBoard} from './store.js'
 import {startRefresh,refreshStatus} from './refresh.js'
 import {sportyEventFixtures,sportyFixturesByDate,sportyLiveEvents} from './sportyBet.js'
 import {gismoMatches} from './sportyStats.js'
-import {normalizeFixtureStatus,resolveResult} from './settlement.js'
+import {normalizeFixtureStatus,resolveResult,fixtureForPick} from './settlement.js'
 import {buildLearningProfiles} from './learning.js'
 import {ENGINE_VERSION} from './config.js'
 import {eliteFeedAuthorized,buildEliteFeed} from './eliteExport.js'
@@ -52,7 +52,8 @@ async function resultPayload(date){
   const map=mergeLive(new Map(fixtures.map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]})),live,published)
   const stored=board.results||{}
   const pending=p=>({outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'})
-  const withResult=p=>({...p,result:resolveResult(p,map.get(String(p.fixtureId)),stored[String(p.fixtureId)])||pending(p)})
+  const indexed=[...map.values()]
+  const withResult=p=>({...p,result:resolveResult(p,fixtureForPick(p,indexed)||map.get(String(p.fixtureId)),stored[String(p.fixtureId)])||pending(p)})
   const picks=compactResultRows((board.bestPicks||[]).map(withResult))
   const varTips=compactResultRows((board.varTips||[]).map(withResult))
   const filterTips=compactResultRows((board.filterTips||[]).map(withResult))
