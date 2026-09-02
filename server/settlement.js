@@ -103,6 +103,21 @@ export function pickNameKey(p){
   return nameKey(p?.home||p?.homeName,p?.away||p?.awayName)
 }
 
+export function pickResultKey(p){
+  return `${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`
+}
+
+export function storedResultForPick(results,pick){
+  const bag=results&&typeof results==='object'?results:{}
+  const keyed=bag[pickResultKey(pick)]
+  if(keyed)return keyed
+  return bag[String(pick?.fixtureId??'')]||null
+}
+
+export function pickDecided(results,pick){
+  return isDecided(storedResultForPick(results,pick)?.outcome)
+}
+
 export function indexFixtures(fixtures=[]){
   const byId=new Map(),byName=new Map()
   for(const raw of fixtures||[]){
@@ -148,11 +163,17 @@ export function settleBoard(board,fixtures=[]){
   const prior=board?.results||{}
   const results={...prior}
   for(const pick of boardPicks(board)){
-    const key=String(pick.fixtureId),fixture=fixtureForPick(pick,index)
+    const fixture=fixtureForPick(pick,index)
     if(!fixture)continue
-    results[key]=resolveResult(pick,fixture,prior[key])
+    const pickKey=pickResultKey(pick)
+    const idKey=String(pick.fixtureId)
+    const graded=resolveResult(pick,fixture,storedResultForPick(prior,pick))
+    results[pickKey]=graded
+    const existing=results[idKey]
+    if(!existing||!isDecided(existing.outcome)||isDecided(graded.outcome))results[idKey]=graded
   }
-  const values=Object.values(results),summary={pending:0,live:0,won:0,lost:0,void:0,postponed:0}
+  const values=boardPicks(board).map(p=>storedResultForPick(results,p)).filter(Boolean)
+  const summary={pending:0,live:0,won:0,lost:0,void:0,postponed:0}
   for(const r of values){
     if(r?.outcome==='won')summary.won++
     else if(r?.outcome==='lost')summary.lost++

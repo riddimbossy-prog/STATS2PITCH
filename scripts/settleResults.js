@@ -1,7 +1,7 @@
 import {sportyEventFixtures,sportyFixturesByDate,sportyLiveEvents} from '../server/sportyBet.js'
 import {gismoMatches,teamLastX,teamVersus} from '../server/sportyStats.js'
 import {listBoards,saveBoard} from '../server/store.js'
-import {settleBoard,boardPicks,fixtureForPick,indexFixtures,pickNameKey,normalizeFixtureStatus} from '../server/settlement.js'
+import {settleBoard,boardPicks,fixtureForPick,indexFixtures,pickNameKey,pickResultKey,pickDecided,normalizeFixtureStatus} from '../server/settlement.js'
 
 const lookback=Math.max(1,Math.min(90,Number(process.env.RESULT_LOOKBACK_DAYS||45)))
 const ZONE=process.env.APP_TIMEZONE||'Africa/Accra'
@@ -21,6 +21,25 @@ function sameDay(fixture,date,kickoff){
   return Boolean(got)&&got===want
 }
 
+function shareTeamIds(picks,index){
+  const byName=new Map()
+  for(const pick of picks||[]){
+    const k=pickNameKey(pick)
+    if(!k)continue
+    const fx=fixtureForPick(pick,index)
+    const homeId=pick.homeId??fx?.teams?.home?.id??fx?.homeId??null
+    const awayId=pick.awayId??fx?.teams?.away?.id??fx?.awayId??null
+    const prev=byName.get(k)||{}
+    byName.set(k,{homeId:prev.homeId||homeId,awayId:prev.awayId||awayId})
+  }
+  for(const pick of picks||[]){
+    const ids=byName.get(pickNameKey(pick))
+    if(!ids)continue
+    if(!pick.homeId&&ids.homeId)pick.homeId=ids.homeId
+    if(!pick.awayId&&ids.awayId)pick.awayId=ids.awayId
+  }
+}
+
 async function fixturesForBoard(date,picks){
   const eventIds=picks.map(p=>p.sportyEventId||p.eventId).filter(Boolean)
   const fixtureIds=picks.map(p=>p.fixtureId).filter(id=>id!=null)
@@ -29,13 +48,19 @@ async function fixturesForBoard(date,picks){
   try{rows=rows.concat(await sportyFixturesByDate(date))}catch{}
   try{rows=rows.concat(await sportyLiveEvents())}catch{}
   let index=indexFixtures(rows)
-  const missingIds=fixtureIds.filter(id=>!index.byId.has(String(id)))
+  shareTeamIds(picks,index)
+  const missingIds=fixtureIds.filter(id=>!index.byId.has(String(id))&&!picks.some(p=>String(p.fixtureId)===String(id)&&fixtureForPick(p,index)))
   if(missingIds.length){
     try{rows=rows.concat(await gismoMatches(missingIds))}catch{}
     index=indexFixtures(rows)
+    shareTeamIds(picks,index)
   }
   const unresolved=picks.filter(p=>!fixtureForPick(p,index))
+  const tried=new Set()
   for(const pick of unresolved){
+    const name=pickNameKey(pick)||String(pick.fixtureId||'')
+    if(tried.has(name))continue
+    tried.add(name)
     try{
       let extra=[]
       if(pick.homeId&&pick.awayId)extra=await teamVersus(pick.homeId,pick.awayId)
@@ -43,9 +68,13 @@ async function fixturesForBoard(date,picks){
       if(!extra.length&&pick.awayId)extra=await teamLastX(pick.awayId,20)
       const hit=extra.find(f=>fixtureForPick(pick,[f])&&sameDay(f,date,pick.kickoff))
         ||extra.find(f=>fixtureForPick(pick,[f]))
-      if(hit)rows.push(hit)
+      if(hit){
+        rows.push(hit)
+        index=indexFixtures(rows)
+        shareTeamIds(picks,index)
+      }
     }catch(error){
-      console.warn(`${date}: name fallback ${pickNameKey(pick)||pick.fixtureId}:`,error?.message||error)
+      console.warn(`${date}: name fallback ${name}:`,error?.message||error)
     }
   }
   return rows
@@ -57,7 +86,7 @@ for(const row of rows){
   const date=row.snapshot_date,board=row.payload
   const picks=boardPicks(board)
   if(!picks.length){skipped++;continue}
-  const fullySettled=picks.every(p=>['won','lost','void','postponed'].includes(board?.results?.[String(p.fixtureId)]?.outcome))
+  const fullySettled=picks.every(p=>pickDecided(board?.results,p))
   if(fullySettled){skipped++;continue}
   try{
     const fixtures=await fixturesForBoard(date,picks)
