@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <script>
   (function(){
-    var k='s2p-sw-kill-5.15.0';
+    var k='s2p-sw-kill-5.17.0';
     try{if(sessionStorage.getItem(k)==='1')return}catch(e){}
     if(!navigator.serviceWorker){try{sessionStorage.setItem(k,'1')}catch(e){} return;}
     var had=false;
@@ -118,7 +118,7 @@
         <div class="goals-hero-num"><b id="goalsHeroCount">0</b><small>picks</small></div>
         <div class="goals-hero-copy">
           <strong>Goals Bankers <em class="v3-badge">V4</em></strong>
-          <p>One published pick per match from favourite win, favourite 2+, Over 2.5 or GG. Teams must first prove they can produce the market. Add up to three legs to a slip. Skip is a valid V4 result.</p>
+          <p>One published pick per match from favourite win, favourite 2+, Over 2.5 or GG. When no single path is clear, a combo cover — Draw or Over 2.5, Draw or Under 2.5, or Draw or GG — can publish. Either leg winning settles the pick. Combos stay off the slip.</p>
         </div>
       </section>
       <nav id="goalsMarkets" class="goals-markets" aria-label="Goals Bankers markets"></nav>
@@ -181,10 +181,10 @@
     </a>
   </nav>
   <script src="/runtime-config.js"></script>
-  <link rel="modulepreload" href="/net.js?v=5.7.0">
-  <link rel="modulepreload" href="/goalsBankers.js?v=5.12.0">
+  <link rel="modulepreload" href="/net.js?v=5.17.0">
+  <link rel="modulepreload" href="/goalsBankers.js?v=5.17.0">
   <script src="/leagueFlags.js?v=5.7.0"></script>
-  <script type="module" src="/goalsBankers.js?v=5.12.0"></script>
-  <script src="/pwa.js?v=5.15.0"></script>
+  <script type="module" src="/goalsBankers.js?v=5.17.0"></script>
+  <script src="/pwa.js?v=5.17.0"></script>
 </body>
 </html>
