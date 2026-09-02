@@ -57,3 +57,4 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RESULT_LOOKBACK_DAYS: "45"
           SPORTYBET_COUNTRY: "gh"
+          APP_TIMEZONE: "Africa/Accra"

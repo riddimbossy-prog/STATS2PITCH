@@ -86,6 +86,43 @@ export function resolveResult(pick,fixture,stored){
   return live||stored||{outcome:'pending',matchState:Date.parse(pick?.kickoff)>Date.now()?'upcoming':'pending'}
 }
 
+export function nameKey(home,away){
+  const n=s=>String(s??'').toLowerCase().replace(/[^a-z0-9]+/g,'')
+  const a=n(home),b=n(away)
+  return a&&b?`${a}|${b}`:''
+}
+
+export function fixtureNameKey(f){
+  return nameKey(
+    f?.homeName||f?.home?.name||f?.teams?.home?.name,
+    f?.awayName||f?.away?.name||f?.teams?.away?.name
+  )
+}
+
+export function pickNameKey(p){
+  return nameKey(p?.home||p?.homeName,p?.away||p?.awayName)
+}
+
+export function indexFixtures(fixtures=[]){
+  const byId=new Map(),byName=new Map()
+  for(const raw of fixtures||[]){
+    const n=raw?.matchState?raw:normalizeFixtureStatus(raw)
+    const id=String(n.fixtureId??raw?.fixture?.id??raw?.fixtureId??'')
+    if(id&&id!=='undefined'&&id!=='null')byId.set(id,raw)
+    const k=fixtureNameKey(n)||fixtureNameKey(raw)
+    if(k)byName.set(k,raw)
+  }
+  return{byId,byName}
+}
+
+export function fixtureForPick(pick,fixtures){
+  const index=Array.isArray(fixtures)?indexFixtures(fixtures):fixtures
+  const id=String(pick?.fixtureId??'')
+  if(id&&index.byId.has(id))return index.byId.get(id)
+  const k=pickNameKey(pick)
+  return k?index.byName.get(k)||null:null
+}
+
 export function boardPicks(board){
   const seen=new Set(),out=[]
   for(const pick of [
@@ -107,11 +144,11 @@ export function boardPicks(board){
 }
 
 export function settleBoard(board,fixtures=[]){
-  const map=new Map((fixtures||[]).map(f=>{const n=normalizeFixtureStatus(f);return[String(n.fixtureId),n]}))
+  const index=indexFixtures(fixtures)
   const prior=board?.results||{}
   const results={...prior}
   for(const pick of boardPicks(board)){
-    const key=String(pick.fixtureId),fixture=map.get(key)
+    const key=String(pick.fixtureId),fixture=fixtureForPick(pick,index)
     if(!fixture)continue
     results[key]=resolveResult(pick,fixture,prior[key])
   }

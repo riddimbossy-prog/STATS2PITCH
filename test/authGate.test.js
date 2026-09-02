@@ -15,8 +15,8 @@ test('sign-in of a new member switches to sign up with email and password kept',
   assert.match(gate,/No account for this email yet/)
   assert.match(gate,/invalid login credentials/)
   assert.match(gate,/\{email,password\}/)
-  assert.match(gate,/draft\.email\)emailEl\.value=draft\.email/)
-  assert.match(gate,/draft\.password\)passEl\.value=draft\.password/)
+  assert.match(gate,/draft\.email\)emailEl\.value=draft.email/)
+  assert.match(gate,/draft\.password\)passEl\.value=draft.password/)
   assert.match(gate,/signup\?'Sign up':'Sign in'/)
   assert.match(gate,/readDraft\(host\)/)
 })
@@ -47,6 +47,14 @@ test('successful sign-in opens the boards even if /me cannot be confirmed',()=>{
   assert.doesNotMatch(gate,/await finishAuth/)
   assert.match(net,/keepSession/)
   assert.match(net,/credentials:'omit'/)
+})
+
+test('Results page loads the same sign-in gate as All Picks',async()=>{
+  const html=await readFile(new URL('../public/results.html',import.meta.url),'utf8')
+  const home=await readFile(new URL('../public/index.html',import.meta.url),'utf8')
+  assert.match(html,/gate\.js\?v=5\.15\.0/)
+  assert.match(html,/auth\.css\?v=5\.15\.0/)
+  assert.match(home,/gate\.js\?v=5\.15\.0/)
 })
 
 test('service worker self-destructs so iPhone sign-in is not cached stale',()=>{

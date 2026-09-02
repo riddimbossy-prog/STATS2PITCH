@@ -24,6 +24,14 @@ test('board settlement produces summary',()=>{
   assert.equal(settleBoard(board,[raw]).resultSummary.won,1)
 })
 
+test('board settlement matches finished fixtures by team names when ids differ',()=>{
+  const board={bestPicks:[{fixtureId:999,home:'Home FC',away:'Away FC',market:'match-winner',selection:'Home'}]}
+  const raw={fixture:{id:1517328,status:{short:'FT'}},teams:{home:{name:'Home FC'},away:{name:'Away FC'}},goals:{home:2,away:0},score:{fulltime:{home:2,away:0}}}
+  const next=settleBoard(board,[raw])
+  assert.equal(next.results['999'].outcome,'won')
+  assert.equal(next.results['999'].homeScore,2)
+})
+
 test('safest Daily Bankers settle even when dailyBankers is empty',()=>{
   const board={
     safestBankers:[{fixtureId:14,market:'both-teams-score',selection:'Yes'}],
