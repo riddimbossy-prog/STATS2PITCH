@@ -99,9 +99,8 @@ function showAuth(mode='login',message='',draft={}){
       takeSession(data)
       await finishAuth()
     }catch(ex){
-      if(!signup && (ex.code==='new_user'||/no account/i.test(ex.message||'')) && allowSignup){
+      if(!signup && allowSignup && (ex.code==='new_user'||/no account|invalid login credentials/i.test(ex.message||''))){
         showAuth('signup','No account for this email yet. Sign up to open the boards.',{email,password})
-        host.querySelector('#s2pAuthSubmit')?.focus()
         return
       }
       if(signup && (ex.code==='exists'||/already has an account/i.test(ex.message||''))){

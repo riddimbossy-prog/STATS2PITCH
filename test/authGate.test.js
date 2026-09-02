@@ -10,6 +10,7 @@ test('sign-in of a new member switches to sign up with email and password kept',
   assert.match(gate,/ex\.code==='new_user'/)
   assert.match(gate,/showAuth\('signup'/)
   assert.match(gate,/No account for this email yet/)
+  assert.match(gate,/invalid login credentials/)
   assert.match(gate,/\{email,password\}/)
   assert.match(gate,/draft\.email\)emailEl\.value=draft\.email/)
   assert.match(gate,/draft\.password\)passEl\.value=draft\.password/)
