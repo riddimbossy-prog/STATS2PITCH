@@ -2,7 +2,7 @@ let deferredInstall=null
 const button=document.getElementById('installApp')
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;if(button)button.hidden=false})
 button?.addEventListener('click',async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;button.hidden=true})
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js?v=5.13.1').catch(()=>{}))
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js?v=5.13.2').catch(()=>{}))
 
 const root=document.documentElement
 let scrollNavTimer=null
@@ -42,3 +42,20 @@ if(nav){
   nav.addEventListener('click',blockNavNav,true)
   nav.addEventListener('touchend',blockNavNav,true)
 }
+
+;(function bootAuthGate(){
+  if(document.querySelector('script[data-s2p-gate]'))return
+  if(!document.querySelector('link[href*="auth.css"]')){
+    const link=document.createElement('link')
+    link.rel='stylesheet'
+    link.href='/auth.css?v=5.13.2'
+    document.head.appendChild(link)
+  }
+  if(!document.querySelector('script[src*="gate.js"]')){
+    const s=document.createElement('script')
+    s.type='module'
+    s.src='/gate.js?v=5.13.2'
+    s.dataset.s2pGate='1'
+    document.head.appendChild(s)
+  }
+})()

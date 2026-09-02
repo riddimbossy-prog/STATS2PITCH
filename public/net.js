@@ -29,9 +29,10 @@ export function endpoint(path){
   return `${base}/functions/v1/${fn}${path}`
 }
 
+if(getToken())releaseAuth()
+
 export async function api(path,options={}){
   const {cache='no-store',skipAuthWait=false,...rest}=options
-  if(!skipAuthWait)await whenAuthed
   const token=getToken()
   const res=await fetch(endpoint(path),{
     ...rest,
