@@ -49,13 +49,14 @@ test('successful sign-in opens the boards even if /me cannot be confirmed',()=>{
   assert.match(net,/credentials:'omit'/)
 })
 
-test('service worker does not proxy Supabase or auth scripts',()=>{
-  assert.match(sw,/u\.origin!==self\.location\.origin/)
+test('service worker self-destructs so iPhone sign-in is not cached stale',()=>{
+  assert.match(sw,/stats2pitch-shell-v5\.15\.0/)
+  assert.match(sw,/registration\.unregister/)
+  assert.match(sw,/clients\.map\(c=>c\.navigate/)
+  assert.doesNotMatch(sw,/addEventListener\('fetch'/)
   assert.doesNotMatch(sw,/functions\/v1/)
-  assert.match(sw,/stats2pitch-shell-v5\.14\.0/)
-  assert.match(sw,/LIVE=/)
-  assert.match(sw,/runtime-config/)
-  assert.match(pwa,/updateViaCache:'none'/)
+  assert.match(pwa,/s2p-sw-kill-/)
   assert.match(pwa,/unregister\(\)/)
-  assert.match(pwa,/v=5\.14\.0/)
+  assert.doesNotMatch(pwa,/serviceWorker\.register/)
+  assert.match(pwa,/v=5\.15\.0/)
 })

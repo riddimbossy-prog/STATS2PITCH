@@ -1,36 +1,27 @@
 let deferredInstall=null
 const button=document.getElementById('installApp')
-const SW_VER='5.14.0'
+const SW_VER='5.15.0'
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;if(button)button.hidden=false})
 button?.addEventListener('click',async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;button.hidden=true})
 
-;(function refreshWorker(){
-  if(!('serviceWorker'in navigator))return
-  const flag='s2p-sw-'+SW_VER
-  const go=async()=>{
+;(function killWorker(){
+  const flag='s2p-sw-kill-'+SW_VER
+  const run=async()=>{
     try{
       if(window.caches){
         const keys=await caches.keys()
-        await Promise.all(keys.filter(k=>k!=='stats2pitch-shell-v'+SW_VER).map(k=>caches.delete(k)))
+        await Promise.all(keys.map(k=>caches.delete(k)))
       }
+      if(!('serviceWorker'in navigator))return
       const regs=await navigator.serviceWorker.getRegistrations()
-      let stale=false
-      for(const r of regs){
-        const url=(r.active&&r.active.scriptURL)||(r.waiting&&r.waiting.scriptURL)||(r.installing&&r.installing.scriptURL)||''
-        if(!String(url).includes('v='+SW_VER)){
-          stale=true
-          await r.unregister()
-        }
-      }
-      const reg=await navigator.serviceWorker.register('/sw.js?v='+SW_VER,{updateViaCache:'none'})
-      if(reg.waiting)reg.waiting.postMessage('SKIP_WAITING')
-      if(stale&&sessionStorage.getItem(flag)!=='1'){
+      await Promise.all(regs.map(r=>r.unregister()))
+      if(regs.length&&sessionStorage.getItem(flag)!=='1'){
         sessionStorage.setItem(flag,'1')
         location.reload()
       }
     }catch{}
   }
-  go()
+  run()
 })()
 
 const root=document.documentElement
@@ -77,13 +68,13 @@ if(nav){
   if(!document.querySelector('link[href*="auth.css"]')){
     const link=document.createElement('link')
     link.rel='stylesheet'
-    link.href='/auth.css?v=5.14.0'
+    link.href='/auth.css?v=5.15.0'
     document.head.appendChild(link)
   }
   if(!document.querySelector('script[src*="gate.js"]')){
     const s=document.createElement('script')
     s.type='module'
-    s.src='/gate.js?v=5.14.0'
+    s.src='/gate.js?v=5.15.0'
     s.dataset.s2pGate='1'
     document.head.appendChild(s)
   }

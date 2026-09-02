@@ -2,6 +2,23 @@
 <html lang="en" class="s2p-booting">
 <head>
   <meta charset="utf-8">
+  <script>
+  (function(){
+    var k='s2p-sw-kill-5.15.0';
+    try{if(sessionStorage.getItem(k)==='1')return}catch(e){}
+    if(!navigator.serviceWorker){try{sessionStorage.setItem(k,'1')}catch(e){} return;}
+    var had=false;
+    navigator.serviceWorker.getRegistrations().then(function(rs){
+      had=rs.length>0;
+      var jobs=rs.map(function(r){return r.unregister()});
+      if(window.caches)jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(x){return caches.delete(x)}))}));
+      return Promise.all(jobs);
+    }).then(function(){
+      try{sessionStorage.setItem(k,'1')}catch(e){}
+      if(had)location.reload();
+    }).catch(function(){});
+  })();
+  </script>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0b">
   <title>Stats2Pitch</title>
@@ -143,13 +160,13 @@
       <span>Results</span>
     </a>
   </nav>
-  <link rel="stylesheet" href="/auth.css?v=5.14.0">
+  <link rel="stylesheet" href="/auth.css?v=5.15.0">
   <script src="/runtime-config.js"></script>
-  <script type="module" src="/gate.js?v=5.14.0"></script>
-  <link rel="modulepreload" href="/net.js?v=5.14.0">
+  <script type="module" src="/gate.js?v=5.15.0"></script>
+  <link rel="modulepreload" href="/net.js?v=5.15.0">
   <link rel="modulepreload" href="/appCrests.js?v=5.12.0">
   <script src="/leagueFlags.js?v=5.7.0"></script>
   <script type="module" src="/appCrests.js?v=5.12.0"></script>
-  <script src="/pwa.js?v=5.14.0"></script>
+  <script src="/pwa.js?v=5.15.0"></script>
 </body>
 </html>

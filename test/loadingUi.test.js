@@ -13,8 +13,8 @@ test('v4 uses skeleton loading and installable PWA shell',async()=>{
   assert.match(app,/class=\\?"card skeleton/)
   assert.match(app,/setInterval\(async\(\)=>/)
   assert.match(pwa,/beforeinstallprompt/)
-  assert.match(pwa,/serviceWorker\.register/)
-  assert.match(sw,/stats2pitch-shell-v5/)
+  assert.match(pwa,/serviceWorker/)
+  assert.match(sw,/registration\.unregister/)
   await access(new URL('../public/offline.html',import.meta.url))
 })
 
