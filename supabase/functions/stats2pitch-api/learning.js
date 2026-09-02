@@ -216,7 +216,8 @@ function decideAction(g) {
   const n7 = g.last7
   const lossStreak = g.lossStreak
   const kind = g.kind
-  const canDrop = kind === 'filter-route' || kind === 'profile' || kind === 'country-market' || kind === 'country'
+  const isFilter = kind === 'filter-route'
+  const canDrop = isFilter || kind === 'profile' || kind === 'country-market' || kind === 'country'
   if (kind === 'board' || kind === 'market' || kind === 'board-market') {
     if (n >= 12 && wr < 55) return 'tighten'
     if (n >= 10 && wr >= 74) return 'boost'
@@ -227,6 +228,13 @@ function decideAction(g) {
     if (n >= 10 && wr < 56) return 'tighten'
     if (n >= 10 && wr >= 74) return 'boost'
     return n >= 8 ? 'keep' : 'watch'
+  }
+  if (isFilter) {
+    if ((lossStreak >= 3 && n >= 3) || (n7 >= 4 && last7 < 42) || (n >= 8 && wr < 48) || (n >= 18 && wr < 52)) return 'drop'
+    if (lossStreak >= 2 || (n7 >= 3 && last7 < 55) || (n >= 5 && wr < 60) || (n >= 16 && wr < 62)) return 'tighten'
+    if (n >= 8 && wr >= 74 && (n7 < 3 || last7 >= 65)) return 'boost'
+    if (n >= 5 && wr >= 62) return 'keep'
+    return 'watch'
   }
   if (canDrop && ((lossStreak >= 4 && n >= 4) || (n7 >= 4 && last7 < 40) || (n >= 8 && wr < 48) || (n >= 18 && wr < 52))) return 'drop'
   if (lossStreak >= 3 || (n7 >= 3 && last7 < 50) || (n >= 6 && wr < 58) || (n >= 16 && wr < 62)) return 'tighten'
@@ -240,7 +248,7 @@ function actionNote(g) {
   const rate = `${g.winRate}%`
   const recent = g.last7 ? ` Last 7 days: ${g.last7Wins}W / ${g.last7Losses}L.` : ''
   if (g.action === 'drop') {
-    if (g.lossStreak >= 4) return `Overnight: ${g.label} was taken off after ${g.lossStreak} straight losses (${rec}, ${rate}).`
+    if (g.lossStreak >= 3) return `Overnight: ${g.label} was taken off after ${g.lossStreak} straight losses (${rec}, ${rate}).`
     return `Overnight: ${g.label} was dropped after ${rec} (${rate}). Recent misses are too heavy.${recent}`
   }
   if (g.action === 'tighten') {

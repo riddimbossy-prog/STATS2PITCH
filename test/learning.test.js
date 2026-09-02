@@ -66,6 +66,37 @@ test('a filter that keeps losing is dropped overnight', () => {
   assert.match(route.note, /Overnight:|dropped|taken off/i)
 })
 
+test('three straight filter losses are enough to drop that route', () => {
+  const boards = []
+  for (let i = 1; i <= 3; i++) {
+    boards.push(board(`2026-08-2${i}`, [filterPick(i, 'over-25')], {[i]: 'lost'}))
+  }
+  const state = buildLearningState(boards, '2026-08-24', 3)
+  const route = state.profiles.find(p => p.kind === 'filter-route')
+  assert.ok(route)
+  assert.equal(route.action, 'drop')
+  const verdict = learningAllows(filterPick(99, 'over-25'), state, {board: 'filter'})
+  assert.equal(verdict.allowed, false)
+  assert.equal(verdict.action, 'drop')
+})
+
+test('two straight filter misses tighten instead of dropping', () => {
+  const boards = []
+  for (let i = 1; i <= 6; i++) {
+    const date = `2026-08-${String(18 + i).padStart(2, '0')}`
+    const outcome = i >= 5 ? 'lost' : 'won'
+    boards.push(board(date, [filterPick(i, 'gg')], {[i]: outcome}))
+  }
+  const state = buildLearningState(boards, '2026-08-25', 3)
+  const route = state.profiles.find(p => p.kind === 'filter-route')
+  assert.equal(route.action, 'tighten')
+  const weak = learningAllows(filterPick(50, 'gg', {rawFilterScore: 71, consensus: 70, homeConsensus: 70, awayConsensus: 70}), state, {board: 'filter', tightenMinScore: 82})
+  const strong = learningAllows(filterPick(51, 'gg', {rawFilterScore: 90}), state, {board: 'filter', tightenMinScore: 82})
+  assert.equal(weak.allowed, false)
+  assert.equal(strong.allowed, true)
+  assert.equal(strong.action, 'tighten')
+})
+
 test('a hitting filter stays on the board', () => {
   const boards = []
   for (let i = 1; i <= 10; i++) {
