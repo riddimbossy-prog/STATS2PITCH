@@ -423,7 +423,7 @@ function actionOwner(matches, hasRoute) {
     || null
 }
 
-export function learningAllows(pick, profiles = [], opts = {}) {
+export function learningAllows(pick, profiles, opts = {}) {
   const state = asState(profiles)
   const board = opts.board || null
   const matches = matchingDimensions(pick, state, board)
@@ -508,7 +508,7 @@ export function stampLearning(pick, verdict) {
   }
 }
 
-export function applyLearningToRows(rows = [], profiles = [], opts = {}) {
+export function applyLearningToRows(rows = [], profiles, opts = {}) {
   const out = []
   for (const pick of rows || []) {
     const verdict = learningAllows(pick, profiles, opts)
