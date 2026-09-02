@@ -41,7 +41,9 @@ export async function api(path,options={}){
       Authorization:`Bearer ${token||anon}`,
       ...(rest.headers||{})
     },
-    cache
+    cache,
+    credentials:'omit',
+    mode:'cors'
   })
   const body=await res.json().catch(()=>null)
   if(res.status===401){

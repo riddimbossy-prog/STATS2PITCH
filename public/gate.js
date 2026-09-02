@@ -21,25 +21,70 @@ function emailFromToken(token){
 
 function friendlyAuthError(message){
   const text=String(message||'')
-  if(/unable to load this right now|failed to fetch|networkerror|load failed|offline/i.test(text)){
+  if(/unable to load this right now|failed to fetch|networkerror|load failed|offline|abort/i.test(text)){
     return 'Connection glitch. Check your signal and try again.'
   }
   return text||'Unable to sign in right now'
 }
 
-async function authCall(path,body){
-  const res=await fetch(authUrl(path),{
-    method:'POST',
-    headers:{apikey:anon,'Content-Type':'application/json'},
-    body:JSON.stringify(body)
-  })
-  const data=await res.json().catch(()=>({}))
-  if(!res.ok){
-    const err=new Error(data?.error||data?.msg||data?.message||'Unable to sign in right now')
-    err.code=data?.code||''
-    throw err
+function isNetworkFailure(error){
+  const text=String(error?.message||error||'')
+  return /failed to fetch|networkerror|load failed|offline|abort|unable to load this right now/i.test(text)
+}
+
+async function rawFetch(url,body){
+  const ctrl=typeof AbortController==='function'?new AbortController():null
+  const timer=ctrl?setTimeout(()=>ctrl.abort(),12000):null
+  try{
+    return await fetch(url,{
+      method:'POST',
+      headers:{apikey:anon,'Content-Type':'application/json'},
+      body:JSON.stringify(body),
+      cache:'no-store',
+      credentials:'omit',
+      mode:'cors',
+      signal:ctrl?.signal
+    })
+  }finally{
+    if(timer)clearTimeout(timer)
   }
+}
+
+function throwAuth(data,status){
+  const err=new Error(data?.error||data?.msg||data?.message||data?.error_description||'Unable to sign in right now')
+  err.code=data?.code||data?.error_code||''
+  err.status=status
+  throw err
+}
+
+async function parseAuth(res){
+  const data=await res.json().catch(()=>({}))
+  if(!res.ok)throwAuth(data,res.status)
   return data
+}
+
+async function directGrant(body){
+  if(body?.email&&body?.password){
+    return parseAuth(await rawFetch(`${base}/auth/v1/token?grant_type=password`,{email:body.email,password:body.password}))
+  }
+  if(body?.refresh_token){
+    return parseAuth(await rawFetch(`${base}/auth/v1/token?grant_type=refresh_token`,{refresh_token:body.refresh_token}))
+  }
+  throw new Error('Unable to sign in right now')
+}
+
+async function authCall(path,body){
+  try{
+    return await parseAuth(await rawFetch(authUrl(path),body))
+  }catch(error){
+    if(path==='/signup')throw error
+    if(!isNetworkFailure(error)&&error.status&&error.status<500)throw error
+    try{
+      return await directGrant(body)
+    }catch(fallback){
+      throw isNetworkFailure(error)?fallback:error
+    }
+  }
 }
 
 function takeSession(data){
@@ -114,8 +159,12 @@ function showAuth(mode='login',message='',draft={}){
     try{
       const data=await authCall(signup?'/signup':'/login',{email,password})
       takeSession(data)
-      await finishAuth(email)
+      finishAuth(email)
     }catch(ex){
+      if(getToken()){
+        finishAuth(email)
+        return
+      }
       if(!signup && allowSignup && (ex.code==='new_user'||/no account|invalid login credentials/i.test(ex.message||''))){
         showAuth('signup','No account for this email yet. Sign up to open the boards.',{email,password})
         return
@@ -179,21 +228,30 @@ async function readMe(){
   return ''
 }
 
-async function finishAuth(fallbackEmail=''){
-  let email=fallbackEmail||sessionStorage.getItem('s2p_email')||emailFromToken(getToken())
-  let me=await readMe()
-  if(!me && getToken()){
-    if(await refreshIfNeeded())me=await readMe()
-  }
-  if(me)email=me
+function openBoards(email=''){
   if(email)sessionStorage.setItem('s2p_email',email)
+  hideAuth()
+  bindAccount()
+  releaseAuth()
+}
+
+function finishAuth(fallbackEmail=''){
   if(!getToken()){
     showAuth('login','Please sign in again.')
     return
   }
-  hideAuth()
-  bindAccount()
-  releaseAuth()
+  const email=fallbackEmail||sessionStorage.getItem('s2p_email')||emailFromToken(getToken())
+  openBoards(email)
+  readMe().then(async me=>{
+    if(me){
+      sessionStorage.setItem('s2p_email',me)
+      return
+    }
+    if(await refreshIfNeeded()){
+      const again=await readMe()
+      if(again)sessionStorage.setItem('s2p_email',again)
+    }
+  }).catch(()=>{})
 }
 
 async function start(){
@@ -202,7 +260,7 @@ async function start(){
     return
   }
   if(getToken()){
-    await finishAuth()
+    finishAuth()
     return
   }
   showAuth('login')
