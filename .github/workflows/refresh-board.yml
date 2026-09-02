@@ -32,6 +32,16 @@ jobs:
         run: |
           test -n "$SUPABASE_URL" || (echo "Missing SUPABASE_URL" && exit 1)
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "Missing SUPABASE_SERVICE_ROLE_KEY" && exit 1)
+
+      - name: Settle published picks
+        run: npm run settle
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESULT_LOOKBACK_DAYS: "45"
+          SPORTYBET_COUNTRY: "gh"
+          APP_TIMEZONE: "Africa/Accra"
+
       - name: Generate fresh Stats2Pitch boards
         run: npm run refresh
         env:
@@ -49,12 +59,3 @@ jobs:
           SPORTYBET_TIMELINE: "192"
           SPORTY_LASTX: "40"
           BOARD_DAY_PAUSE_MS: "800"
-
-      - name: Settle published picks
-        run: npm run settle
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          RESULT_LOOKBACK_DAYS: "45"
-          SPORTYBET_COUNTRY: "gh"
-          APP_TIMEZONE: "Africa/Accra"
