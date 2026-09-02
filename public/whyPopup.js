@@ -1,6 +1,6 @@
 const fallbackEsc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
-const GOAL_ROUTES=['FAV_WIN','FAV_2PLUS','OVER_2.5','GG']
-const GOAL_LABELS={FAV_WIN:'Favourite win',FAV_2PLUS:'Favourite 2+','OVER_2.5':'Over 2.5',GG:'GG'}
+const GOAL_ROUTES=['FAV_WIN','FAV_2PLUS','OVER_2.5','GG','DRAW_OR_OVER_25','DRAW_OR_UNDER_25','DRAW_OR_GG']
+const GOAL_LABELS={FAV_WIN:'Favourite win',FAV_2PLUS:'Favourite 2+','OVER_2.5':'Over 2.5',GG:'GG',DRAW_OR_OVER_25:'Draw or Over 2.5',DRAW_OR_UNDER_25:'Draw or Under 2.5',DRAW_OR_GG:'Draw or GG'}
 
 function shortDate(v){
   const d=new Date(v)
@@ -122,6 +122,9 @@ function chosenHeadline(route,fav,price,type){
     if(type==='BALANCED'||type==='LEAN')return`Both teams to score${at} is the published Goals Banker. This is ${shape}, so favourite win and favourite 2+ are not used. GG is the both-teams market that qualified.`
     return`Both teams to score${at} is the published Goals Banker. Both sides are priced to get on the scoresheet, so GG beats a favourite-side call.`
   }
+  if(route==='DRAW_OR_OVER_25')return`Draw or Over 2.5${at} is the published combo. No single Goals path separated, so the pick wins on a draw or on 3+ goals.`
+  if(route==='DRAW_OR_UNDER_25')return`Draw or Under 2.5${at} is the published combo. No single Goals path separated, so the pick wins on a draw or on 2 goals or fewer.`
+  if(route==='DRAW_OR_GG')return`Draw or GG${at} is the published combo. No single Goals path separated — if a side contributes a goal the GG leg lands; if nobody breaks through, the draw still wins.`
   return''
 }
 
@@ -155,9 +158,8 @@ function passedReason(chosen,other,fav,prices,type){
 
 export function goalsMarketWhy(pick){
   const route=String(pick?.route||'')
-  if(!GOAL_ROUTES.includes(route))return null
-  if(pick?.engine&&pick.engine!=='goals-bankers-v1'&&pick.engine!=='goals-bankers-v3')return null
   if(pick?.marketWhy?.headline&&Array.isArray(pick.marketWhy.passed))return pick.marketWhy
+  if(!GOAL_ROUTES.includes(route))return null
   const book=pick?.oddsBook||{}
   const prices={FAV_WIN:px(book.fav_odds),FAV_2PLUS:px(book.fav_2plus),'OVER_2.5':px(book.over25),GG:px(book.btts_yes)}
   const fav=pick?.favourite==='home'?pick.home:pick?.favourite==='away'?pick.away:(pick?.home||'the favourite')
