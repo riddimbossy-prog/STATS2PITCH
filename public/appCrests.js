@@ -104,7 +104,10 @@ function learningDesk(){
 }
 function learningList(items,tone){
   if(!items?.length)return`<p class="perf-empty-note">Nothing in this bucket yet.</p>`
-  return`<ul>${items.map(r=>`<li><strong>${esc(r.label||'Profile')}</strong><span>${Number(r.winRate||0).toFixed(1)}% · ${r.wins||0}W / ${r.losses||0}L · ${esc(r.note||'')}</span></li>`).join('')}</ul>`
+  return`<ul>${items.map(r=>{
+    const form=Array.isArray(r.form)&&r.form.length?`<span class="learn-form" aria-label="recent form">${r.form.map(x=>`<i class="${x==='W'?'w':'l'}">${x}</i>`).join('')}</span>`:''
+    return`<li><strong>${esc(r.label||'Profile')}</strong>${form}<span>${Number(r.winRate||0).toFixed(1)}% · ${r.wins||0}W / ${r.losses||0}L · ${esc(r.note||'')}</span></li>`
+  }).join('')}</ul>`
 }
 function renderLearningDesk(){
   const host=$('#learningDesk')

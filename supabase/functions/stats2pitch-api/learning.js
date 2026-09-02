@@ -252,6 +252,13 @@ function actionNote(g) {
   return `${g.label} is still sampling — ${rec} so far.`
 }
 
+function formLine(results = []) {
+  return [...results]
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .slice(-8)
+    .map(r => r.outcome === 'won' ? 'W' : 'L')
+}
+
 function finalizeGroup(g) {
   const decided = g.wins + g.losses
   const rawRate = decided ? round1(g.wins * 100 / decided) : 0
@@ -262,6 +269,7 @@ function finalizeGroup(g) {
   const next = {
     ...g,
     results: undefined,
+    form: formLine(g.results),
     winRate: recencyWinRate,
     rawWinRate: rawRate,
     recencyWinRate,
@@ -400,36 +408,45 @@ export function meetsTighten(pick, opts = {}) {
   return false
 }
 
+const COARSE_KIND = Object.freeze(new Set(['board', 'market', 'board-market']))
+const DESK_KIND = Object.freeze(new Set(['filter-route', 'profile', 'country-market']))
+
+function isCoarse(kind) {
+  return COARSE_KIND.has(kind)
+}
+
+function actionOwner(matches, hasRoute) {
+  if (!matches.length) return null
+  if (hasRoute) return matches.find(m => m.kind === 'filter-route') || null
+  return matches.find(m => m.kind === 'profile' || m.kind === 'country-market')
+    || matches.find(m => !isCoarse(m.kind))
+    || null
+}
+
 export function learningAllows(pick, profiles = [], opts = {}) {
   const state = asState(profiles)
   const board = opts.board || null
   const matches = matchingDimensions(pick, state, board)
   const hasRoute = !!norm(pickRoute(pick))
-  const drops = matches.filter(m => m.action === 'drop')
-  for (const drop of drops) {
-    if (hasRoute && drop.kind !== 'filter-route') continue
-    if (drop.kind === 'filter-route') {
-      const droppedRoute = norm(drop.route || String(drop.key).split('|').pop())
-      if (norm(pickRoute(pick)) && droppedRoute && droppedRoute !== norm(pickRoute(pick))) continue
-    }
-    return {allowed: false, action: 'drop', gate: 'skip', profile: drop, note: drop.note, matches}
+  const owner = actionOwner(matches, hasRoute)
+
+  if (owner?.action === 'drop') {
+    return {allowed: false, action: 'drop', gate: 'skip', profile: owner, note: owner.note, matches}
   }
-  const tighten = matches.find(m => m.action === 'tighten')
-  if (tighten) {
+
+  if (owner?.action === 'tighten') {
     if (opts.enforceTighten !== false && !meetsTighten(pick, opts)) {
-      return {allowed: false, action: 'tighten', gate: '100-only', profile: tighten, note: tighten.note, matches}
+      return {allowed: false, action: 'tighten', gate: '100-only', profile: owner, note: owner.note, matches}
     }
-    return {allowed: true, action: 'tighten', gate: '100-only', profile: tighten, note: tighten.note, matches}
+    return {allowed: true, action: 'tighten', gate: '100-only', profile: owner, note: owner.note, matches}
   }
-  const boost = matches.find(m => m.action === 'boost')
-  const keep = matches.find(m => m.action === 'keep')
-  const primary = boost || keep || matches[0] || null
+
   return {
     allowed: true,
-    action: primary?.action || 'watch',
-    gate: primary?.gate || 'standard',
-    profile: primary,
-    note: primary?.note || '',
+    action: owner?.action || 'watch',
+    gate: owner?.gate || ACTION_GATE[owner?.action] || 'standard',
+    profile: owner || null,
+    note: owner?.note || '',
     matches
   }
 }
@@ -447,6 +464,7 @@ function slimMatch(row) {
     losses: row.losses,
     winRate: row.winRate,
     lossStreak: row.lossStreak,
+    form: row.form || [],
     note: row.note
   }
 }
@@ -458,7 +476,7 @@ export function stampLearning(pick, verdict) {
   const reasons = Array.isArray(pick.reasons) ? [...pick.reasons] : []
   if (note && !reasons.includes(note)) reasons.unshift(note)
   const extras = (verdict.matches || [])
-    .filter(m => m && m !== verdict.profile && (m.action === 'keep' || m.action === 'boost' || m.action === 'tighten'))
+    .filter(m => m && m !== verdict.profile && !isCoarse(m.kind) && (m.action === 'keep' || m.action === 'boost'))
     .slice(0, 2)
   for (const extra of extras) {
     if (extra.note && !reasons.includes(extra.note)) reasons.push(extra.note)
@@ -502,14 +520,30 @@ export function applyLearningToRows(rows = [], profiles = [], opts = {}) {
 
 export function publicLearning(state) {
   const s = asState(state)
-  const take = (rows, n = 8) => (rows || []).slice(0, n).map(slimMatch)
+  const prefer = rows => {
+    const list = rows || []
+    const specific = list.filter(p => DESK_KIND.has(p.kind))
+    return specific.length ? specific : list
+  }
+  const take = (rows, n = 8) => prefer(rows).slice(0, n).map(slimMatch)
+  const drop = prefer(s.adjustments?.drop)
+  const tighten = prefer(s.adjustments?.tighten)
+  const keep = prefer(s.adjustments?.keep)
+  const boost = prefer(s.adjustments?.boost)
+  const watch = prefer(s.adjustments?.watch)
   return {
     asOf: s.asOf,
     generatedAt: s.generatedAt,
-    summary: s.summary || {},
-    drop: take(s.adjustments?.drop, 10),
-    tighten: take(s.adjustments?.tighten, 10),
-    keep: take(s.adjustments?.keep, 8),
-    boost: take(s.adjustments?.boost, 8)
+    summary: {
+      dropped: drop.length,
+      tightened: tighten.length,
+      kept: keep.length,
+      boosted: boost.length,
+      watching: watch.length
+    },
+    drop: take(drop, 10),
+    tighten: take(tighten, 10),
+    keep: take(keep, 8),
+    boost: take(boost, 8)
   }
 }

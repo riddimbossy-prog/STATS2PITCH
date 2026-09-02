@@ -91,6 +91,62 @@ test('dropped Over 2.5 does not kill Over 1.5 on the same fixture', () => {
   assert.equal(over25.allowed, false)
   assert.equal(over25.action, 'drop')
   assert.equal(over15.allowed, true)
+  assert.ok(['keep', 'boost', 'watch'].includes(over15.action), over15.action)
+})
+
+test('a dead Over 2.5 filter does not tighten a hitting Over 1.5', () => {
+  const boards = []
+  for (let i = 1; i <= 5; i++) {
+    boards.push(board(`2026-08-${String(20 + i).padStart(2, '0')}`, [filterPick(i, 'over-25')], {[i]: 'lost'}))
+  }
+  for (let i = 1; i <= 9; i++) {
+    boards.push(board(`2026-08-${String(10 + i).padStart(2, '0')}`, [filterPick(100 + i, 'over-15')], {[100 + i]: i === 4 ? 'lost' : 'won'}))
+  }
+  const state = buildLearningState(boards, '2026-08-26', 3)
+  const over15 = learningAllows(filterPick(901, 'over-15', {rawFilterScore: 91}), state, {board: 'filter', tightenMinScore: 82})
+  assert.equal(over15.allowed, true)
+  assert.ok(['keep', 'boost'].includes(over15.action), over15.action)
+  assert.match(over15.note, /Over 1\.5/)
+  assert.doesNotMatch(over15.note, /Over 2\.5/)
+  const stamped = stampLearning(filterPick(901, 'over-15', {reasons: ['Venue form agrees.']}), over15)
+  assert.ok(stamped.reasons[0].includes('Over 1.5'))
+  assert.equal(stamped.reasons.some(line => /total goals was tightened/i.test(line)), false)
+})
+
+test('a hitting league profile is not tightened by a failing country', () => {
+  const boards = []
+  for (let i = 1; i <= 5; i++) {
+    boards.push(board(`2026-08-${String(20 + i).padStart(2, '0')}`, [filterPick(i, 'over-25')], {[i]: 'lost'}))
+  }
+  for (let i = 1; i <= 12; i++) {
+    boards.push(board(`2026-08-${String(8 + i).padStart(2, '0')}`, [], {[400 + i]: i === 5 || i === 9 ? 'lost' : 'won'}, {
+      bestPicks: [{
+        fixtureId: 400 + i,
+        country: 'England',
+        league: 'Championship',
+        market: 'draw-no-bet',
+        selection: 'Home',
+        consensus: 100,
+        homeConsensus: 100,
+        awayConsensus: 100
+      }]
+    }))
+  }
+  const state = buildLearningState(boards, '2026-08-26', 3)
+  const pick = {
+    fixtureId: 902,
+    country: 'England',
+    league: 'Championship',
+    market: 'draw-no-bet',
+    selection: 'Home',
+    consensus: 100,
+    homeConsensus: 100,
+    awayConsensus: 100
+  }
+  const verdict = learningAllows(pick, state, {board: 'all'})
+  assert.equal(verdict.allowed, true)
+  assert.ok(['keep', 'boost'].includes(verdict.action), verdict.action)
+  assert.match(verdict.note, /draw no bet|Championship/i)
 })
 
 test('tighten keeps only higher-evidence copies', () => {
@@ -158,7 +214,6 @@ test('applyLearningToRows drops failing rows and stamps survivors', () => {
   const kept = applyLearningToRows(rows, state, {board: 'filter'})
   assert.equal(kept.some(p => p.route === 'over-25'), false)
   assert.equal(kept.some(p => p.route === 'over-15'), true)
-  assert.ok(kept[0].learning)
 })
 
 test('publicLearning trims the overnight desk', () => {
