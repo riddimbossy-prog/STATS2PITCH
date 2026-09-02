@@ -8,7 +8,7 @@ const TOKEN_KEY='s2p_access_token'
 const REFRESH_KEY='s2p_refresh_token'
 
 function authUrl(path){return `${base}/functions/v1/stats2pitch-auth${path}`}
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))}
 
 async function authCall(path,body){
   const res=await fetch(authUrl(path),{
@@ -17,7 +17,11 @@ async function authCall(path,body){
     body:JSON.stringify(body)
   })
   const data=await res.json().catch(()=>({}))
-  if(!res.ok)throw new Error(data?.error||data?.msg||data?.message||'Unable to sign in right now')
+  if(!res.ok){
+    const err=new Error(data?.error||data?.msg||data?.message||'Unable to sign in right now')
+    err.code=data?.code||''
+    throw err
+  }
   return data
 }
 
@@ -28,7 +32,14 @@ function takeSession(data){
   return session
 }
 
-function showAuth(mode='login',message=''){
+function readDraft(host){
+  return {
+    email:host?.querySelector('#s2pEmail')?.value.trim()||'',
+    password:host?.querySelector('#s2pPassword')?.value||''
+  }
+}
+
+function showAuth(mode='login',message='',draft={}){
   if(!document.getElementById('s2p-gate-style')){
     const style=document.createElement('style')
     style.id='s2p-gate-style'
@@ -44,7 +55,7 @@ function showAuth(mode='login',message=''){
     document.body.appendChild(host)
   }
   const signup=mode==='signup'
-  host.innerHTML=`<section class="auth-stadium" role="dialog" aria-modal="true" aria-label="Sign in to Stats2Pitch">
+  host.innerHTML=`<section class="auth-stadium" role="dialog" aria-modal="true" aria-label="${signup?'Create a Stats2Pitch account':'Sign in to Stats2Pitch'}">
     <div class="auth-stage">
       <div class="auth-brand">
         <img class="auth-brand-mark" src="/assets/s2p-pitch-mark.svg" width="138" height="105" alt="">
@@ -54,23 +65,26 @@ function showAuth(mode='login',message=''){
       <div class="auth-card auth-card--stadium">
         <div class="auth-copy">
           <h1>${signup?'Create account':'Sign in'}</h1>
-          <p>${signup?'No email verification. Create an account so we can count who uses the boards.':'Sign in to open the boards. No email verification.'}</p>
+          <p>${signup?'No email verification. Sign up so we can count who uses the boards.':'Sign in to open the boards. No email verification.'}</p>
         </div>
         <form id="s2pAuthForm">
           <div class="auth-field"><label for="s2pEmail">Email</label><input id="s2pEmail" type="email" autocomplete="username" required placeholder="you@email.com"></div>
           <div class="auth-field"><label for="s2pPassword">Password</label><div class="auth-password-wrap"><input id="s2pPassword" type="password" autocomplete="${signup?'new-password':'current-password'}" minlength="6" required placeholder="At least 6 characters"><button class="auth-password-toggle" type="button" id="s2pTogglePw" aria-label="Show password"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
           <p class="auth-error" id="s2pAuthError">${esc(message)}</p>
-          <button class="auth-submit" type="submit" id="s2pAuthSubmit">${signup?'Create account':'Sign in'}</button>
+          <button class="auth-submit" type="submit" id="s2pAuthSubmit">${signup?'Sign up':'Sign in'}</button>
         </form>
         ${allowSignup?`<p class="auth-signup-line">${signup?'Already have an account?':'New here?'} <button class="auth-signup-link" type="button" id="s2pAuthSwitch">${signup?'Sign in':'Create account'}</button></p>`:''}
       </div>
     </div>
   </section>`
+  const emailEl=host.querySelector('#s2pEmail')
+  const passEl=host.querySelector('#s2pPassword')
+  if(draft.email)emailEl.value=draft.email
+  if(draft.password)passEl.value=draft.password
   host.querySelector('#s2pTogglePw').onclick=()=>{
-    const input=host.querySelector('#s2pPassword')
-    input.type=input.type==='password'?'text':'password'
+    passEl.type=passEl.type==='password'?'text':'password'
   }
-  host.querySelector('#s2pAuthSwitch')?.addEventListener('click',()=>showAuth(signup?'login':'signup'))
+  host.querySelector('#s2pAuthSwitch')?.addEventListener('click',()=>showAuth(signup?'login':'signup','',readDraft(host)))
   host.querySelector('#s2pAuthForm').onsubmit=async e=>{
     e.preventDefault()
     const btn=host.querySelector('#s2pAuthSubmit')
@@ -78,18 +92,28 @@ function showAuth(mode='login',message=''){
     btn.disabled=true
     btn.textContent=signup?'Creating…':'Signing in…'
     err.textContent=''
+    const email=emailEl.value.trim()
+    const password=passEl.value
     try{
-      const email=host.querySelector('#s2pEmail').value.trim()
-      const password=host.querySelector('#s2pPassword').value
       const data=await authCall(signup?'/signup':'/login',{email,password})
       takeSession(data)
       await finishAuth()
     }catch(ex){
+      if(!signup && (ex.code==='new_user'||/no account/i.test(ex.message||'')) && allowSignup){
+        showAuth('signup','No account for this email yet. Sign up to open the boards.',{email,password})
+        host.querySelector('#s2pAuthSubmit')?.focus()
+        return
+      }
+      if(signup && (ex.code==='exists'||/already has an account/i.test(ex.message||''))){
+        showAuth('login','That email already has an account. Sign in instead.',{email,password})
+        return
+      }
       err.textContent=ex.message||'Unable to sign in right now'
       btn.disabled=false
-      btn.textContent=signup?'Create account':'Sign in'
+      btn.textContent=signup?'Sign up':'Sign in'
     }
   }
+  if(signup && draft.email && draft.password) host.querySelector('#s2pAuthSubmit')?.focus()
 }
 
 function hideAuth(){
