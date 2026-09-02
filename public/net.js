@@ -32,7 +32,7 @@ export function endpoint(path){
 if(getToken())releaseAuth()
 
 export async function api(path,options={}){
-  const {cache='no-store',skipAuthWait=false,...rest}=options
+  const {cache='no-store',skipAuthWait=false,keepSession=false,...rest}=options
   const token=getToken()
   const res=await fetch(endpoint(path),{
     ...rest,
@@ -45,7 +45,7 @@ export async function api(path,options={}){
   })
   const body=await res.json().catch(()=>null)
   if(res.status===401){
-    clearSession()
+    if(!keepSession)clearSession()
     throw new Error('Sign in required')
   }
   if(!res.ok)throw new Error('Unable to load this right now')

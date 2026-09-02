@@ -4,11 +4,28 @@ const cfg=window.__STATS2PITCH_CONFIG__||{}
 const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'')
 const anon=String(cfg.supabaseAnonKey||'')
 const allowSignup=cfg.allowPublicSignup!==false
-const TOKEN_KEY='s2p_access_token'
 const REFRESH_KEY='s2p_refresh_token'
 
 function authUrl(path){return `${base}/functions/v1/stats2pitch-auth${path}`}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))}
+
+function emailFromToken(token){
+  try{
+    const part=String(token||'').split('.')[1]
+    if(!part)return ''
+    const json=atob(part.replace(/-/g,'+').replace(/_/g,'/'))
+    const payload=JSON.parse(json)
+    return String(payload.email||payload.user_metadata?.email||'').trim()
+  }catch{return ''}
+}
+
+function friendlyAuthError(message){
+  const text=String(message||'')
+  if(/unable to load this right now|failed to fetch|networkerror|load failed|offline/i.test(text)){
+    return 'Connection glitch. Check your signal and try again.'
+  }
+  return text||'Unable to sign in right now'
+}
 
 async function authCall(path,body){
   const res=await fetch(authUrl(path),{
@@ -97,7 +114,7 @@ function showAuth(mode='login',message='',draft={}){
     try{
       const data=await authCall(signup?'/signup':'/login',{email,password})
       takeSession(data)
-      await finishAuth()
+      await finishAuth(email)
     }catch(ex){
       if(!signup && allowSignup && (ex.code==='new_user'||/no account|invalid login credentials/i.test(ex.message||''))){
         showAuth('signup','No account for this email yet. Sign up to open the boards.',{email,password})
@@ -107,7 +124,7 @@ function showAuth(mode='login',message='',draft={}){
         showAuth('login','That email already has an account. Sign in instead.',{email,password})
         return
       }
-      err.textContent=ex.message||'Unable to sign in right now'
+      err.textContent=friendlyAuthError(ex.message)
       btn.disabled=false
       btn.textContent=signup?'Sign up':'Sign in'
     }
@@ -150,23 +167,29 @@ async function refreshIfNeeded(){
     takeSession(data)
     return true
   }catch{
-    clearSession()
     return false
   }
 }
 
-async function finishAuth(){
+async function readMe(){
   try{
-    const me=await api('/me',{skipAuthWait:true})
-    if(me?.email)sessionStorage.setItem('s2p_email',me.email)
-  }catch{
-    if(await refreshIfNeeded()){
-      const me=await api('/me',{skipAuthWait:true})
-      if(me?.email)sessionStorage.setItem('s2p_email',me.email)
-    }else{
-      showAuth('login','Please sign in again.')
-      return
-    }
+    const me=await api('/me',{skipAuthWait:true,keepSession:true})
+    if(me?.email)return String(me.email)
+  }catch{}
+  return ''
+}
+
+async function finishAuth(fallbackEmail=''){
+  let email=fallbackEmail||sessionStorage.getItem('s2p_email')||emailFromToken(getToken())
+  let me=await readMe()
+  if(!me && getToken()){
+    if(await refreshIfNeeded())me=await readMe()
+  }
+  if(me)email=me
+  if(email)sessionStorage.setItem('s2p_email',email)
+  if(!getToken()){
+    showAuth('login','Please sign in again.')
+    return
   }
   hideAuth()
   bindAccount()

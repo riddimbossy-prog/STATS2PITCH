@@ -2,7 +2,7 @@ let deferredInstall=null
 const button=document.getElementById('installApp')
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;if(button)button.hidden=false})
 button?.addEventListener('click',async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;button.hidden=true})
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js?v=5.13.3').catch(()=>{}))
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js?v=5.13.4').catch(()=>{}))
 
 const root=document.documentElement
 let scrollNavTimer=null
@@ -48,13 +48,13 @@ if(nav){
   if(!document.querySelector('link[href*="auth.css"]')){
     const link=document.createElement('link')
     link.rel='stylesheet'
-    link.href='/auth.css?v=5.13.3'
+    link.href='/auth.css?v=5.13.4'
     document.head.appendChild(link)
   }
   if(!document.querySelector('script[src*="gate.js"]')){
     const s=document.createElement('script')
     s.type='module'
-    s.src='/gate.js?v=5.13.3'
+    s.src='/gate.js?v=5.13.4'
     s.dataset.s2pGate='1'
     document.head.appendChild(s)
   }

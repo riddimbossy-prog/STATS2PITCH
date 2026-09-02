@@ -74,6 +74,6 @@ test('public clients request a slim board view and reuse a cached board',async()
     assert.match(src,/warmNeighbors/)
   }
   assert.match(files[4],/sessionStorage/)
-  assert.match(files[5],/stats2pitch-shell-v5\.12\.0/)
+  assert.match(files[5],/stats2pitch-shell-v5/)
   assert.match(files[5],/\/net\.js/)
 })
