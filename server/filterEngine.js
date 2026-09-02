@@ -1,6 +1,7 @@
 import {ENGINE_VERSION,FINISHED,FORM_SAMPLE} from './config.js'
 import {venueMetrics} from './awayFavEngine.js'
 import {attachWhy,last5Form,last5Overall,fixtureHasStats} from './pickWhy.js'
+import {learningAllows, stampLearning} from './learning.js'
 import {isSrlMatch} from './redFlags.js'
 
 export const ENGINE_ID='sporty-filter-v2'
@@ -495,10 +496,11 @@ function packPick(fixture,odds,home,away,routed,direction,runnerUp=null){
     sportyEventId:fixture.sportyEventId||null
   }
   const reasons=publicReasons(pick,home,away,direction,odds)
-  return attachWhy(pick,fixture,{reasons,last5Home,last5Away,lastMatchesHome,lastMatchesAway,homeAvg:home,awayAvg:away,h2h:fixture.h2h||[]})
+  const packed=attachWhy(pick,fixture,{reasons,last5Home,last5Away,lastMatchesHome,lastMatchesAway,homeAvg:home,awayAvg:away,h2h:fixture.h2h||[]})
+  return routed.learning ? stampLearning(packed, routed.learning) : packed
 }
 
-export function diagnoseFilterFixture(fixture){
+export function diagnoseFilterFixture(fixture, learningState=null){
   if(isSrlMatch(fixture))return{pick:null,skip:'srl'}
   if(!fixtureHasStats(fixture))return{pick:null,skip:'no-stats'}
   if(fixture?.earlySeason===true)return{pick:null,skip:'early-season'}
@@ -538,6 +540,23 @@ export function diagnoseFilterFixture(fixture){
       continue
     }
     const scored=scoreCandidate(row,direction,home,away,odds)
+    const stub={
+      country:fixture.country,
+      league:fixture.league,
+      market:row.market,
+      route:row.route,
+      selection:row.selection,
+      homeConsensus:direction.home,
+      awayConsensus:direction.away,
+      consensus:direction.consensus,
+      rawFilterScore:scored.rawScore,
+      filterScore:scored.rawScore
+    }
+    const learned=learningAllows(stub,learningState,{board:'filter',tightenMinScore:82})
+    if(!learned.allowed){
+      rejected.push({route:row.route,reason:learned.action==='drop'?'learning-drop':'learning-tighten',score:scored.rawScore,learning:learned})
+      continue
+    }
     if(scored.rawScore<RULES.candidateMinScore){
       rejected.push({route:row.route,reason:'low-evidence-score',score:scored.rawScore,displayScore:scored.displayScore,direction})
       continue
@@ -551,7 +570,8 @@ export function diagnoseFilterFixture(fixture){
       capability:scored.capability,
       filterReasons:scored.reasons,
       filterFlags:scored.flags,
-      totalGoalEnvironment:scored.totalGoalEnvironment
+      totalGoalEnvironment:scored.totalGoalEnvironment,
+      learning:learned
     })
   }
 
@@ -589,12 +609,12 @@ export function diagnoseFilterFixture(fixture){
   }
 }
 
-export function evaluateFilterFixture(fixture){
-  return diagnoseFilterFixture(fixture).pick
+export function evaluateFilterFixture(fixture, learningState=null){
+  return diagnoseFilterFixture(fixture, learningState).pick
 }
 
-export function buildFilterBoard(fixtures,meta={}){
-  const diagnosed=(fixtures||[]).map(fixture=>({fixture,result:diagnoseFilterFixture(fixture)}))
+export function buildFilterBoard(fixtures,meta={},learningState=null){
+  const diagnosed=(fixtures||[]).map(fixture=>({fixture,result:diagnoseFilterFixture(fixture,learningState)}))
   const qualified=diagnosed.map(row=>row.result.pick).filter(Boolean)
     .sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(b.rawFilterScore||b.filterScore||0)-Number(a.rawFilterScore||a.filterScore||0)||Number(a.odds)-Number(b.odds))
   const skipped=diagnosed.filter(row=>!row.result.pick).reduce((map,row)=>{

@@ -1,5 +1,5 @@
 import {ENGINE_VERSION,MIN_ODD,MAX_ODD,MIN_CONSENSUS,FORM_SAMPLE,FINISHED} from './config.js'
-import {learningAllows} from './learning.js'
+import {learningAllows, stampLearning} from './learning.js'
 import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 import {buildAwayFavBoard,venueMetrics,favouriteSide,extractOdds} from './awayFavEngine.js'
@@ -208,20 +208,21 @@ export function analyzeFixture(f,{ignoreTransition=false}={}){
 }
 
 export function buildBoard(fixtures,meta={},learningProfiles=[]){
-  const learnedList=Array.isArray(learningProfiles)?learningProfiles:[]
+  const learnedList=Array.isArray(learningProfiles)||learningProfiles?.profiles?learningProfiles:[]
+  const learnedCount=Array.isArray(learnedList)?learnedList.filter(x=>x?.ready||x?.action).length:(learnedList.profiles||[]).filter(x=>x?.ready||x?.action).length
   const raw=(fixtures||[]).flatMap(analyzeFixture)
   const all=[]
   for(const p of raw){
-    const learned=learningAllows(p,learnedList)
-    if(!learned.allowed)continue
-    all.push({...p,learningProfile:learned.profile?{sample:learned.profile.sample,winRate:learned.profile.winRate,gate:learned.profile.gate}:null})
+    const learned = learningAllows(p, learnedList, {board: 'all'})
+    if (!learned.allowed) continue
+    all.push(stampLearning({...p, learningProfile: learned.profile ? {sample: learned.profile.sample, winRate: learned.profile.winRate, gate: learned.profile.gate, action: learned.action} : null}, learned))
   }
   const best=[],seen=new Set()
   for(const p of all){if(seen.has(String(p.fixtureId)))continue;seen.add(String(p.fixtureId));best.push(p)}
-  const varBoard=buildAwayFavBoard(fixtures,meta)
-  const filterBoard=buildFilterBoard(fixtures,meta)
-  const goalsBoard=buildGoalsBankerBoard(fixtures,meta)
-  const dailyBankersBoard=buildDailyBankersBoard(fixtures,meta)
+  const varBoard=buildAwayFavBoard(fixtures,meta,learnedList)
+  const filterBoard=buildFilterBoard(fixtures,meta,learnedList)
+  const goalsBoard=buildGoalsBankerBoard(fixtures,meta,learnedList)
+  const dailyBankersBoard=buildDailyBankersBoard(fixtures,meta,learnedList)
   return{
     meta:{
       ...meta,
@@ -233,7 +234,8 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
       formSample:FORM_SAMPLE,
       qualified:all.length,
       bestPicks:best.length,
-      learningProfiles:learnedList.filter(x=>x?.ready).length,
+      learningProfiles:learnedCount,
+      learningSummary:learnedList.summary||null,
       varTipsEngine:varBoard.meta?.engine||'away-fav-streak-v1',
       varTipsCount:Array.isArray(varBoard.bestPicks)?varBoard.bestPicks.length:0,
       filterTipsEngine:filterBoard.meta?.engine||'sporty-filter-v1',

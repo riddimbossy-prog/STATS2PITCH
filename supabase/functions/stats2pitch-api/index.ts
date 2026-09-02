@@ -1,3 +1,5 @@
+import {buildLearningProfiles,buildLearningState,publicLearning} from './learning.js'
+
 const ELITE_FEED_TOKEN=Deno.env.get('STATS2PITCH_ELITE_FEED_TOKEN')||''
 const ENGINE_VERSION='stats2pitch-v5-var-tips'
 const SUPABASE_URL=(Deno.env.get('SUPABASE_URL')||'').replace(/\/$/,'')
@@ -380,9 +382,9 @@ function performanceFromBoards(boards:any[]){
   return{summary,groups:rows}
 }
 function learningFromBoards(boards:any[]){
-  const groups=new Map<string,any>()
-  for(const b of boards)for(const p of b?.bestPicks||[]){const r=b?.results?.[String(p.fixtureId)];if(!r||!['won','lost'].includes(r.outcome))continue;const key=`${String(p.country||'').toLowerCase()}|${String(p.league||'').toLowerCase()}|${String(p.market||'').toLowerCase()}`,g=groups.get(key)||{key,country:p.country||'',league:p.league||'',market:p.market||'',wins:0,losses:0,sample:0};g.sample++;if(r.outcome==='won')g.wins++;else g.losses++;groups.set(key,g)}
-  return[...groups.values()].map(g=>{const winRate=Math.round(g.wins*1000/g.sample)/10;let gate='standard';if(g.sample>=30&&winRate<50)gate='skip';else if(g.sample>=20&&winRate<58)gate='100-only';return{...g,winRate,gate,ready:g.sample>=20}}).sort((a,b)=>b.sample-a.sample)
+  const dated=(boards||[]).map((b:any)=>({...b,date:b?.date||b?.meta?.date,meta:{...(b?.meta||{}),date:b?.date||b?.meta?.date}}))
+  const state=buildLearningState(dated,today(),6)
+  return{profiles:buildLearningProfiles(dated,20),state:publicLearning(state)}
 }
 async function boardRows(days=30){const end=today(),start=addDays(end,-Math.max(1,Math.min(90,days))+1);return await rest(`/rest/v1/prediction_snapshots?select=snapshot_date,payload,generated_at&snapshot_date=gte.${start}&snapshot_date=lte.${end}&order=snapshot_date.desc`)}
 async function dispatchRefresh(){
@@ -428,15 +430,16 @@ Deno.serve(async req=>{
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}
     if(route==='/performance'&&req.method==='GET'){
       const days=Math.max(1,Math.min(90,Number(url.searchParams.get('days')||30))),rows=await boardRows(days),boards=(rows||[]).map((x:any)=>x.payload).filter(Boolean)
-      return json({days,...performanceFromBoards(boards),learning:learningFromBoards(boards)})
+      const learned=learningFromBoards(boards)
+      return json({days,...performanceFromBoards(boards),learning:learned.profiles,learningState:learned.state})
     }
     if(route==='/refresh-status'&&req.method==='GET'){const date=requestedDate(url),row=await snapshot(date);return json(snapshotState(date,row))}
     if(route==='/me'&&req.method==='GET'){const me=await verifyUser(req);if(!me)return json({error:'Authentication required'},401);return json({id:me.id,email:me.email||''})}
     if(route==='/admin/overview'&&req.method==='GET'){
       const admin=await verifyAdmin(req);if(!admin)return json({error:'Admin access required'},403)
-      const rows=await boardRows(30),boards=(rows||[]).map((x:any)=>x.payload).filter(Boolean),performance=performanceFromBoards(boards),learning=learningFromBoards(boards)
+      const rows=await boardRows(30),boards=(rows||[]).map((x:any)=>x.payload).filter(Boolean),performance=performanceFromBoards(boards),learned=learningFromBoards(boards)
       const latest=(rows||[])[0]||null,meta=latest?.payload?.meta||{},latestPicks=(latest?.payload?.bestPicks||[]).slice(0,25)
-      return json({user:{email:admin.email||''},snapshots:rows.length,performance,learning,latest,health:{footballData:true,sourceFixtures:meta.sourceFixtures||0,scheduledFixtures:meta.scheduledFixtures||0,analyzedFixtures:meta.analyzedFixtures||0,statsVerifiedFixtures:meta.statsVerifiedFixtures||0,historyFallbackTeams:meta.historyFallbackTeams||0},latestPicks})
+      return json({user:{email:admin.email||''},snapshots:rows.length,performance,learning:learned.profiles,learningState:learned.state,latest,health:{footballData:true,sourceFixtures:meta.sourceFixtures||0,scheduledFixtures:meta.scheduledFixtures||0,analyzedFixtures:meta.analyzedFixtures||0,statsVerifiedFixtures:meta.statsVerifiedFixtures||0,historyFallbackTeams:meta.historyFallbackTeams||0},latestPicks})
     }
     if(route==='/admin/refresh'&&req.method==='POST'){
       const admin=await verifyAdmin(req);if(!admin)return json({error:'Admin access required'},403);await dispatchRefresh();return json({ok:true,message:'Refresh requested.'},202)

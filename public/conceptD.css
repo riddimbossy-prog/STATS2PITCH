@@ -919,6 +919,76 @@ header {
 .why-tip li { margin: 0 0 7px; }
 .why-lines { margin: 0 0 16px; }
 .why-empty { margin: 0 0 12px; color: var(--muted); }
+.why-learn {
+  margin: 0 0 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(200, 245, 66, 0.06);
+  border: 1px solid rgba(200, 245, 66, 0.18);
+}
+.why-learn h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.why-learn-lead {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.why-learn-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 0 0;
+}
+.why-learn-row + .why-learn-row {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.why-learn-row p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+.learn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+.card > .learn-chip { margin: 0 0 8px; }
+.learn-chip.keep, .learn-chip.boost {
+  background: rgba(200, 245, 66, 0.16);
+  color: var(--accent);
+}
+.learn-chip.tighten {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+.learn-chip.drop, .learn-chip.watch {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+}
+.perf-callout.tighten { border-color: rgba(245, 158, 11, 0.32); }
+.perf-callout.tighten .perf-callout-kicker {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+.learning-desk { margin-bottom: 22px; }
 .why-market { margin: 0 0 16px; }
 .why-market-chosen {
   margin: 0 0 14px;
@@ -1471,6 +1541,7 @@ body.modal-open { overflow: hidden; }
   .perf-ring-copy b { font-size: 20px; }
   .perf-hero-grid { grid-template-columns: 1fr 1fr; }
   .perf-advice { grid-template-columns: 1fr; }
+  .learning-desk { grid-template-columns: 1fr; }
   .performance-table { grid-template-columns: 1fr; }
 }
 @media (max-width: 620px) {

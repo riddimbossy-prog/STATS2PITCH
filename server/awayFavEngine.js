@@ -1,5 +1,6 @@
 import {ENGINE_VERSION,FINISHED,FORM_SAMPLE} from './config.js'
 import {attachWhy,last5Form,last5Overall,varPublicReasons,fixtureHasStats} from './pickWhy.js'
+import {applyLearningToRows} from './learning.js'
 import {isCupCompetition,isSrlMatch,favConflict} from './redFlags.js'
 
 
@@ -335,10 +336,13 @@ export function evaluateAwayFavFixture(fixture){
   return diagnoseAwayFavFixture(fixture).pick
 }
 
-export function buildAwayFavBoard(fixtures,meta={}){
+export function buildAwayFavBoard(fixtures,meta={},learningState=null){
   const diagnosed=(fixtures||[]).map(fixture=>({fixture,result:diagnoseAwayFavFixture(fixture)}))
-  const qualified=diagnosed.map(row=>row.result.pick).filter(Boolean)
-    .sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||b.engineRating-a.engineRating)
+  const qualified=applyLearningToRows(
+    diagnosed.map(row=>row.result.pick).filter(Boolean),
+    learningState,
+    {board:'var',tightenMinScore:72}
+  ).sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||b.engineRating-a.engineRating)
   const skipped=diagnosed.filter(row=>!row.result.pick).reduce((map,row)=>{
     const key=row.result.skip||'unknown'
     map[key]=(map[key]||0)+1

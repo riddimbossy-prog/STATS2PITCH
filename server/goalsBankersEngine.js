@@ -10,6 +10,7 @@ import {
   statsFromFixture
 } from './goalsBankersV4.js'
 import {chooseGoalsCombo,isComboRoute,publishedCombo,COMBO_ROUTES} from './goalsCombo.js'
+import {applyLearningToRows} from './learning.js'
 export {last5VenueRates,goalsFormGate,weakFavouriteGate} from './goalsFormGate.js'
 export {ENGINE_ID}
 
@@ -345,9 +346,13 @@ export function canAddAccaLeg(slip,pick){
   return{ok:true,reason:null,legs:next}
 }
 
-export function buildGoalsBankerBoard(fixtures,meta={}){
+export function buildGoalsBankerBoard(fixtures,meta={},learningState=null){
   const diagnosed=(fixtures||[]).map(fixture=>({fixture,result:diagnoseGoalsBankerFixture(fixture)}))
-  const qualified=diagnosed.map(row=>row.result.pick).filter(Boolean).sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(a.odds)-Number(b.odds))
+  const qualified=applyLearningToRows(
+    diagnosed.map(row=>row.result.pick).filter(Boolean),
+    learningState,
+    {board:'goals',tightenMinScore:86}
+  ).sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(a.odds)-Number(b.odds))
   const skipped=diagnosed.filter(row=>!row.result.pick).reduce((map,row)=>{const key=row.result.skip||'unknown';map[key]=(map[key]||0)+1;return map},{})
   return{meta:{...meta,engineVersion:ENGINE_VERSION,engine:ENGINE_ID,qualified:qualified.length,bestPicks:qualified.length,skipped,publishedRoutes:['FAV_WIN','FAV_2PLUS','OVER_2.5','GG',...COMBO_ROUTES]},priority:qualified,bestPicks:qualified,availableMarkets:[...new Set(qualified.map(row=>row.market))].sort()}
 }

@@ -121,6 +121,7 @@ function mergePublished(existing,incoming){
     bankers,
     results:{...(existing?.results||{}),...(incoming?.results||{})},
     resultSummary:incoming?.resultSummary||existing?.resultSummary||null,
+    learning:incoming?.learning||existing?.learning||null,
     availableMarkets:[...new Set([...(incoming?.availableMarkets||[]),...bestPicks.map(x=>x.market).filter(Boolean)])].sort(),
     meta:{
       ...(incoming?.meta||{}),

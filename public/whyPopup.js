@@ -169,7 +169,7 @@ export function goalsMarketWhy(pick){
     chosen:GOAL_LABELS[route],
     price:prices[route],
     headline:chosenHeadline(route,fav,prices[route],type),
-    passed:GOAL_ROUTES.filter(id=>id!==route).map(id=>({id,label:GOAL_LABELS[id],price:prices[id],reason:passedReason(route,id,fav,prices,type)}))
+    passed:GOAL_ROUTES.filter(id=>id!==route&&!id.startsWith('DRAW_OR')).map(id=>({id,label:GOAL_LABELS[id],price:prices[id],reason:passedReason(route,id,fav,prices,type)}))
   }
 }
 
@@ -182,14 +182,64 @@ function marketChoiceHtml(choice,esc){
   </div>`
 }
 
+function actionLabel(action){
+  return({drop:'Dropped',tighten:'Tightened',keep:'Kept',boost:'Boosted',watch:'Sampling'})[action]||'Adjusted'
+}
+
+function learningRows(pick){
+  const learning=pick?.learning||{}
+  const rows=[]
+  const seen=new Set()
+  const push=row=>{
+    if(!row?.note&&!row?.label)return
+    const key=String(row.note||row.label)
+    if(seen.has(key))return
+    seen.add(key)
+    rows.push(row)
+  }
+  if(learning.note||learning.action)push(learning)
+  for(const row of learning.matches||[])push(row)
+  return rows
+}
+
+function isLearningLine(line,pick){
+  const text=String(line||'')
+  if(/^(Overnight:|Kept:|Kept and boosted:)/.test(text))return true
+  return learningRows(pick).some(row=>row.note===text)
+}
+
+export function learningChipHtml(pick,esc=fallbackEsc){
+  const learning=pick?.learning
+  const action=learning?.action
+  if(!action||action==='watch')return''
+  const sample=Number(learning.sample)||0
+  const rate=learning.winRate==null?'':`${Number(learning.winRate).toFixed(1)}%`
+  const detail=sample?`${rate}${rate?' · ':''}${sample} settled`:''
+  return`<span class="learn-chip ${esc(action)}" title="${esc(learning.note||'')}">${esc(actionLabel(action))}${detail?` · ${esc(detail)}`:''}</span>`
+}
+
+export function learningSectionHtml(pick,esc=fallbackEsc){
+  const rows=learningRows(pick)
+  if(!rows.length)return''
+  return`<div class="why-learn">
+    <h4>Overnight adjustment</h4>
+    <p class="why-learn-lead">Stats2Pitch settled yesterday's board, kept what is hitting, and dropped or tightened what is not. That change is already in this pick.</p>
+    ${rows.map(row=>`<div class="why-learn-row ${esc(row.action||'watch')}">
+      <span class="learn-chip ${esc(row.action||'watch')}">${esc(actionLabel(row.action))}</span>
+      <p>${esc(row.note||row.label||'')}</p>
+    </div>`).join('')}
+  </div>`
+}
+
 export function whySectionHtml(r,esc=fallbackEsc,opts={}){
   const why=r?.why||{}
   const choice=goalsMarketWhy(r)
-  const lines=choice?[]:reasonLines(r)
+  const lines=choice?[]:reasonLines(r).filter(t=>!isLearningLine(t,r))
   const homeForm=why.lastMatchesHome||why.last5Home||[]
   const awayForm=why.lastMatchesAway||why.last5Away||[]
   return`<div class="why-tip">
     <h3>Why this pick was chosen</h3>
+    ${learningSectionHtml(r,esc)}
     ${consensusHtml(r,esc)}
     ${choice?marketChoiceHtml(choice,esc):(lines.length?`<ul class="why-lines">${lines.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'<p class="why-empty">The published tip is preserved. Form detail will appear after the next board refresh.</p>')}
     ${homeForm.length||awayForm.length?`<div class="why-form">

@@ -5,7 +5,7 @@ import {venueSample,buildBoard} from './engine.js'
 import {buildBankerRules,buildLeagueScoringProfile,evaluateBankerFixture,buildOverallTable} from './bankerEngine.js'
 import {buildOver25Profile} from './over25.js'
 import {saveBoard,listBoards} from './store.js'
-import {buildLearningProfiles} from './learning.js'
+import {buildLearningState, publicLearning} from './learning.js'
 import {SCHEDULED,FORM_SAMPLE} from './config.js'
 import {h2hSnapshot,last5Overall,teamStats} from './pickWhy.js'
 
@@ -58,7 +58,16 @@ function ppgFor(rows,teamId,venue){let pts=0,played=0;for(const f of rows){const
 function splitTable(history,venue){const ids=new Map();for(const f of history||[]){const t=venue==='home'?f?.teams?.home:f?.teams?.away;if(t?.id)ids.set(String(t.id),{id:t.id,name:t.name||''})}const rows=[];for(const t of ids.values()){const sample=lastNVenue(history,t.id,venue);if(sample.length<FORM_SAMPLE)continue;rows.push({...t,ppg:ppgFor(sample,t.id,venue),played:sample.length})}rows.sort((a,b)=>b.ppg-a.ppg||String(a.name).localeCompare(String(b.name)));return new Map(rows.map((r,i)=>[String(r.id),{position:i+1,size:rows.length,ppg:+r.ppg.toFixed(2),played:r.played,sampleReady:true,venue}]))}
 function cachedSplitTable(leagueId,season,venue,history){const key=`${leagueId}|${season}|${venue}|${FORM_SAMPLE}`;if(!splitCache.has(key))splitCache.set(key,splitTable(history,venue));return splitCache.get(key)}
 function cachedOverallTable(leagueId,season,history){const key=`${leagueId}|${season}|overall`;if(!standingCache.has(key))standingCache.set(key,buildOverallTable(history));return standingCache.get(key)}
-async function learningProfiles(){try{const end=new Date(),start=new Date(end.getTime()-60*86400000),rows=await listBoards(start.toISOString().slice(0,10),end.toISOString().slice(0,10));return buildLearningProfiles(rows.map(x=>x.payload).filter(Boolean),20)}catch{return[]}}
+async function learningProfiles(){
+  try{
+    const end=new Date(),start=new Date(end.getTime()-60*86400000)
+    const rows=await listBoards(start.toISOString().slice(0,10),end.toISOString().slice(0,10))
+    const boards=rows.map(x=>({...(x.payload||{}),date:x.snapshot_date,meta:{...(x.payload?.meta||{}),date:x.snapshot_date}})).filter(Boolean)
+    return buildLearningState(boards,end.toISOString().slice(0,10),6)
+  }catch{
+    return buildLearningState([],new Date().toISOString().slice(0,10),6)
+  }
+}
 
 async function enrichHistoryFixture(row){
   const id=String(row?.fixture?.id??'')
@@ -183,6 +192,8 @@ export async function refreshNow(date,onProgress=()=>{}){
   board.meta.diagnostics.safestBankers=(board.safestBankers||[]).length
   board.meta.diagnostics.valueBankers=(board.valueBankers||[]).length
   board.meta.diagnostics.dailyBankersEngine=board.dailyBankersMeta?.engine||board.meta?.dailyBankersEngine||null
+  board.learning=publicLearning(learned)
+  board.meta.learning=board.learning
   const picks=new Map(board.bestPicks.map(p=>[String(p.fixtureId),p])),eligibleIds=new Set(fixtures.map(f=>String(f.fixtureId)))
   const statsById=new Map(fixtures.map(f=>[String(f.fixtureId),f.statsReady!==false]))
   board.fixtures=raw.filter(f=>eligibleIds.has(String(f?.fixture?.id))).map(f=>{

@@ -23,7 +23,8 @@ function slimMeta(meta={}){
     bankerRulesEngine:meta.bankerRulesEngine||meta.bankerRules?.engine||null,
     bankerRulesCount:meta.bankerRulesCount??meta.diagnostics?.bankerRulePicks??null,
     requiresRefresh:meta.requiresRefresh===true,
-    refresh:meta.refresh||null
+    refresh:meta.refresh||null,
+    learning:meta.learning||null
   }
 }
 
@@ -44,6 +45,7 @@ export function publicBoard(board={},view='all'){
     priority:[],
     bankers:[]
   }
+  if(board?.learning)empty.learning=board.learning
   const markets=rows=>[...new Set((rows||[]).map(x=>x?.market).filter(Boolean))].sort()
   if(v==='var'){
     empty.varTips=Array.isArray(board?.varTips)?board.varTips:[]

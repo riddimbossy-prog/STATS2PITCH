@@ -1,6 +1,7 @@
 import {FINISHED} from './config.js'
 import {fixtureHasStats} from './pickWhy.js'
 import {isSrlMatch} from './redFlags.js'
+import {applyLearningToRows} from './learning.js'
 
 export const DAILY_BANKERS_ENGINE='daily-bankers-v2'
 export const DAILY_BANKERS_RULES=Object.freeze({
@@ -281,7 +282,7 @@ function samePick(a,b){
   return a&&b&&String(a.fixtureId)===String(b.fixtureId)&&String(a.market)===String(b.market)&&norm(a.selection)===norm(b.selection)
 }
 
-export function buildDailyBankersBoard(fixtures,meta={}){
+export function buildDailyBankersBoard(fixtures,meta={},learningState=null){
   const safest=[],value=[]
   for(const fixture of fixtures||[]){
     const result=analyzeDailyBankerFixture(fixture)
@@ -290,8 +291,8 @@ export function buildDailyBankersBoard(fixtures,meta={}){
   }
   safest.sort((a,b)=>b.rawScore-a.rawScore||a.odds-b.odds||Date.parse(a.kickoff)-Date.parse(b.kickoff))
   value.sort((a,b)=>b.valueEdge-a.valueEdge||b.rawScore-a.rawScore||Date.parse(a.kickoff)-Date.parse(b.kickoff))
-  const safestBankers=safest.slice(0,DAILY_BANKERS_RULES.maxSafest)
-  const valueBankers=value.slice(0,DAILY_BANKERS_RULES.maxValue)
+  const safestBankers=applyLearningToRows(safest.slice(0,DAILY_BANKERS_RULES.maxSafest),learningState,{board:'bankers',tightenMinScore:88})
+  const valueBankers=applyLearningToRows(value.slice(0,DAILY_BANKERS_RULES.maxValue),learningState,{board:'bankers',tightenMinScore:84})
   const all=[...safestBankers,...valueBankers]
   return{
     meta:{...meta,engine:DAILY_BANKERS_ENGINE,safestCount:safestBankers.length,valueCount:valueBankers.length,total:all.length,

@@ -7,7 +7,7 @@ import {startRefresh,refreshStatus} from './refresh.js'
 import {sportyEventFixtures,sportyFixturesByDate,sportyLiveEvents} from './sportyBet.js'
 import {gismoMatches} from './sportyStats.js'
 import {normalizeFixtureStatus,resolveResult,fixtureForPick} from './settlement.js'
-import {buildLearningProfiles} from './learning.js'
+import {buildLearningProfiles,buildLearningState,publicLearning} from './learning.js'
 import {ENGINE_VERSION} from './config.js'
 import {eliteFeedAuthorized,buildEliteFeed} from './eliteExport.js'
 import {publicBoard,compactResultRows} from './publicBoard.js'
@@ -79,7 +79,13 @@ async function api(req,res,url){
     return send(res,200,{date:r.date,picks:r.picks,varTips:r.varTips,filterTips:r.filterTips,goalsBankers:r.goalsBankers,dailyBankers:r.dailyBankers,bankers:r.bankers})
   }
   if(url.pathname==='/api/live-scores'){const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today();const r=await resultPayload(date);return send(res,200,{date,fixtures:r.fixtures||[]})}
-  if(url.pathname==='/api/performance'){const days=Math.max(1,Math.min(90,Number(url.searchParams.get('days')||30))),to=today(),from=addDays(to,-days+1),rows=await listBoards(from,to),boards=rows.map(x=>x.payload).filter(Boolean);return send(res,200,{days,...performance(boards),learning:buildLearningProfiles(boards)})}
+  if(url.pathname==='/api/performance'){
+    const days=Math.max(1,Math.min(90,Number(url.searchParams.get('days')||30))),to=today(),from=addDays(to,-days+1)
+    const rows=await listBoards(from,to)
+    const boards=rows.map(x=>({...(x.payload||{}),date:x.snapshot_date,meta:{...(x.payload?.meta||{}),date:x.snapshot_date}})).filter(b=>b&& (b.bestPicks||b.filterTips))
+    const learningState=buildLearningState(boards,to,6)
+    return send(res,200,{days,...performance(boards),learning:buildLearningProfiles(boards),learningState:publicLearning(learningState)})
+  }
   if(url.pathname==='/api/refresh'&&req.method==='POST'){const b=await json(req),date=dateOk(b.date)?b.date:today();await clearBoard(date);return send(res,202,{ok:true,job:startRefresh(date)})}
   if(url.pathname==='/api/refresh-status'){const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today();return send(res,200,refreshStatus(date))}
   if(url.pathname==='/api/export/elite'){
