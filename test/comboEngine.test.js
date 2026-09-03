@@ -26,10 +26,10 @@ function strongHomeFixture({price=1.44,h2h=[],markets=null}={}){
 function balancedDrawOverFixture(price=1.29){
   const homeId=1,awayId=2
   const homeFixtures=[
-    ft(21,homeId,9,1,1,'2026-08-30'),ft(22,homeId,8,2,2,'2026-08-24'),ft(23,homeId,7,2,1,'2026-08-18'),ft(24,homeId,6,1,1,'2026-08-12'),ft(25,homeId,5,3,1,'2026-08-06')
+    ft(21,homeId,9,1,1,'2026-08-30'),ft(22,homeId,8,2,2,'2026-08-24'),ft(23,homeId,7,2,1,'2026-08-18'),ft(24,homeId,6,3,1,'2026-08-12'),ft(25,homeId,5,1,2,'2026-08-06')
   ]
   const awayFixtures=[
-    ft(31,9,awayId,1,1,'2026-08-29'),ft(32,8,awayId,2,2,'2026-08-23'),ft(33,7,awayId,1,2,'2026-08-17'),ft(34,6,awayId,0,0,'2026-08-11'),ft(35,5,awayId,2,1,'2026-08-05')
+    ft(31,9,awayId,1,1,'2026-08-29'),ft(32,8,awayId,2,2,'2026-08-23'),ft(33,7,awayId,2,1,'2026-08-17'),ft(34,6,awayId,1,2,'2026-08-11'),ft(35,5,awayId,3,1,'2026-08-05')
   ]
   return{
     fixtureId:199,league:'Balanced League',country:'Test',kickoff:'2026-09-07T18:00:00Z',statsReady:true,
@@ -92,6 +92,8 @@ test('rejects a Combo when either venue split hits below 80 percent',()=>{
 
 test('high odds require elite evidence rather than being rescued by a generic score',()=>{
   const f=balancedDrawOverFixture(1.75)
+  f.home.fixtures[0]=ft(21,1,9,1,0,'2026-08-30')
+  f.home.lastMatches=f.home.fixtures
   const picks=analyzeComboFixture(f)
   assert.equal(picks.length,0)
 })
