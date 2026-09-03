@@ -10,6 +10,7 @@ import {saveBoard,listBoards} from './store.js'
 import {buildLearningState, publicLearning} from './learning.js'
 import {SCHEDULED,FORM_SAMPLE} from './config.js'
 import {h2hSnapshot,last5Overall,teamStats} from './pickWhy.js'
+import {sanitizeGoalsAndCombo} from './publicBoard.js'
 
 
 const jobs=new Map(),leagueCache=new Map(),teamCache=new Map(),splitCache=new Map(),standingCache=new Map(),eventCache=new Map()
@@ -188,6 +189,7 @@ export async function refreshNow(date,onProgress=()=>{}){
   const comboBoard=buildComboBoard(fixtures,board.meta)
   board.comboPicks=comboBoard.bestPicks;board.comboMeta=comboBoard.meta
   board.meta.comboEngine=comboBoard.meta.engine;board.meta.comboCount=comboBoard.bestPicks.length
+  Object.assign(board,sanitizeGoalsAndCombo(board))
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}

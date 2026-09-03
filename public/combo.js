@@ -5,8 +5,8 @@ import {api,readBoardCache,writeBoardCache,scrollDateStrip,isSrlPick,bootDone} f
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const ESC={amp:"&"+"amp;",lt:"&"+"lt;",gt:"&"+"gt;",quot:"&"+"quot;",apos:"&"+"#39;"}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":ESC.amp,"<":ESC.lt,">":ESC.gt,'"':ESC.quot,"'":ESC.apos}[c]))
-const VIEW='combo'
-const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',family:'all',timer:null}
+const VIEW='combo-v3'
+const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'all',country:'all',league:'all',family:'all',timer:null}
 
 function flag(c){return typeof window.countryFlag==='function'?window.countryFlag(c):'🌍'}
 function pickKey(r){return `${r.fixtureId}|${r.market}|${String(r.selection||'').trim()}`}
@@ -14,10 +14,9 @@ function isComboBoardPick(r){const m=String(r?.market||'');return m.startsWith('
 function comboRowsOf(board){
   const dedicated=(board?.comboPicks||[]).filter(isComboBoardPick)
   if(dedicated.length)return dedicated
-  return (board?.goalsBankers||[]).filter(isComboBoardPick)
+  return []
 }
 function rows(){return comboRowsOf(state.board).filter(r=>Number(r?.odds)>=1.20&&!isSrlPick(r))}
-function comboPayloadReady(board){return Boolean(board?.comboMeta||board?.meta?.comboEngine||comboRowsOf(board).length)}
 function kickoffMs(r){const n=Date.parse(r?.kickoff||'');return Number.isFinite(n)?n:Number.MAX_SAFE_INTEGER}
 function familyLabel(v){return v==='result-goals'?'Result + O/U 2.5':v==='result-gg'?'Result + GG':v==='result-clean-sheet'?'Result + Clean Sheet':'Combo'}
 function pickLabel(r){return String(r.displaySelection||r.selection||'Selection')}
@@ -166,10 +165,8 @@ function startPolling(){
   state.timer=setInterval(async()=>{try{state.results=await api(`/results?date=${encodeURIComponent(state.date)}`);render()}catch{}},30000)
 }
 async function fetchComboBoard(date){
-  const combo=await api(`/board?date=${encodeURIComponent(date)}&view=combo`,{cache:'default'})
-  if(comboPayloadReady(combo))return {...combo,comboPicks:comboRowsOf(combo)}
-  const goals=await api(`/board?date=${encodeURIComponent(date)}&view=goals`,{cache:'default'})
-  return {...goals,comboPicks:comboRowsOf(goals)}
+  const combo=await api(`/board?date=${encodeURIComponent(date)}&view=combo`,{cache:'no-store'})
+  return {...combo,comboPicks:comboRowsOf(combo),goalsBankers:[]}
 }
 async function load(){
   renderDates()
@@ -199,7 +196,7 @@ $('#statusFilter')?.addEventListener('change',e=>{state.status=e.target.value;re
 $('#countryFilter')?.addEventListener('change',e=>{state.country=e.target.value;state.league='all';render()})
 $('#leagueFilter')?.addEventListener('change',e=>{state.league=e.target.value;render()})
 $('#familyFilter')?.addEventListener('change',e=>{state.family=e.target.value;render()})
-$('#clearFilters')?.addEventListener('click',()=>{state.status='upcoming';state.country=state.league=state.family='all';render()})
+$('#clearFilters')?.addEventListener('click',()=>{state.status='all';state.country=state.league=state.family='all';render()})
 $('#refresh')?.addEventListener('click',load)
 $('#notifyBell')?.addEventListener('click',load)
 $('#profileBtn')?.addEventListener('click',()=>document.body.classList.toggle('filters-open'))

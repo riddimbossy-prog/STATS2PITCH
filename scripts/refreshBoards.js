@@ -19,10 +19,11 @@ for(let i=0;i<dates.length;i++){
     const varTips=board.varTips?.length||0
     const filterTips=board.filterTips?.length||0
     const goalsBankers=board.goalsBankers?.length||0
+    const comboPicks=board.comboPicks?.length||0
     const safest=board.safestBankers?.length||0
     const value=board.valueBankers?.length||0
     completed++
-    console.log(`${d}: ${published} All Picks · ${filterTips} Filter Tips · ${varTips} VAR Tips · ${goalsBankers} Goals Bankers · ${safest} Safest Bankers · ${value} Value Bankers · ${board.priority.length} qualified · ${src} source fixtures`)
+    console.log(`${d}: ${published} All Picks · ${filterTips} Filter Tips · ${varTips} VAR Tips · ${goalsBankers} Goals Bankers · ${comboPicks} Combo · ${safest} Safest Bankers · ${value} Value Bankers · ${board.priority.length} qualified · ${src} source fixtures`)
     if(src===0){
       console.warn(`${d}: no upcoming fixtures for this date`)
     }

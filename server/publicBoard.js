@@ -46,6 +46,21 @@ export function splitGoalsAndCombo(board={}){
   }
 }
 
+export function sanitizeGoalsAndCombo(board={}){
+  const split=splitGoalsAndCombo(board)
+  return{
+    ...board,
+    goalsBankers:split.goalsBankers,
+    comboPicks:split.comboPicks,
+    meta:{
+      ...(board.meta||{}),
+      goalsBankersCount:split.goalsBankers.length,
+      comboCount:split.comboPicks.length,
+      comboEngine:board?.meta?.comboEngine||board?.comboMeta?.engine||null
+    }
+  }
+}
+
 export function publicBoard(board={},view='all'){
   const v=VIEWS.has(String(view||''))?String(view):'all'
   const split=splitGoalsAndCombo(board)

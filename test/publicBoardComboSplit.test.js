@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {isComboBoardPick,splitGoalsAndCombo,publicBoard} from '../server/publicBoard.js'
+import {isComboBoardPick,splitGoalsAndCombo,publicBoard,sanitizeGoalsAndCombo} from '../server/publicBoard.js'
+import {isolateComboBags} from '../server/store.js'
 
 test('combo engine picks are not treated as Goals Bankers',()=>{
   const win={fixtureId:1,market:'match-winner',route:'FAV_WIN',selection:'Home'}
@@ -42,4 +43,48 @@ test('legacy boards without comboPicks still split combo-* out of goalsBankers',
   assert.equal(split.goalsBankers.length,1)
   assert.equal(split.comboPicks.length,1)
   assert.equal(publicBoard({goalsBankers:[goals,combo]},'combo').comboPicks[0].market,'combo-away-under-25')
+})
+
+test('sanitizeGoalsAndCombo moves leftover combo-* out of goalsBankers',()=>{
+  const goals={fixtureId:1,market:'total-goals',route:'OVER_2.5',selection:'Over 2.5'}
+  const combo={fixtureId:2,market:'combo-home-gg',route:'HOME_GG',selection:'Home Team or GG'}
+  const next=sanitizeGoalsAndCombo({goalsBankers:[goals,combo],comboPicks:[],meta:{}})
+  assert.deepEqual(next.goalsBankers.map(r=>r.fixtureId),[1])
+  assert.deepEqual(next.comboPicks.map(r=>r.market),['combo-home-gg'])
+  assert.equal(next.meta.goalsBankersCount,1)
+  assert.equal(next.meta.comboCount,1)
+})
+
+test('snapshot merge does not copy Combo leftovers back onto Goals',()=>{
+  const now='2026-09-10T12:00:00.000Z'
+  const existing={
+    goalsBankers:[
+      {fixtureId:1,market:'total-goals',selection:'Over 2.5',kickoff:'2026-09-10T18:00:00.000Z'},
+      {fixtureId:2,market:'combo-home-gg',selection:'Home Team or GG',kickoff:'2026-09-10T19:00:00.000Z'}
+    ],
+    comboPicks:[]
+  }
+  const incoming={
+    goalsBankers:[{fixtureId:1,market:'total-goals',selection:'Over 2.5',kickoff:'2026-09-10T18:00:00.000Z'}],
+    comboPicks:[]
+  }
+  const {goalsBankers,comboPicks}=isolateComboBags(existing,incoming,now)
+  assert.equal(goalsBankers.length,1)
+  assert.equal(goalsBankers[0].market,'total-goals')
+  assert.equal(comboPicks.length,1)
+  assert.equal(comboPicks[0].market,'combo-home-gg')
+})
+
+test('combo merge keeps two combo markets on the same fixture',()=>{
+  const now='2026-09-10T12:00:00.000Z'
+  const existing={
+    goalsBankers:[],
+    comboPicks:[
+      {fixtureId:9,market:'combo-home-gg',selection:'Home Team or GG',kickoff:'2026-09-10T20:00:00.000Z'},
+      {fixtureId:9,market:'combo-home-clean-sheet',selection:'Home Team or Any Clean Sheet',kickoff:'2026-09-10T20:00:00.000Z'}
+    ]
+  }
+  const incoming={goalsBankers:[],comboPicks:existing.comboPicks}
+  const {comboPicks}=isolateComboBags(existing,incoming,now)
+  assert.equal(comboPicks.length,2)
 })

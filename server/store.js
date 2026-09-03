@@ -1,6 +1,7 @@
 import {ENGINE_VERSION} from './config.js'
 import {BANKER_ENGINE} from './bankerEngine.js'
 import {toBankerPageRows} from './bankerPage.js'
+import {isComboBoardPick} from './publicBoard.js'
 
 const raw=String(process.env.SUPABASE_URL||'').trim().replace(/\/+$/,'')
 const URL=!raw?'':/^https?:\/\//i.test(raw)?raw:raw.includes('.supabase.co')?`https://${raw}`:`https://${raw}.supabase.co`
@@ -33,7 +34,7 @@ export function attachCrests(board){
     return{...row,homeLogo,awayLogo,homeId,awayId}
   }
   const next={...board}
-  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','comboPicks','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
 }
 function applyBankerPage(board){
@@ -62,15 +63,15 @@ function kickoffPassed(row,now){
   const ts=Date.parse(now||'')
   return Number.isFinite(ko)&&Number.isFinite(ts)&&ko<=ts
 }
-function mergeRows(oldRows,freshRows,now,existing){
+function mergeRows(oldRows,freshRows,now,existing,keyFn=p=>String(p?.fixtureId??'')){
   const oldList=Array.isArray(oldRows)?oldRows:[]
   const freshList=Array.isArray(freshRows)?freshRows:[]
-  const freshMap=new Map(freshList.map(p=>[String(p?.fixtureId),p]))
+  const freshMap=new Map(freshList.map(p=>[keyFn(p),p]))
   const out=[]
   const seen=new Set()
   for(const old of oldList){
-    const id=String(old?.fixtureId??'')
-    if(!id||seen.has(id))continue
+    const id=keyFn(old)
+    if(!id||id==='||'||seen.has(id))continue
     const fresh=freshMap.get(id)
     const publishedAt=old.publishedAt||existing?.meta?.firstPublishedAt||existing?.meta?.storedAt||now
     const useFresh=Boolean(fresh)&&!kickoffPassed(old,now)
@@ -86,15 +87,28 @@ function mergeRows(oldRows,freshRows,now,existing){
     seen.add(id)
   }
   for(const p of freshList){
-    const id=String(p?.fixtureId??'')
-    if(!id||seen.has(id))continue
+    const id=keyFn(p)
+    if(!id||id==='||'||seen.has(id))continue
     out.push(stampPick(p,now))
     seen.add(id)
   }
   return out.sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0))
 }
+function comboRowsFrom(board){
+  return [...(Array.isArray(board?.comboPicks)?board.comboPicks:[]),...(Array.isArray(board?.goalsBankers)?board.goalsBankers:[])].filter(isComboBoardPick)
+}
+export function isolateComboBags(existing,incoming,now){
+  const goalsBankers=mergeRows(
+    (existing?.goalsBankers||[]).filter(r=>!isComboBoardPick(r)),
+    (incoming?.goalsBankers||[]).filter(r=>!isComboBoardPick(r)),
+    now,
+    existing
+  )
+  const comboPicks=mergeRows(comboRowsFrom(existing),comboRowsFrom(incoming),now,existing,p=>p?.proofKey||proofKey(p))
+  return{goalsBankers,comboPicks}
+}
 function countTips(board){
-  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.goalsBankers||[]).length+(board?.dailyBankers||[]).length+(board?.safestBankers||[]).length+(board?.valueBankers||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
+  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.goalsBankers||[]).length+(board?.comboPicks||[]).length+(board?.dailyBankers||[]).length+(board?.safestBankers||[]).length+(board?.valueBankers||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
 }
 function incomingFeedEmpty(board){
   const source=Number(board?.meta?.sourceFixtures??board?.meta?.diagnostics?.sourceFixtures??0)
@@ -110,7 +124,7 @@ function mergePublished(existing,incoming){
   const bestPicks=mergeRows(existing?.bestPicks,incoming?.bestPicks,now,existing)
   const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
   const filterTips=mergeRows(existing?.filterTips,incoming?.filterTips,now,existing)
-  const goalsBankers=mergeRows(existing?.goalsBankers,incoming?.goalsBankers,now,existing)
+  const {goalsBankers,comboPicks}=isolateComboBags(existing,incoming,now)
   const bankers=mergeRows(existing?.bankers,incoming?.bankers,now,existing)
   return attachCrests({
     ...incoming,
@@ -118,6 +132,8 @@ function mergePublished(existing,incoming){
     varTips,
     filterTips,
     goalsBankers,
+    comboPicks,
+    comboMeta:incoming?.comboMeta||existing?.comboMeta||null,
     bankers,
     results:{...(existing?.results||{}),...(incoming?.results||{})},
     resultSummary:incoming?.resultSummary||existing?.resultSummary||null,
@@ -130,6 +146,8 @@ function mergePublished(existing,incoming){
       varTipsCount:varTips.length,
       filterTipsCount:filterTips.length,
       goalsBankersCount:goalsBankers.length,
+      comboCount:comboPicks.length,
+      comboEngine:incoming?.meta?.comboEngine||incoming?.comboMeta?.engine||existing?.meta?.comboEngine||null,
       bankerRulesCount:bankers.length
     }
   })

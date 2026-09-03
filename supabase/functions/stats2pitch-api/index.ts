@@ -288,6 +288,20 @@ function splitGoalsAndCombo(board:any={}){
   const fromGoals=rawGoals.filter(isComboBoardPick)
   return{goalsBankers:rawGoals.filter((r:any)=>!isComboBoardPick(r)),comboPicks:dedicated.length?dedicated:fromGoals}
 }
+function sanitizeGoalsAndCombo(board:any={}){
+  const split=splitGoalsAndCombo(board)
+  return{
+    ...board,
+    goalsBankers:split.goalsBankers,
+    comboPicks:split.comboPicks,
+    meta:{
+      ...(board?.meta||{}),
+      goalsBankersCount:split.goalsBankers.length,
+      comboCount:split.comboPicks.length,
+      comboEngine:board?.meta?.comboEngine||board?.comboMeta?.engine||null
+    }
+  }
+}
 function slimMeta(meta:any={}){
   return{
     date:meta.date,
@@ -356,7 +370,8 @@ async function snapshot(date:string){
   const rows=await rest(`/rest/v1/prediction_snapshots?select=payload,generated_at&snapshot_date=eq.${encodeURIComponent(date)}&limit=1`)
   const row=Array.isArray(rows)?rows[0]:null,payload=row?.payload||null
   if(!payload)return null
-  return{board:{...payload,meta:{...(payload.meta||{}),storedAt:row.generated_at}},generatedAt:row.generated_at}
+  const board=sanitizeGoalsAndCombo({...payload,meta:{...(payload.meta||{}),storedAt:row.generated_at}})
+  return{board,generatedAt:row.generated_at}
 }
 function snapshotState(date:string,row:{board:any,generatedAt:string}|null){
   const raw=row?.board?.meta?.generatedAt||row?.generatedAt||'',at=Date.parse(raw),isFresh=Number.isFinite(at)&&Date.now()-at<TTL_MS
