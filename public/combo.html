@@ -18,8 +18,8 @@
   <link rel="stylesheet" href="/goalsBankers.css?v=5.7.0">
   <link rel="stylesheet" href="/fontPlus2.css?v=5.7.0">
   <link rel="stylesheet" href="/compactBoard.css?v=5.22.1">
-  <link rel="stylesheet" href="/combo.css?v=1.0.0">
-  <style>html.s2p-booting{background:#000}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#000}@media(max-width:1100px){.mobile-nav{display:flex!important}.page-tabs{display:none!important}}@media(min-width:1101px){.mobile-nav{display:none!important}}</style>
+  <link rel="stylesheet" href="/combo.css?v=1.1.0">
+  <style>html.s2p-booting{background:#000}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#000}@media(max-width:1100px){.mobile-nav{display:flex!important}.page-tabs{display:none!important}.card>.match-badge,.card>.fav-badge,.card>.var-badge,.card>.filter-badge,.card>.goals-badge,.card>.route-badge,.card>.live-score-note,.pick-result{display:none!important;visibility:hidden!important}}@media(min-width:1101px){.mobile-nav{display:none!important}}</style>
 </head>
 <body data-view="combo">
   <div id="boot" class="s2p-boot" role="status" aria-live="polite" aria-label="Loading Stats2Pitch">
@@ -55,18 +55,7 @@
     </header>
 
     <div class="wrap">
-      <section class="combo-hero">
-        <div class="combo-hero-num"><b id="comboCount">0</b><small>picks</small></div>
-        <div class="combo-hero-copy">
-          <strong>Combo <em>TOP 2</em></strong>
-          <p>Like a smarter double chance across result + goals. Stats2Pitch checks venue split, recent form and H2H, ranks the listed Combo markets, and publishes only the two strongest routes per match. Minimum SportyBet price: <b>1.20</b>.</p>
-        </div>
-      </section>
-
-      <div class="combo-rules" aria-label="Combo engine rules">
-        <span>12 supported markets</span><span>Split + recent + H2H</span><span>Up to 2 per match</span><span>Odds ≥ 1.20</span>
-      </div>
-
+      <section id="todayStats"></section>
       <div class="controls-shell combo-controls">
         <nav id="dates"></nav>
         <div class="toolbar filters">
@@ -79,7 +68,7 @@
         </div>
       </div>
       <div id="countryChips" class="country-chips" aria-label="Country shortcuts"></div>
-      <main id="comboCards" class="combo-board"><div class="empty">Loading Combo picks…</div></main>
+      <main id="cards"><div class="empty">Loading Combo picks…</div></main>
     </div>
   </div>
 
@@ -97,7 +86,7 @@
   <script src="/runtime-config.js"></script>
   <link rel="modulepreload" href="/net.js?v=5.17.0">
   <script src="/leagueFlags.js?v=5.7.0"></script>
-  <script type="module" src="/combo.js?v=1.0.0"></script>
+  <script type="module" src="/combo.js?v=1.1.0"></script>
   <script src="/pwa.js?v=5.17.0"></script>
 </body>
 </html>
