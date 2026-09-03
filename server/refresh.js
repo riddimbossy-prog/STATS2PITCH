@@ -1,5 +1,6 @@
 import {sportyFixturesByDate} from './sportyBet.js'
 import {hydrateSportyComboMarkets} from './comboMarketHydrator.js'
+import {buildComboBoard} from './comboEngine.js'
 import {teamLastX,leagueFormPack,matchGoalEvents,nid,overallSample,hasMatchStats,teamVersus} from './sportyStats.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard} from './engine.js'
@@ -184,6 +185,9 @@ export async function refreshNow(date,onProgress=()=>{}){
 
   const fixtures=analyzed.filter(Boolean),bankerRules=buildBankerRules(fixtures)
   const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,skippedNoStats,feed,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,skippedNoStats,qualifiedTips:0,bestPicks:0,varTips:0,filterTips:0,comboPicks:0,bankerRulePicks:bankerRules.picks.length,feed}},learned)
+  const comboBoard=buildComboBoard(fixtures,board.meta)
+  board.comboPicks=comboBoard.bestPicks;board.comboMeta=comboBoard.meta
+  board.meta.comboEngine=comboBoard.meta.engine;board.meta.comboCount=comboBoard.bestPicks.length
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}
