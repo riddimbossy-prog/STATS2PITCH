@@ -9,7 +9,7 @@ const APP_TIMEZONE=Deno.env.get('APP_TIMEZONE')||'UTC'
 const SPORTYBET_COUNTRY=(Deno.env.get('SPORTYBET_COUNTRY')||'gh').replace(/[^a-z]/gi,'').toLowerCase()||'gh'
 const SPORTYBET_BASE=(Deno.env.get('SPORTYBET_BASE')||'https://www.sportybet.com').replace(/\/$/,'')
 const TTL_MS=Math.max(15,Number(Deno.env.get('AUTO_REFRESH_TTL_MINUTES')||45))*60_000
-const ADMIN_EMAILS=(Deno.env.get('STATS2PITCH_ADMIN_EMAILS')||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean)
+const ADMIN_EMAILS=['stats2pitch@gmail.com',...(Deno.env.get('STATS2PITCH_ADMIN_EMAILS')||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean)]
 const GITHUB_TOKEN=Deno.env.get('STATS2PITCH_GITHUB_TOKEN')||''
 const GITHUB_REPO=Deno.env.get('STATS2PITCH_GITHUB_REPO')||'riddimbossy-prog/STATS2PITCH'
 
