@@ -34,12 +34,13 @@ function pickResult(r){const x=resultFor(r);return decided(x?.outcome)?`<span cl
 function topStatus(r){const s=stateFor(r),x=resultFor(r);if(s==='live'){const clock=clockText(x);return `<span class="m-result live">${clock?esc(clock):'LIVE'}</span>`}if(decided(x?.outcome))return topResult(r);return `<span class="m-kick-row">${esc(kickClock(r.kickoff))}</span>`}
 function topResult(r){const x=resultFor(r);return decided(x?.outcome)?`<span class="m-result ${esc(x.outcome)}">${outcomeLabel(x.outcome)}</span>`:''}
 function pickLabel(r){return String(r.displaySelection||r.pick||r.selection||'Selection')}
-function isComboPick(r){return COMBO_ROUTES.has(String(r?.route||''))||String(r?.family||'')==='Combo'||String(r?.market||'').startsWith('draw-or-')}
+function isComboBoardPick(r){const m=String(r?.market||'');return m.startsWith('combo-')||String(r?.engineVersion||r?.engine||'').startsWith('combo-')}
+function isComboPick(r){if(isComboBoardPick(r))return false;return COMBO_ROUTES.has(String(r?.route||''))||String(r?.family||'')==='Combo'||String(r?.market||'').startsWith('draw-or-')}
 function marketName(r){const m=String(r.market||'');if(m==='both-teams-score')return'Both Teams To Score';if(m==='match-winner')return'Match winner';if(m==='away-team-goals')return'Away team goals';if(m==='home-team-goals')return'Home team goals';if(m==='total-goals')return'Total goals';if(m==='draw-or-over-25')return'Draw or Over 2.5';if(m==='draw-or-under-25')return'Draw or Under 2.5';if(m==='draw-or-gg')return'Draw or GG';return m.replaceAll('-',' ')||'Market'}
 function routeLabel(r){return({FAV_WIN:'WIN',FAV_2PLUS:'2+','OVER_2.5':'O2.5',GG:'GG',DRAW_OR_OVER_25:'D/O2.5',DRAW_OR_UNDER_25:'D/U2.5',DRAW_OR_GG:'D/GG'})[r.route]||(isComboPick(r)?'COMBO':'PICK')}
 function uniq(xs){return[...new Set(xs.filter(Boolean).map(String))].sort((a,b)=>a.localeCompare(b))}
 function options(el,values,current,label,fmt=v=>v){if(!el)return'all';const valid=current==='all'||values.includes(current)?current:'all';el.innerHTML=`<option value="all">${esc(label)}</option>`+values.map(v=>`<option value="${esc(v)}" ${v===valid?'selected':''}>${fmt(v)}</option>`).join('');return valid}
-function allRows(){return boardReady(state.board)?(state.board.goalsBankers||[]).filter(r=>!isSrlPick(r)):[]}
+function allRows(){return boardReady(state.board)?(state.board.goalsBankers||[]).filter(r=>!isSrlPick(r)&&!isComboBoardPick(r)):[]}
 function filtered(rows){return rows.filter(r=>{const s=stateFor(r);if(state.status!=='all'&&s!==state.status)return false;if(state.country!=='all'&&String(r.country)!==state.country)return false;if(state.league!=='all'&&String(r.league)!==state.league)return false;if(state.market!=='all'&&String(r.market)!==state.market)return false;if(state.route==='COMBO'){if(!isComboPick(r))return false}else if(state.route!=='all'&&String(r.route)!==state.route)return false;return true}).sort((a,b)=>kickoffMs(a)-kickoffMs(b)||String(a.league).localeCompare(String(b.league)))}
 function renderHero(rows){const el=$('#goalsHeroCount');if(el)el.textContent=String(rows.length)}
 function renderMarkets(rows){
@@ -132,7 +133,7 @@ function render(){
 }
 
 function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
-function pickRows(board){return (board?.goalsBankers||[]).filter(r=>!isSrlPick(r))}
+function pickRows(board){return (board?.goalsBankers||[]).filter(r=>!isSrlPick(r)&&!isComboBoardPick(r))}
 async function hopIfEmpty(){
   if(state.status!=='upcoming')return false
   if(hasRemainingTips(pickRows(state.board)))return false

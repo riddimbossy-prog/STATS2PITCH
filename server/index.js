@@ -10,7 +10,7 @@ import {normalizeFixtureStatus,resolveResult,fixtureForPick} from './settlement.
 import {buildLearningProfiles,buildLearningState,publicLearning} from './learning.js'
 import {ENGINE_VERSION} from './config.js'
 import {eliteFeedAuthorized,buildEliteFeed} from './eliteExport.js'
-import {publicBoard,compactResultRows} from './publicBoard.js'
+import {publicBoard,compactResultRows,splitGoalsAndCombo} from './publicBoard.js'
 
 const PORT=Number(process.env.PORT||3000),PUBLIC=fileURLToPath(new URL('../public/',import.meta.url))
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml','.mp4':'video/mp4'}
@@ -38,8 +38,8 @@ function mergeLive(map,liveRows,published){
   return map
 }
 async function resultPayload(date){
-  const board=await loadBoard(date)||{bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],dailyBankers:[],bankers:[],safestBankers:[],valueBankers:[],results:{}}
-  const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
+  const board=await loadBoard(date)||{bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],dailyBankers:[],bankers:[],safestBankers:[],valueBankers:[],results:{}}
+  const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.comboPicks||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
   const eventIds=published.map(p=>p.sportyEventId||p.eventId).filter(Boolean)
   let fixtures=[]
   try{if(eventIds.length)fixtures=await sportyEventFixtures(eventIds)}catch{}
@@ -57,10 +57,12 @@ async function resultPayload(date){
   const picks=compactResultRows((board.bestPicks||[]).map(withResult))
   const varTips=compactResultRows((board.varTips||[]).map(withResult))
   const filterTips=compactResultRows((board.filterTips||[]).map(withResult))
-  const goalsBankers=compactResultRows((board.goalsBankers||[]).map(withResult))
+  const split=splitGoalsAndCombo(board)
+  const goalsBankers=compactResultRows(split.goalsBankers.map(withResult))
+  const comboPicks=compactResultRows(split.comboPicks.map(withResult))
   const dailyBankers=compactResultRows((board.dailyBankers||[]).map(withResult))
   const bankers=compactResultRows([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])].map(withResult))
-  return{date,picks,varTips,filterTips,goalsBankers,dailyBankers,bankers,fixtures:[...map.values()]}
+  return{date,picks,varTips,filterTips,goalsBankers,comboPicks,dailyBankers,bankers,fixtures:[...map.values()]}
 }
 async function api(req,res,url){
   if(url.pathname==='/api/health')return send(res,200,{ok:true,engineVersion:ENGINE_VERSION,version:'4.0.0'})
@@ -76,7 +78,7 @@ async function api(req,res,url){
   if(url.pathname==='/api/results'){
     const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today()
     const r=await resultPayload(date)
-    return send(res,200,{date:r.date,picks:r.picks,varTips:r.varTips,filterTips:r.filterTips,goalsBankers:r.goalsBankers,dailyBankers:r.dailyBankers,bankers:r.bankers})
+    return send(res,200,{date:r.date,picks:r.picks,varTips:r.varTips,filterTips:r.filterTips,goalsBankers:r.goalsBankers,comboPicks:r.comboPicks,dailyBankers:r.dailyBankers,bankers:r.bankers})
   }
   if(url.pathname==='/api/live-scores'){const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today();const r=await resultPayload(date);return send(res,200,{date,fixtures:r.fixtures||[]})}
   if(url.pathname==='/api/performance'){

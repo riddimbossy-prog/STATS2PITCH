@@ -30,8 +30,25 @@ function slimMeta(meta={}){
   }
 }
 
+export function isComboBoardPick(r){
+  const m=String(r?.market||'')
+  const engine=String(r?.engineVersion||r?.engine||'')
+  return m.startsWith('combo-')||engine.startsWith('combo-')
+}
+
+export function splitGoalsAndCombo(board={}){
+  const rawGoals=Array.isArray(board?.goalsBankers)?board.goalsBankers:[]
+  const dedicated=Array.isArray(board?.comboPicks)?board.comboPicks.filter(isComboBoardPick):[]
+  const fromGoals=rawGoals.filter(isComboBoardPick)
+  return{
+    goalsBankers:rawGoals.filter(r=>!isComboBoardPick(r)),
+    comboPicks:dedicated.length?dedicated:fromGoals
+  }
+}
+
 export function publicBoard(board={},view='all'){
   const v=VIEWS.has(String(view||''))?String(view):'all'
+  const split=splitGoalsAndCombo(board)
   const empty={
     meta:slimMeta(board?.meta||{}),
     fixtures:Array.isArray(board?.fixtures)?board.fixtures:[],
@@ -63,13 +80,13 @@ export function publicBoard(board={},view='all'){
     return empty
   }
   if(v==='goals'){
-    empty.goalsBankers=Array.isArray(board?.goalsBankers)?board.goalsBankers:[]
+    empty.goalsBankers=split.goalsBankers
     empty.goalsBankersMeta=board?.goalsBankersMeta||null
     empty.availableMarkets=markets(empty.goalsBankers)
     return empty
   }
   if(v==='combo'){
-    empty.comboPicks=Array.isArray(board?.comboPicks)?board.comboPicks:[]
+    empty.comboPicks=split.comboPicks
     empty.comboMeta=board?.comboMeta||null
     empty.availableMarkets=markets(empty.comboPicks)
     return empty

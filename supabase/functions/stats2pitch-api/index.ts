@@ -273,10 +273,21 @@ function attachCrests(board:any){
     return{...row,homeLogo,awayLogo}
   }
   const next={...board}
-  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','comboPicks','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
 }
-function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,goalsBankersCount:0,safestBankersCount:0,valueBankersCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],dailyBankers:[],safestBankers:[],valueBankers:[],fixtures:[],availableMarkets:[],results:{}}}
+function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,goalsBankersCount:0,comboCount:0,safestBankersCount:0,valueBankersCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],dailyBankers:[],safestBankers:[],valueBankers:[],fixtures:[],availableMarkets:[],results:{}}}
+function isComboBoardPick(r:any){
+  const m=String(r?.market||'')
+  const engine=String(r?.engineVersion||r?.engine||'')
+  return m.startsWith('combo-')||engine.startsWith('combo-')
+}
+function splitGoalsAndCombo(board:any={}){
+  const rawGoals=Array.isArray(board?.goalsBankers)?board.goalsBankers:[]
+  const dedicated=Array.isArray(board?.comboPicks)?board.comboPicks.filter(isComboBoardPick):[]
+  const fromGoals=rawGoals.filter(isComboBoardPick)
+  return{goalsBankers:rawGoals.filter((r:any)=>!isComboBoardPick(r)),comboPicks:dedicated.length?dedicated:fromGoals}
+}
 function slimMeta(meta:any={}){
   return{
     date:meta.date,
@@ -294,6 +305,8 @@ function slimMeta(meta:any={}){
     filterTipsCount:meta.filterTipsCount,
     goalsBankersEngine:meta.goalsBankersEngine,
     goalsBankersCount:meta.goalsBankersCount,
+    comboEngine:meta.comboEngine,
+    comboCount:meta.comboCount,
     dailyBankersEngine:meta.dailyBankersEngine,
     safestBankersCount:meta.safestBankersCount,
     valueBankersCount:meta.valueBankersCount,
@@ -302,7 +315,8 @@ function slimMeta(meta:any={}){
   }
 }
 function publicBoard(board:any={},view='all'){
-  const v=['all','var','filter','goals','bankers'].includes(String(view||''))?String(view):'all'
+  const v=['all','var','filter','goals','combo','bankers'].includes(String(view||''))?String(view):'all'
+  const split=splitGoalsAndCombo(board)
   const empty:any={
     meta:slimMeta(board?.meta||{}),
     fixtures:Array.isArray(board?.fixtures)?board.fixtures:[],
@@ -312,6 +326,7 @@ function publicBoard(board:any={},view='all'){
     varTips:[],
     filterTips:[],
     goalsBankers:[],
+    comboPicks:[],
     dailyBankers:[],
     safestBankers:[],
     valueBankers:[],
@@ -322,7 +337,8 @@ function publicBoard(board:any={},view='all'){
   const markets=(rows:any[])=>[...new Set((rows||[]).map((x:any)=>x?.market).filter(Boolean))].sort()
   if(v==='var'){empty.varTips=board?.varTips||[];empty.varTipsMeta=board?.varTipsMeta||null;empty.availableMarkets=markets(empty.varTips);return empty}
   if(v==='filter'){empty.filterTips=board?.filterTips||[];empty.filterTipsMeta=board?.filterTipsMeta||null;empty.availableMarkets=markets(empty.filterTips);return empty}
-  if(v==='goals'){empty.goalsBankers=board?.goalsBankers||[];empty.goalsBankersMeta=board?.goalsBankersMeta||null;empty.availableMarkets=markets(empty.goalsBankers);return empty}
+  if(v==='goals'){empty.goalsBankers=split.goalsBankers;empty.goalsBankersMeta=board?.goalsBankersMeta||null;empty.availableMarkets=markets(empty.goalsBankers);return empty}
+  if(v==='combo'){empty.comboPicks=split.comboPicks;empty.comboMeta=board?.comboMeta||null;empty.availableMarkets=markets(empty.comboPicks);return empty}
   if(v==='bankers'){
     empty.dailyBankers=board?.dailyBankers||[]
     empty.safestBankers=board?.safestBankers||[]
@@ -471,7 +487,7 @@ async function liveScores(date:string){
   }catch{}
   try{
     const row=await snapshot(date)
-    const picks=[...(row?.board?.bestPicks||[]),...(row?.board?.varTips||[]),...(row?.board?.filterTips||[]),...(row?.board?.goalsBankers||[]),...(row?.board?.dailyBankers||[]),...(row?.board?.safestBankers||[]),...(row?.board?.valueBankers||[]),...(row?.board?.bankers||[])]
+    const picks=[...(row?.board?.bestPicks||[]),...(row?.board?.varTips||[]),...(row?.board?.filterTips||[]),...(row?.board?.goalsBankers||[]),...(row?.board?.comboPicks||[]),...(row?.board?.dailyBankers||[]),...(row?.board?.safestBankers||[]),...(row?.board?.valueBankers||[]),...(row?.board?.bankers||[])]
     const have=new Set(out.map(f=>String(f?.fixture?.id||'')))
     const missing=picks.map((p:any)=>p?.fixtureId).filter((id:any)=>id!=null&&!have.has(String(id)))
     for(const id of missing.slice(0,80)){
@@ -516,6 +532,24 @@ function settle(p:any,f:any){
   else if(market==='draw-or-over-25'){outcome=win(h===a||(h+a)>2.5)}
   else if(market==='draw-or-under-25'){outcome=win(h===a||(h+a)<2.5)}
   else if(market==='draw-or-gg'||market==='draw-or-btts'){outcome=win(h===a||(h>0&&a>0))}
+  else if(market.startsWith('combo-')){
+    const total=h+a,gg=h>0&&a>0,anyCleanSheet=h===0||a===0,homeWin=h>a,draw=h===a,awayWin=a>h
+    const map:Record<string,boolean>={
+      'combo-home-over-25':homeWin||total>2.5,
+      'combo-home-under-25':homeWin||total<2.5,
+      'combo-draw-over-25':draw||total>2.5,
+      'combo-draw-under-25':draw||total<2.5,
+      'combo-away-over-25':awayWin||total>2.5,
+      'combo-away-under-25':awayWin||total<2.5,
+      'combo-home-gg':homeWin||gg,
+      'combo-draw-gg':draw||gg,
+      'combo-away-gg':awayWin||gg,
+      'combo-home-clean-sheet':homeWin||anyCleanSheet,
+      'combo-draw-clean-sheet':draw||anyCleanSheet,
+      'combo-away-clean-sheet':awayWin||anyCleanSheet
+    }
+    if(Object.prototype.hasOwnProperty.call(map,market))outcome=win(map[market])
+  }
   else if(market==='total-goals'){const q=ou(p?.selection);if(q){const t=h+a;outcome=win(q.side==='over'?t>q.line:t<q.line,t===q.line)}}
   else if(market==='home-team-goals'){const q=ou(p?.selection);if(q)outcome=win(q.side==='over'?h>q.line:h<q.line,h===q.line)}
   else if(market==='away-team-goals'){const q=ou(p?.selection);if(q)outcome=win(q.side==='over'?a>q.line:a<q.line,a===q.line)}
@@ -579,17 +613,19 @@ Deno.serve(async req=>{
     }
     if(route==='/results'&&req.method==='GET'){
       const date=requestedDate(url),row=await snapshot(date),board=row?.board||emptyBoard(date)
-      const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
+      const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.comboPicks||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
       let fixtures:any[]=[];try{fixtures=await liveScores(date)}catch{}
       const map=mergeLive(new Map(),fixtures,published),stored=board?.results||{}
       const withResult=(rows:any[])=>compactResultRows((rows||[]).map((p:any)=>({...p,result:attachResult(p,map.get(String(p.fixtureId)),stored[String(p.fixtureId)])})))
       const picks=withResult(board?.bestPicks)
       const varTips=withResult(board?.varTips)
       const filterTips=withResult(board?.filterTips)
-      const goalsBankers=withResult(board?.goalsBankers)
+      const split=splitGoalsAndCombo(board)
+      const goalsBankers=withResult(split.goalsBankers)
+      const comboPicks=withResult(split.comboPicks)
       const dailyBankers=withResult(board?.dailyBankers)
       const bankers=withResult([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])])
-      return json({date,picks,varTips,filterTips,goalsBankers,dailyBankers,bankers})
+      return json({date,picks,varTips,filterTips,goalsBankers,comboPicks,dailyBankers,bankers})
     }
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}
     if(route==='/performance'&&req.method==='GET'){
