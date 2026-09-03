@@ -73,27 +73,91 @@ async function lookupGeo(req:Request){
   }catch{}
   return fallback
 }
+function accraDay(input:Date|string|number=Date.now()){
+  return new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Accra',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(input))
+}
+function lastDays(n:number){
+  return Array.from({length:n},(_,i)=>accraDay(Date.now()-(n-1-i)*86_400_000))
+}
+const REGION_INDEX:Record<string,string>={}
+function addRegion(name:string, codes:string){
+  for(const c of codes.split(' ')) REGION_INDEX[c]=name
+}
+addRegion('Africa','DZ AO BJ BW BF BI CM CV CF TD KM CG CD CI DJ EG GQ ER SZ ET GA GM GH GN GW KE LS LR LY MG MW ML MR MU MA MZ NA NE NG RW SN SC SL SO ZA SS SD TZ TG TN UG ZM ZW')
+addRegion('Europe','AL AT BE BA BG HR CY CZ DK EE FI FR DE GR HU IS IE IT LV LT LU MT MD ME NL MK NO PL PT RO RS SK SI ES SE CH UA GB')
+addRegion('North America','US CA MX GT HN NI CR PA CU DO HT JM TT')
+addRegion('South America','AR BO BR CL CO EC GY PY PE UY VE')
+addRegion('Asia','AE SA QA KW BH OM IL JO LB TR IR IQ IN PK BD LK NP CN HK TW JP KR VN TH MY SG ID PH KH LA MM KZ UZ')
+addRegion('Oceania','AU NZ PG FJ')
+function regionOf(code:string){
+  return REGION_INDEX[String(code||'').toUpperCase()]||'Unknown'
+}
+function pruneDays(days:Record<string,unknown>){
+  const keep=new Set(lastDays(62))
+  const out:Record<string,unknown>={}
+  for(const [k,v] of Object.entries(days||{})) if(keep.has(k)) out[k]=v
+  return out
+}
 function visitorFromUser(u:any, now=Date.now()){
   const m=u?.user_metadata||{}
   const last=Date.parse(m.last_seen_at||'')
   const online=Number.isFinite(last)&&now-last<120000
   const sessions=Math.max(1,Number(m.session_count||m.login_count||1))
   const total=Math.max(0,Number(m.total_seconds||0))
+  const country=String(m.country||'').toUpperCase()||'—'
+  const activeDays=Object.keys(m.presence_days||{})
+  if(m.last_seen_at){
+    const day=accraDay(m.last_seen_at)
+    if(!activeDays.includes(day)) activeDays.push(day)
+  }
   return{
     id:u.id,
     email:u.email||'',
     name:String(u.email||'user').split('@')[0],
-    country:String(m.country||'').toUpperCase()||'—',
+    country,
     countryName:m.country_name||m.country||'Unknown',
     city:m.city||'',
+    region:regionOf(country),
     loginCount:Number(m.login_count||0),
     sessionCount:sessions,
     totalSeconds:total,
     avgSessionSeconds:sessions?Math.round(total/sessions):0,
     lastSeenAt:m.last_seen_at||null,
+    createdAt:u.created_at||m.first_seen_at||null,
     lastPath:m.last_path||'/',
     device:m.device||'mobile',
+    activeDays,
     online
+  }
+}
+function analyticsFrom(visitors:any[]){
+  const series=lastDays(30).map(day=>{
+    const online=visitors.filter((v:any)=>(v.activeDays||[]).includes(day)).length
+    const neu=visitors.filter((v:any)=>v.createdAt&&accraDay(v.createdAt)===day).length
+    return {day,online,newUsers:neu}
+  })
+  const createdIn=(n:number)=>visitors.filter((v:any)=>v.createdAt&&lastDays(n).includes(accraDay(v.createdAt))).length
+  const activeIn=(n:number)=>visitors.filter((v:any)=>(v.activeDays||[]).some((d:string)=>lastDays(n).includes(d))).length
+  const regionMap:Record<string,{name:string,count:number,online:number}>={}
+  const countryMap:Record<string,{code:string,name:string,region:string,count:number,online:number}>={}
+  for(const v of visitors){
+    const region=v.region||'Unknown'
+    regionMap[region]=regionMap[region]||{name:region,count:0,online:0}
+    regionMap[region].count++
+    if(v.online) regionMap[region].online++
+    const code=String(v.country||'')
+    if(code&&code!=='—'){
+      countryMap[code]=countryMap[code]||{code,name:v.countryName||code,region,count:0,online:0}
+      countryMap[code].count++
+      if(v.online) countryMap[code].online++
+    }
+  }
+  return{
+    newUsers:{day:createdIn(1),week:createdIn(7),month:createdIn(30),total:visitors.length},
+    active:{day:activeIn(1),week:activeIn(7),month:activeIn(30)},
+    series,
+    regions:Object.values(regionMap).sort((a,b)=>b.count-a.count),
+    countries:Object.values(countryMap).sort((a,b)=>b.count-a.count)
   }
 }
 async function listAuthUsers(){
@@ -125,6 +189,10 @@ async function recordPresence(user:any, req:Request, body:any){
     countryName=geo.countryName
     city=geo.city
   }
+  const day=accraDay(now)
+  const days=pruneDays((meta.presence_days&&typeof meta.presence_days==='object')?meta.presence_days:{})
+  const cur:any=days[day]&&typeof days[day]==='object'?days[day]:{hits:0,seconds:0}
+  days[day]={hits:Number(cur.hits||0)+1,seconds:Number(cur.seconds||0)+seconds}
   const next={
     ...meta,
     country,
@@ -134,9 +202,11 @@ async function recordPresence(user:any, req:Request, body:any){
     session_count:Number(meta.session_count||0)+(isNewSession?1:0),
     total_seconds:Number(meta.total_seconds||0)+seconds,
     last_seen_at:now.toISOString(),
+    first_seen_at:meta.first_seen_at||now.toISOString(),
     last_login_at:isNewSession?now.toISOString():(meta.last_login_at||now.toISOString()),
     last_path:String(body?.path||'/').slice(0,120),
-    device:deviceOf(String(body?.device||''))
+    device:deviceOf(String(body?.device||'')),
+    presence_days:days
   }
   if(SUPABASE_SERVICE_ROLE_KEY){
     await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`,{
@@ -539,11 +609,11 @@ Deno.serve(async req=>{
       const rows=await boardRows(30),boards=(rows||[]).map((x:any)=>x.payload).filter(Boolean),performance=performanceFromBoards(boards),learned=learningFromBoards(boards)
       const latest=(rows||[])[0]||null,meta=latest?.payload?.meta||{},latestPicks=(latest?.payload?.bestPicks||[]).slice(0,25)
       const visitors=(await listAuthUsers()).map((u:any)=>visitorFromUser(u)).sort((a:any,b:any)=>Number(b.online)-Number(a.online)||Date.parse(b.lastSeenAt||0)-Date.parse(a.lastSeenAt||0))
-      const countries=[...new Set(visitors.map((v:any)=>v.country).filter((c:string)=>c&&c!=='—'))]
+      const stats=analyticsFrom(visitors)
       const online=visitors.filter((v:any)=>v.online).length
       const avgSession=visitors.length?Math.round(visitors.reduce((n:number,v:any)=>n+Number(v.avgSessionSeconds||0),0)/visitors.length):0
       const logins=visitors.reduce((n:number,v:any)=>n+Number(v.loginCount||0),0)
-      return json({user:{email:admin.email||''},snapshots:rows.length,users:visitors.length,online,countries:countries.length,avgSession,logins,visitors,performance,learning:learned.profiles,learningState:learned.state,latest,health:{footballData:true,sourceFixtures:meta.sourceFixtures||0,scheduledFixtures:meta.scheduledFixtures||0,analyzedFixtures:meta.analyzedFixtures||0,statsVerifiedFixtures:meta.statsVerifiedFixtures||0,historyFallbackTeams:meta.historyFallbackTeams||0},latestPicks})
+      return json({user:{email:admin.email||''},snapshots:rows.length,users:visitors.length,online,countries:stats.countries.length,avgSession,logins,newUsers:stats.newUsers,active:stats.active,series:stats.series,regions:stats.regions,countryStats:stats.countries,visitors,performance,learning:learned.profiles,learningState:learned.state,latest,health:{footballData:true,sourceFixtures:meta.sourceFixtures||0,scheduledFixtures:meta.scheduledFixtures||0,analyzedFixtures:meta.analyzedFixtures||0,statsVerifiedFixtures:meta.statsVerifiedFixtures||0,historyFallbackTeams:meta.historyFallbackTeams||0},latestPicks})
     }
     if(route==='/admin/refresh'&&req.method==='POST'){
       const admin=await verifyAdmin(req);if(!admin)return json({error:'Admin access required'},403);await dispatchRefresh();return json({ok:true,message:'Refresh requested.'},202)

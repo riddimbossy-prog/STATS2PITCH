@@ -13,7 +13,7 @@ const PALS = [
   "linear-gradient(135deg,#2a1208,#ff7a1a)"
 ]
 
-const state = { view: "overview", data: null, selected: null, query: "", map: null, timer: null }
+const state = { view: "overview", data: null, selected: null, query: "", map: null, timer: null, range: "week" }
 
 function apiUrl(path) { return `${base}/functions/v1/${apiFn}${path}` }
 function authUrl(path) { return `${base}/functions/v1/stats2pitch-auth${path}` }
@@ -90,12 +90,66 @@ function countries() {
   for (const v of visitors()) {
     const code = String(v.country || "").toUpperCase()
     if (!code || code === "—") continue
-    map[code] = map[code] || { code, name: v.countryName || code, count: 0, online: 0, seconds: 0 }
+    map[code] = map[code] || { code, name: v.countryName || code, region: v.region || "Unknown", count: 0, online: 0, seconds: 0 }
     map[code].count += 1
     map[code].seconds += Number(v.avgSessionSeconds || 0)
     if (v.online) map[code].online += 1
   }
   return Object.values(map).sort((a, b) => b.count - a.count)
+}
+function periodKey() { return state.range === "day" ? "day" : state.range === "month" ? "month" : "week" }
+function periodLabel() { return state.range === "day" ? "today" : state.range === "month" ? "this month" : "this week" }
+function rangeLen() { return state.range === "day" ? 7 : state.range === "month" ? 30 : 14 }
+function rangePills() {
+  return `<div class="pills">${["day","week","month"].map(r => `<button type="button" class="pill ${state.range===r?"on":""}" data-range="${r}">${r[0].toUpperCase()+r.slice(1)}</button>`).join("")}</div>`
+}
+function isNew(v) {
+  const t = Date.parse(v.createdAt || "")
+  return Number.isFinite(t) && Date.now() - t < 7 * 86400000
+}
+function createdInRange(v) {
+  const day = String(v.createdAt || "").slice(0, 10)
+  if (!day) return false
+  const n = state.range === "day" ? 1 : state.range === "month" ? 30 : 7
+  const keep = new Set((state.data?.series || []).slice(-n).map(r => r.day))
+  return keep.has(day)
+}
+function regionRows() {
+  return (state.data?.regions || []).slice()
+}
+function barList(rows, nameKey = "name") {
+  const max = Math.max(1, ...rows.map(r => r.count))
+  if (!rows.length) return `<p class="empty">No data yet.</p>`
+  return `<div class="bars">${rows.map(r => `<div class="bar"><span>${r.code ? flag(r.code) : ""}${esc(r[nameKey] || r.name)}</span><div class="track"><i style="width:${Math.max(8, (r.count / max) * 100)}%"></i></div><b>${r.count}</b></div>`).join("")}</div>`
+}
+function chartBox() {
+  const rows = (state.data?.series || []).slice(-rangeLen())
+  const max = Math.max(1, ...rows.map(r => Math.max(Number(r.online || 0), Number(r.newUsers || 0))))
+  const w = 720, h = 200, padL = 28, padB = 28, padT = 12
+  const inner = w - padL - 8
+  const barW = rows.length ? inner / rows.length : 1
+  const bars = rows.map((r, i) => {
+    const x = padL + i * barW
+    const ho = (Number(r.online || 0) / max) * (h - padB - padT)
+    const hn = (Number(r.newUsers || 0) / max) * (h - padB - padT)
+    return `<rect x="${x + 3}" y="${h - padB - ho}" width="${Math.max(2, barW * 0.42)}" height="${Math.max(0, ho)}" rx="3" fill="#3ddc84"></rect>
+      <rect x="${x + barW * 0.5}" y="${h - padB - hn}" width="${Math.max(2, barW * 0.38)}" height="${Math.max(0, hn)}" rx="3" fill="#8b929c"></rect>`
+  }).join("")
+  const labels = rows.map((r, i) => {
+    const show = rows.length <= 10 || i % Math.ceil(rows.length / 8) === 0 || i === rows.length - 1
+    if (!show) return ""
+    return `<text x="${padL + i * barW + barW / 2}" y="${h - 8}" text-anchor="middle" fill="#8b929c" font-size="11">${esc(String(r.day || "").slice(5))}</text>`
+  }).join("")
+  return `<div class="card">
+    <div class="card-head">
+      <div>
+        <h2>Online by ${esc(state.range)}</h2>
+        <p class="sub"><span class="leg mint"></span> Unique online &nbsp; <span class="leg mute"></span> New users</p>
+      </div>
+      ${rangePills()}
+    </div>
+    ${rows.length ? `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img">${bars}${labels}</svg>` : `<p class="empty">Activity by day appears as people use the site.</p>`}
+  </div>`
 }
 
 function showLogin(message = "") {
@@ -143,6 +197,7 @@ function topbar(title, subtitle) {
       <p>${esc(subtitle)}</p>
     </div>
     <div class="top-actions">
+      ${rangePills()}
       <button class="btn" id="refresh">Refresh</button>
       <div class="who"><span class="avatar">${esc(name.slice(0, 1).toUpperCase())}</span>${esc(email)}</div>
     </div>
@@ -151,11 +206,15 @@ function topbar(title, subtitle) {
 
 function kpis() {
   const d = state.data || {}
-  return `<section class="kpis">
-    <div class="kpi"><small>Users</small><b>${d.users || visitors().length || 0}</b><em>Signed in</em></div>
-    <div class="kpi"><small>Countries</small><b>${d.countries || countries().length || 0}</b><em>Live origin</em></div>
+  const k = periodKey()
+  const neu = d.newUsers?.[k] ?? 0
+  const act = d.active?.[k] ?? 0
+  return `<section class="kpis five">
+    <div class="kpi"><small>Total users</small><b>${d.users || visitors().length || 0}</b><em>All time</em></div>
+    <div class="kpi"><small>New users</small><b>${neu}</b><em>${periodLabel()}</em></div>
+    <div class="kpi"><small>Online</small><b>${act}</b><em>Unique ${periodLabel()}</em></div>
     <div class="kpi"><small>Online now</small><b>${d.online || 0}</b><em>Last 2 minutes</em></div>
-    <div class="kpi"><small>Avg time</small><b>${fmtMins(d.avgSession || 0)}</b><em>${d.logins || 0} logins</em></div>
+    <div class="kpi"><small>Countries</small><b>${d.countries || countries().length || 0}</b><em>${(d.regions || []).length} regions</em></div>
   </section>`
 }
 
@@ -163,7 +222,7 @@ function userRow(v, compact = false) {
   const on = selected()?.id === v.id
   return `<div class="user-row ${on ? "on" : ""}" data-id="${esc(v.id)}">
     <div class="mini" style="background:${pal(v.id, v.online)}"><b>${esc(v.country || "S2P")}</b><small>${esc((v.name || "user").slice(0, 10))}</small></div>
-    <div><strong>${esc(v.name || v.email || "User")}</strong><span class="mail">${esc(v.email || "")}</span></div>
+    <div><strong>${esc(v.name || v.email || "User")}${isNew(v) ? `<span class="badge">New</span>` : ""}</strong><span class="mail">${esc(v.email || "")}${v.region ? " · " + esc(v.region) : ""}</span></div>
     ${compact ? "" : `<div class="num">${flag(v.country)}${esc(v.countryName || v.country || "—")}</div>
     <div class="num">${v.loginCount || 0} logins · ${fmtMins(v.avgSessionSeconds)}</div>`}
     <div>${status(v)}</div>
@@ -189,6 +248,8 @@ function detail(v) {
     </div>
     <div class="hero">${status(v)}</div>
     <dt>Country</dt><dd>${flag(v.country)}${esc(v.countryName || v.country || "Unknown")}${v.city ? " · " + esc(v.city) : ""}</dd>
+    <dt>Region</dt><dd>${esc(v.region || "Unknown")}</dd>
+    <dt>Joined</dt><dd>${v.createdAt ? esc(new Date(v.createdAt).toLocaleDateString()) : "—"}${isNew(v) ? " · New" : ""}</dd>
     <dt>Logins</dt><dd>${v.loginCount || 0}</dd>
     <dt>Average time on site</dt><dd>${fmtMins(v.avgSessionSeconds)}</dd>
     <dt>Device</dt><dd>${esc(v.device || "—")}</dd>
@@ -199,13 +260,15 @@ function detail(v) {
 
 function overview() {
   const list = visitors().slice(0, 7)
-  return `${topbar("Overview", "Live visitors, countries, and time on Stats2Pitch.")}
+  const neu = visitors().filter(createdInRange).slice(0, 6)
+  return `${topbar("Overview", "New users, regions, and online totals by day, week, and month.")}
     ${kpis()}
+    <section style="margin-bottom:12px">${chartBox()}</section>
     <section class="grid-2">
       <div class="card">
-        <h2>Live users</h2>
-        <p class="sub">Newest activity first</p>
-        ${list.length ? list.map(v => userRow(v, true)).join("") : `<p class="empty">No signed-in users yet.</p>`}
+        <h2>Users by region</h2>
+        <p class="sub">Continent totals</p>
+        ${barList(regionRows())}
       </div>
       <div class="card">
         <h2>Users by country</h2>
@@ -213,10 +276,22 @@ function overview() {
         ${bars()}
       </div>
     </section>
+    <section class="grid-2">
+      <div class="card">
+        <h2>New users ${esc(periodLabel())}</h2>
+        <p class="sub">Accounts created in this range</p>
+        ${neu.length ? neu.map(v => userRow(v, true)).join("") : `<p class="empty">No new users ${esc(periodLabel())}.</p>`}
+      </div>
+      <div class="card">
+        <h2>Live now</h2>
+        <p class="sub">Newest activity first</p>
+        ${list.length ? list.map(v => userRow(v, true)).join("") : `<p class="empty">No signed-in users yet.</p>`}
+      </div>
+    </section>
     <section class="grid-map">
       <div class="card">
         <h2>Global users</h2>
-        <p class="sub">Pins are live visitor countries</p>
+        <p class="sub">Pins are visitor countries</p>
         <div id="map"></div>
       </div>
       ${detail(selected())}
@@ -240,17 +315,25 @@ function usersView() {
 
 function countriesView() {
   const rows = countries()
-  return `${topbar("Map", "Every country your users are coming from.")}
+  const regions = regionRows()
+  return `${topbar("Map", "Users by region and country.")}
     ${kpis()}
     <div class="card" style="margin-bottom:12px">
       <h2>Global users</h2>
       <p class="sub">Click a pin for the user count</p>
       <div id="mapFull"></div>
     </div>
-    <div class="card">
-      <div class="board-row table-head"><b>Country</b><b>Users</b><b>Online</b><b>Avg time</b><b></b></div>
-      ${rows.length ? rows.map(r => `<div class="board-row"><strong>${flag(r.code)}${esc(r.name)}</strong><span>${r.count}</span><span>${r.online}</span><span>${fmtMins(r.count ? r.seconds / r.count : 0)}</span><span></span></div>`).join("") : `<p class="empty">No country data yet. Open the public site while signed in.</p>`}
-    </div>`
+    <section class="grid-2">
+      <div class="card">
+        <h2>By region</h2>
+        ${barList(regions)}
+      </div>
+      <div class="card">
+        <h2>By country</h2>
+        <div class="board-row table-head"><b>Country</b><b>Region</b><b>Users</b><b>Online</b><b>Avg time</b></div>
+        ${rows.length ? rows.map(r => `<div class="board-row"><strong>${flag(r.code)}${esc(r.name)}</strong><span>${esc(r.region || "—")}</span><span>${r.count}</span><span>${r.online}</span><span>${fmtMins(r.count ? r.seconds / r.count : 0)}</span></div>`).join("") : `<p class="empty">No country data yet. Open the public site while signed in.</p>`}
+      </div>
+    </section>`
 }
 
 function boardsView() {
@@ -335,12 +418,17 @@ function bind() {
   document.querySelectorAll(".user-row[data-id]").forEach(row => {
     row.onclick = () => { state.selected = row.dataset.id; render() }
   })
+  document.querySelectorAll("[data-range]").forEach(btn => {
+    btn.onclick = () => { state.range = btn.dataset.range; render() }
+  })
   const box = $("#userSearch")
   if (box) {
     box.oninput = () => { state.query = box.value; render() }
-    const end = box.value.length
-    box.focus()
-    box.setSelectionRange(end, end)
+    if (document.activeElement && document.activeElement.id === "userSearch") {
+      const end = box.value.length
+      box.focus()
+      box.setSelectionRange(end, end)
+    }
   }
 }
 
