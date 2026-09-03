@@ -36,6 +36,30 @@ export function normalizeFixtureStatus(f){
   }
 }
 
+function comboPass(market,h,a){
+  const total=h+a;
+  const gg=h>0&&a>0;
+  const anyCleanSheet=h===0||a===0;
+  const home=h>a;
+  const draw=h===a;
+  const away=a>h;
+  const map={
+    'combo-home-over-25':home||total>2.5,
+    'combo-home-under-25':home||total<2.5,
+    'combo-draw-over-25':draw||total>2.5,
+    'combo-draw-under-25':draw||total<2.5,
+    'combo-away-over-25':away||total>2.5,
+    'combo-away-under-25':away||total<2.5,
+    'combo-home-gg':home||gg,
+    'combo-draw-gg':draw||gg,
+    'combo-away-gg':away||gg,
+    'combo-home-clean-sheet':home||anyCleanSheet,
+    'combo-draw-clean-sheet':draw||anyCleanSheet,
+    'combo-away-clean-sheet':away||anyCleanSheet
+  };
+  return Object.prototype.hasOwnProperty.call(map,market)?map[market]:null;
+}
+
 export function settlePick(pick,fixture){
   const f=fixture?normalizeFixtureStatus(fixture):null
   if(!f)return{outcome:'pending',matchState:'upcoming'}
@@ -46,7 +70,10 @@ export function settlePick(pick,fixture){
   if(!Number.isFinite(h)||!Number.isFinite(a))return{outcome:'pending',matchState:'settled',...f}
   const market=String(pick?.market||''),sel=norm(pick?.selection)
   let outcome='pending'
-  if(market==='match-winner'){
+  const combo=comboPass(market,h,a)
+  if(combo!==null){
+    outcome=result(combo)
+  }else if(market==='match-winner'){
     if(sel==='home'||sel==='1')outcome=result(h>a)
     else if(sel==='away'||sel==='2')outcome=result(a>h)
     else if(sel==='draw'||sel==='x')outcome=result(h===a)
@@ -149,6 +176,7 @@ export function boardPicks(board){
     ...(board?.varTips||[]),
     ...(board?.filterTips||[]),
     ...(board?.goalsBankers||[]),
+    ...(board?.comboPicks||[]),
     ...(board?.dailyBankers||[]),
     ...(board?.safestBankers||[]),
     ...(board?.valueBankers||[]),

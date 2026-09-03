@@ -1,4 +1,6 @@
 import {sportyFixturesByDate} from './sportyBet.js'
+import {hydrateSportyComboMarkets} from './comboMarketHydrator.js'
+import {buildComboBoard} from './comboEngine.js'
 import {teamLastX,leagueFormPack,matchGoalEvents,nid,overallSample,hasMatchStats,teamVersus} from './sportyStats.js'
 import {verifiedMarkets} from './odds.js'
 import {venueSample,buildBoard} from './engine.js'
@@ -122,6 +124,7 @@ export async function refreshNow(date,onProgress=()=>{}){
   }
   onProgress({stage:'fixtures-and-odds',done:2,total:2,fixtures:raw.length,oddsFixtures:raw.length,feed})
   const scheduled=raw.filter(f=>SCHEDULED.has(String(f?.fixture?.status?.short||'').toUpperCase()))
+  await hydrateSportyComboMarkets(scheduled,{concurrency:Math.max(1,Number(process.env.COMBO_MARKET_CONCURRENCY||3))})
   const leagueIds=[...new Set(scheduled.map(f=>nid(f?.league?.id)).filter(Boolean))]
   let historyDone=0
   onProgress({stage:'league-history',done:0,total:leagueIds.length,fixtures:scheduled.length,feed})
@@ -168,7 +171,7 @@ export async function refreshNow(date,onProgress=()=>{}){
       if(marketOdds.length)statsVerified++
       const over25Profile=buildOver25Profile(mergeUnique(current,previous,history),homeId,awayId)
       const h2h=h2hSnapshot(versusRows.length?versusRows:history,homeId,awayId)
-      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures,formHistory:homeFormHistory,lastMatches:lastMatchesHome},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures,formHistory:awayFormHistory,lastMatches:lastMatchesAway},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,homeStanding,awayStanding,marketOdds,formReady,statsReady,sportyEventId:f?.sporty?.eventId||null,sportyGameId:f?.sporty?.gameId||null,feed,leagueHistoryReady:current.length+previous.length>0,h2h,homeStats:teamStats(last5Overall(lastMatchesHome,homeId)),awayStats:teamStats(last5Overall(lastMatchesAway,awayId))}
+      let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures,formHistory:homeFormHistory,lastMatches:lastMatchesHome},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures,formHistory:awayFormHistory,lastMatches:lastMatchesAway},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,homeStanding,awayStanding,marketOdds,sportyMarkets:f?.sporty?.markets||[],formReady,statsReady,sportyEventId:f?.sporty?.eventId||null,sportyGameId:f?.sporty?.gameId||null,feed,leagueHistoryReady:current.length+previous.length>0,h2h,homeStats:teamStats(last5Overall(lastMatchesHome,homeId)),awayStats:teamStats(last5Overall(lastMatchesAway,awayId))}
 
       if(!statsReady){
         done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures,skippedNoStats})
@@ -181,7 +184,11 @@ export async function refreshNow(date,onProgress=()=>{}){
   })
 
   const fixtures=analyzed.filter(Boolean),bankerRules=buildBankerRules(fixtures)
-  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,skippedNoStats,feed,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,skippedNoStats,qualifiedTips:0,bestPicks:0,varTips:0,filterTips:0,bankerRulePicks:bankerRules.picks.length,feed}},learned)
+  const board=buildBoard(fixtures,{date,generatedAt:new Date().toISOString(),sourceFixtures:raw.length,scheduledFixtures:scheduled.length,analyzedFixtures:fixtures.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,statsVerifiedFixtures:statsVerified,historyFallbackTeams:fallbackTeams,transitionHydratedFixtures,skippedNoStats,feed,bankerRules:bankerRules.meta,diagnostics:{sourceFixtures:raw.length,scheduledFixtures:scheduled.length,insufficientHistoryFixtures:insufficientHistory,analysisErrorFixtures:analysisErrors,analyzedFixtures:fixtures.length,transitionHydratedFixtures,skippedNoStats,qualifiedTips:0,bestPicks:0,varTips:0,filterTips:0,comboPicks:0,bankerRulePicks:bankerRules.picks.length,feed}},learned)
+  const comboBoard=buildComboBoard(fixtures,board.meta)
+  board.comboPicks=comboBoard.bestPicks;board.comboMeta=comboBoard.meta
+  board.meta.comboEngine=comboBoard.meta.engine;board.meta.comboCount=comboBoard.bestPicks.length
+  board.goalsBankers=[...(board.goalsBankers||[]),...board.comboPicks]
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}
@@ -189,6 +196,8 @@ export async function refreshNow(date,onProgress=()=>{}){
   board.meta.diagnostics.filterTipsSkipped=board.filterTipsMeta?.skipped||{}
   board.meta.diagnostics.goalsBankers=(board.goalsBankers||[]).length
   board.meta.diagnostics.goalsBankersSkipped=board.goalsBankersMeta?.skipped||{}
+  board.meta.diagnostics.comboPicks=(board.comboPicks||[]).length
+  board.meta.diagnostics.comboSkipped=board.comboMeta?.skipped||{}
   board.meta.diagnostics.safestBankers=(board.safestBankers||[]).length
   board.meta.diagnostics.valueBankers=(board.valueBankers||[]).length
   board.meta.diagnostics.dailyBankersEngine=board.dailyBankersMeta?.engine||board.meta?.dailyBankersEngine||null
@@ -208,6 +217,6 @@ export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}
 export function startRefresh(date){
   if(jobs.get(date)?.state==='running')return jobs.get(date)
   const job={state:'running',date,startedAt:new Date().toISOString(),progress:{stage:'start'}};jobs.set(date,job)
-  refreshNow(date,p=>job.progress=p).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,varTips:board.varTips?.length||0,filterTips:board.filterTips?.length||0,goalsBankers:board.goalsBankers?.length||0,bankers:board.bankers?.length||0,diagnostics:board.meta?.diagnostics||null}}).catch(e=>{job.state='failed';job.error=e.message;job.completedAt=new Date().toISOString()})
+  refreshNow(date,p=>job.progress=p).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,varTips:board.varTips?.length||0,filterTips:board.filterTips?.length||0,goalsBankers:board.goalsBankers?.length||0,comboPicks:board.comboPicks?.length||0,bankers:board.bankers?.length||0,diagnostics:board.meta?.diagnostics||null}}).catch(e=>{job.state='failed';job.error=e.message;job.completedAt=new Date().toISOString()})
   return job
 }
