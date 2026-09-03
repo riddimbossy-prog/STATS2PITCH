@@ -53,6 +53,100 @@ async function verifyAdmin(req:Request){
   const email=String(user?.email||'').toLowerCase()
   return role==='admin'||ADMIN_EMAILS.includes(email)?user:null
 }
+function clientIp(req:Request){
+  const xf=req.headers.get('x-forwarded-for')||req.headers.get('x-real-ip')||req.headers.get('cf-connecting-ip')||''
+  return xf.split(',')[0].trim()
+}
+function deviceOf(raw:string){
+  return ['mobile','desktop','tablet'].includes(raw)?raw:'mobile'
+}
+async function lookupGeo(req:Request){
+  const ip=clientIp(req)
+  const fallback={country:'GH',countryName:'Ghana',city:'Accra'}
+  if(!ip||ip==='127.0.0.1'||ip.startsWith(':'))return fallback
+  try{
+    const r=await fetch(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,country_code,city`,{headers:{Accept:'application/json'}})
+    const d=await r.json()
+    if(d?.success!==false&&d?.country_code){
+      return{country:String(d.country_code).toUpperCase().slice(0,2),countryName:String(d.country||'Unknown'),city:String(d.city||'')}
+    }
+  }catch{}
+  return fallback
+}
+function visitorFromUser(u:any, now=Date.now()){
+  const m=u?.user_metadata||{}
+  const last=Date.parse(m.last_seen_at||'')
+  const online=Number.isFinite(last)&&now-last<120000
+  const sessions=Math.max(1,Number(m.session_count||m.login_count||1))
+  const total=Math.max(0,Number(m.total_seconds||0))
+  return{
+    id:u.id,
+    email:u.email||'',
+    name:String(u.email||'user').split('@')[0],
+    country:String(m.country||'').toUpperCase()||'—',
+    countryName:m.country_name||m.country||'Unknown',
+    city:m.city||'',
+    loginCount:Number(m.login_count||0),
+    sessionCount:sessions,
+    totalSeconds:total,
+    avgSessionSeconds:sessions?Math.round(total/sessions):0,
+    lastSeenAt:m.last_seen_at||null,
+    lastPath:m.last_path||'/',
+    device:m.device||'mobile',
+    online
+  }
+}
+async function listAuthUsers(){
+  const out:any[]=[]
+  if(!SUPABASE_SERVICE_ROLE_KEY)return out
+  for(let page=1;page<=10;page++){
+    const r=await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=200`,{
+      headers:{apikey:SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${SUPABASE_SERVICE_ROLE_KEY}`}
+    })
+    const d=await r.json().catch(()=>({}))
+    const users=Array.isArray(d?.users)?d.users:[]
+    out.push(...users)
+    if(users.length<200)break
+  }
+  return out
+}
+async function recordPresence(user:any, req:Request, body:any){
+  const now=new Date()
+  const meta=user.user_metadata||{}
+  const last=Date.parse(meta.last_seen_at||'')
+  const isNewSession=!Number.isFinite(last)||now.getTime()-last>30*60*1000
+  const seconds=Math.max(0,Math.min(180,Math.round(Number(body?.seconds||15))))
+  let country=String(meta.country||'')
+  let countryName=String(meta.country_name||'')
+  let city=String(meta.city||'')
+  if(!country){
+    const geo=await lookupGeo(req)
+    country=geo.country
+    countryName=geo.countryName
+    city=geo.city
+  }
+  const next={
+    ...meta,
+    country,
+    country_name:countryName,
+    city,
+    login_count:Number(meta.login_count||0)+(isNewSession?1:0),
+    session_count:Number(meta.session_count||0)+(isNewSession?1:0),
+    total_seconds:Number(meta.total_seconds||0)+seconds,
+    last_seen_at:now.toISOString(),
+    last_login_at:isNewSession?now.toISOString():(meta.last_login_at||now.toISOString()),
+    last_path:String(body?.path||'/').slice(0,120),
+    device:deviceOf(String(body?.device||''))
+  }
+  if(SUPABASE_SERVICE_ROLE_KEY){
+    await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`,{
+      method:'PUT',
+      headers:{apikey:SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},
+      body:JSON.stringify({user_metadata:next})
+    }).catch(()=>{})
+  }
+  return visitorFromUser({...user,user_metadata:next}, now.getTime())
+}
 function eliteAuthorized(req:Request){
   if(!ELITE_FEED_TOKEN)return false
   const bearer=String(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'').trim()
@@ -435,11 +529,21 @@ Deno.serve(async req=>{
     }
     if(route==='/refresh-status'&&req.method==='GET'){const date=requestedDate(url),row=await snapshot(date);return json(snapshotState(date,row))}
     if(route==='/me'&&req.method==='GET'){const me=await verifyUser(req);if(!me)return json({error:'Authentication required'},401);return json({id:me.id,email:me.email||''})}
+    if(route==='/presence'&&req.method==='POST'){
+      const me=await verifyUser(req);if(!me)return json({error:'Authentication required'},401)
+      const body=await req.json().catch(()=>({}))
+      return json(await recordPresence(me,req,body))
+    }
     if(route==='/admin/overview'&&req.method==='GET'){
       const admin=await verifyAdmin(req);if(!admin)return json({error:'Admin access required'},403)
       const rows=await boardRows(30),boards=(rows||[]).map((x:any)=>x.payload).filter(Boolean),performance=performanceFromBoards(boards),learned=learningFromBoards(boards)
       const latest=(rows||[])[0]||null,meta=latest?.payload?.meta||{},latestPicks=(latest?.payload?.bestPicks||[]).slice(0,25)
-      return json({user:{email:admin.email||''},snapshots:rows.length,performance,learning:learned.profiles,learningState:learned.state,latest,health:{footballData:true,sourceFixtures:meta.sourceFixtures||0,scheduledFixtures:meta.scheduledFixtures||0,analyzedFixtures:meta.analyzedFixtures||0,statsVerifiedFixtures:meta.statsVerifiedFixtures||0,historyFallbackTeams:meta.historyFallbackTeams||0},latestPicks})
+      const visitors=(await listAuthUsers()).map((u:any)=>visitorFromUser(u)).sort((a:any,b:any)=>Number(b.online)-Number(a.online)||Date.parse(b.lastSeenAt||0)-Date.parse(a.lastSeenAt||0))
+      const countries=[...new Set(visitors.map((v:any)=>v.country).filter((c:string)=>c&&c!=='—'))]
+      const online=visitors.filter((v:any)=>v.online).length
+      const avgSession=visitors.length?Math.round(visitors.reduce((n:number,v:any)=>n+Number(v.avgSessionSeconds||0),0)/visitors.length):0
+      const logins=visitors.reduce((n:number,v:any)=>n+Number(v.loginCount||0),0)
+      return json({user:{email:admin.email||''},snapshots:rows.length,users:visitors.length,online,countries:countries.length,avgSession,logins,visitors,performance,learning:learned.profiles,learningState:learned.state,latest,health:{footballData:true,sourceFixtures:meta.sourceFixtures||0,scheduledFixtures:meta.scheduledFixtures||0,analyzedFixtures:meta.analyzedFixtures||0,statsVerifiedFixtures:meta.statsVerifiedFixtures||0,historyFallbackTeams:meta.historyFallbackTeams||0},latestPicks})
     }
     if(route==='/admin/refresh'&&req.method==='POST'){
       const admin=await verifyAdmin(req);if(!admin)return json({error:'Admin access required'},403);await dispatchRefresh();return json({ok:true,message:'Refresh requested.'},202)

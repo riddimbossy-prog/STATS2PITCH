@@ -46,3 +46,17 @@ header{position:sticky;top:10px;z-index:30}
 .early-note-flag{font-size:13px;line-height:1}
 .early-season-card{box-shadow:0 18px 38px rgba(0,0,0,.18),0 0 0 1px rgba(248,113,113,.14)}
 @media(max-width:620px){.early-flag{min-width:20px;height:20px;padding:0 5px;font-size:11px}.early-note{font-size:11px}}
+
+.s2p-lead{margin:6px 0 14px;opacity:.82;font-size:14px}
+.s2p-kpis{grid-template-columns:repeat(5,1fr)}
+.s2p-search{width:100%;margin:14px 0 10px;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(3,55,47,.75);color:#fff}
+.s2p-user-row{grid-template-columns:1.6fr 1.3fr .55fr .7fr .8fr}
+.s2p-user-row strong{display:flex;flex-direction:column;gap:2px}
+.s2p-user-row small{font-weight:400;opacity:.7;font-size:12px}
+.s2p-head{background:transparent;opacity:.75;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.s2p-flag{width:20px;height:14px;border-radius:2px;object-fit:cover;vertical-align:-2px;margin-right:8px;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+.s2p-online{display:inline-flex;align-items:center;gap:7px;color:#7dffc4;font-weight:600}
+.s2p-offline{opacity:.7}
+.s2p-dot{width:8px;height:8px;border-radius:50%;background:#3ddc84;box-shadow:0 0 0 0 rgba(61,220,132,.65);animation:s2p-pulse 1.6s infinite}
+@keyframes s2p-pulse{70%{box-shadow:0 0 0 8px rgba(61,220,132,0)}100%{box-shadow:0 0 0 0 rgba(61,220,132,0)}}
+@media(max-width:850px){.s2p-kpis{grid-template-columns:repeat(2,1fr)}.s2p-user-row{grid-template-columns:1fr 1fr}.s2p-head{display:none}}

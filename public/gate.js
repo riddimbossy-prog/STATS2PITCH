@@ -228,11 +228,41 @@ async function readMe(){
   return ''
 }
 
+
+function deviceKind(){
+  const w=Number(window.innerWidth||0)
+  if(w&&w<760)return 'mobile'
+  if(w&&w<1100)return 'tablet'
+  return /Mobi|Android/i.test(navigator.userAgent||'')?'mobile':'desktop'
+}
+function startPresence(){
+  if(window.__s2pPresence)return
+  window.__s2pPresence=1
+  let last=Date.now()
+  const beat=()=>{
+    if(!getToken())return
+    const now=Date.now()
+    const seconds=Math.max(1,Math.round((now-last)/1000))
+    last=now
+    api('/presence',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({path:location.pathname+location.search,seconds,device:deviceKind()}),
+      skipAuthWait:true,
+      keepSession:true
+    }).catch(()=>{})
+  }
+  beat()
+  setInterval(beat,15000)
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)beat()})
+}
+
 function openBoards(email=''){
   if(email)sessionStorage.setItem('s2p_email',email)
   hideAuth()
   bindAccount()
   releaseAuth()
+  startPresence()
 }
 
 function finishAuth(fallbackEmail=''){

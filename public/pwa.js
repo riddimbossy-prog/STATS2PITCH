@@ -74,7 +74,7 @@ if(nav){
   if(!document.querySelector('script[src*="gate.js"]')){
     const s=document.createElement('script')
     s.type='module'
-    s.src='/gate.js?v=5.15.0'
+    s.src='/gate.js?v=5.18.0'
     s.dataset.s2pGate='1'
     document.head.appendChild(s)
   }
