@@ -22,15 +22,18 @@
   background: #f2c45c;
   color: #1a1404;
 }
-.card:has(.var-badge.value) {
+.card:has(.var-badge.value),
+.card:has(.m-board-tag.value) {
   border-color: rgba(242, 196, 92, 0.32);
   background: linear-gradient(160deg, rgba(242, 196, 92, 0.06), var(--surface));
 }
-.card:has(.var-badge.value):hover {
+.card:has(.var-badge.value):hover,
+.card:has(.m-board-tag.value):hover {
   border-color: #f2c45c;
   box-shadow: 0 0 24px rgba(242, 196, 92, 0.16), var(--shadow);
 }
-.card:has(.var-badge.value) .league {
+.card:has(.var-badge.value) .league,
+.card:has(.m-board-tag.value) .league {
   background: rgba(242, 196, 92, 0.07);
   border-bottom-color: rgba(242, 196, 92, 0.18);
 }

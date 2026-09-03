@@ -100,7 +100,8 @@
   border-color: rgba(96, 165, 250, 0.28);
 }
 
-.card:has(.var-badge) {
+.card:has(.var-badge),
+.card:has(.m-board-tag:not(.filter):not(.goals):not(.value)) {
   border-color: rgba(200, 245, 66, 0.28);
   background: linear-gradient(160deg, rgba(200, 245, 66, 0.05), var(--surface));
 }

@@ -1,5 +1,154 @@
-/* Compact live/settled cards: phone, tablet, Z Fold.
-   Desktop (≥1101px) never shows the bottom nav. */
+/* Compact live/settled cards — phone, tablet, Z Fold, desktop.
+   One top-row grid. Absolute HOME FAV / clock / WON badges never paint. */
+
+.card > .match-badge,
+.card > .match-badge.live,
+.card > .match-badge.won,
+.card > .match-badge.lost,
+.card > .match-badge.void,
+.card > .match-badge.postponed,
+.card > .match-badge.upcoming,
+.card > .fav-badge,
+.card > .fav-badge.home,
+.card > .fav-badge.away,
+.card > .var-badge,
+.card > .filter-badge,
+.card > .goals-badge,
+.card > .route-badge,
+.card > .banker-badge,
+.card > .live-score-note,
+.pick-result,
+.card .pick-result {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  inset: auto !important;
+  font-size: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+.m-card-top,
+.m-board-tag,
+.m-fav-tag {
+  display: revert;
+}
+
+.m-card-top {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 12px 14px 4px !important;
+  min-height: 36px;
+  position: relative !important;
+  z-index: 3;
+  background: #141416;
+}
+
+.m-top-left,
+.m-top-mid,
+.m-top-right {
+  display: flex !important;
+  align-items: center;
+  min-width: 0;
+  position: static !important;
+}
+
+.m-top-left {
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.m-top-mid {
+  justify-content: center;
+  overflow: hidden;
+}
+
+.m-top-right {
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.m-card-top .m-board-tag,
+.m-card-top .m-fav-tag,
+.m-card-top .m-result,
+.m-card-top .m-kick-row,
+.m-card-top .m-banker,
+.m-card-top .m-conf {
+  display: inline-flex !important;
+  align-items: center;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  margin: 0 !important;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.m-card-top .m-board-tag,
+.m-card-top .m-fav-tag {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.m-card-top .m-result,
+.m-card-top .m-kick-row {
+  font-size: 11px !important;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-card-top .m-kick-row:before {
+  content: none !important;
+}
+
+.m-result.live {
+  background: rgba(255, 45, 85, 0.18) !important;
+  color: #ff6b88 !important;
+  border: 1px solid rgba(255, 45, 85, 0.45);
+}
+
+.m-result.won {
+  background: rgba(34, 197, 94, 0.18) !important;
+  color: #4ade80 !important;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.m-result.lost {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #f87171 !important;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.m-result.void,
+.m-result.postponed {
+  background: rgba(148, 163, 184, 0.16) !important;
+  color: #cbd5e1 !important;
+}
+
+.league {
+  padding-right: 14px !important;
+}
 
 @media (min-width: 1101px) {
   .mobile-nav,
@@ -12,6 +161,7 @@
   .page-tabs {
     display: none !important;
   }
+
   .mobile-nav,
   .mobile-nav.bankers-nav {
     display: flex !important;
@@ -45,78 +195,36 @@
     display: none !important;
   }
 
-  .card {
-    position: relative !important;
-    isolation: isolate;
-    overflow: hidden !important;
-    background: #141416 !important;
-    z-index: 1;
-  }
-  .kind-tabs,
   .controls-shell,
+  .kind-tabs,
   #dates {
     position: relative !important;
     top: auto !important;
-    z-index: 0;
-  }
-  #cards {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    gap: 12px;
+    z-index: 2;
+    background: #070708;
   }
 
-  .m-card-top {
-    display: flex !important;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    padding: 12px 14px 2px;
-    min-height: 34px;
+  .kind-tabs {
+    isolation: isolate;
+    background: #121214 !important;
   }
-  .m-card-top .m-board-tag,
-  .m-card-top .m-fav-tag,
-  .m-card-top .m-result,
-  .m-card-top .m-kick-row,
-  .m-card-top .m-banker {
-    display: inline-flex !important;
-    align-items: center;
-    flex: 0 0 auto;
-    max-width: 46%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    position: static !important;
-    top: auto !important;
-    right: auto !important;
+
+  #cards {
+    position: relative;
+    z-index: 3;
+    display: grid;
+    gap: 12px;
+    background: #070708;
   }
-  .m-card-top .m-fav-tag {
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-  .m-card-top .m-result,
-  .m-card-top .m-kick-row {
-    margin-left: auto;
-    max-width: 42%;
-    font-size: 11px !important;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 4px 8px;
-    border-radius: 999px;
-  }
-  .m-result.live {
-    background: rgba(255, 45, 85, 0.18) !important;
-    color: #ff6b88 !important;
-    border: 1px solid rgba(255, 45, 85, 0.4);
-  }
-  .m-result.won {
-    background: rgba(34, 197, 94, 0.18) !important;
-    color: #4ade80 !important;
-  }
-  .m-result.lost {
-    background: rgba(239, 68, 68, 0.18) !important;
-    color: #f87171 !important;
+
+  .card {
+    position: relative !important;
+    overflow: hidden !important;
+    background-color: #141416 !important;
+    background-image: none !important;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    z-index: 1;
   }
 
   .crest-matchup,
@@ -125,11 +233,14 @@
     overflow: hidden;
     z-index: 0;
     margin: 6px 8px 10px !important;
+    isolation: isolate;
   }
+
   .crest-matchup::before,
   .teams::before {
     z-index: 0;
   }
+
   .team,
   .match-mid,
   .versus {
@@ -138,7 +249,7 @@
 
   .pick {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     background: #141416 !important;
     margin: 0 14px 6px !important;
     padding: 8px 0 2px !important;
@@ -147,28 +258,26 @@
     align-items: center !important;
     text-align: center;
     gap: 4px;
+    isolation: isolate;
   }
+
   .pick-copy {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
     width: 100%;
+    background: #141416;
   }
-  .pick-result {
-    display: none !important;
-  }
+
   .pick .odd:not(.odd-stack) {
     display: none !important;
   }
-  .m-footer {
-    position: relative;
-    z-index: 1;
-    background: #141416;
-  }
+
+  .m-footer,
   .m-why-row {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     background: #141416;
   }
 
@@ -177,8 +286,14 @@
   }
 }
 
+@media (max-width: 520px) {
+  .card.live .m-top-mid {
+    display: none !important;
+  }
+}
+
 @media (max-width: 380px) {
-  .m-card-top .m-fav-tag {
+  .m-top-mid {
     display: none !important;
   }
 }

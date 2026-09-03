@@ -197,7 +197,14 @@
   .fav-badge,
   .goals-badge,
   .route-badge,
+  .match-badge,
   .match-badge.upcoming,
+  .match-badge.live,
+  .match-badge.won,
+  .match-badge.lost,
+  .match-badge.void,
+  .match-badge.postponed,
+  .pick-result,
   .confidence,
   .time,
   .details,
@@ -205,23 +212,25 @@
     display: none !important;
   }
   .card.upcoming .team-score { display: none !important; }
-  .match-badge.live,
-  .match-badge.won,
-  .match-badge.lost,
-  .match-badge.void,
-  .match-badge.postponed {
-    top: 12px;
-    right: 12px;
-    z-index: 3;
-  }
 
   .m-card-top {
-    display: flex;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px 0;
+    justify-content: stretch;
+    padding: 12px 14px 0;
     gap: 8px;
   }
+  .m-top-left,
+  .m-top-mid,
+  .m-top-right {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .m-top-left { justify-content: flex-start; }
+  .m-top-mid { justify-content: center; overflow: hidden; }
+  .m-top-right { justify-content: flex-end; }
   .m-banker {
     display: inline-flex;
     align-items: center;
@@ -264,7 +273,10 @@
   .m-card-top .m-kick-row:before { content: none; }
 
   .m-card-top .m-board-tag,
-  .m-card-top .m-fav-tag {
+  .m-card-top .m-fav-tag,
+  .m-card-top .m-result,
+  .m-card-top .m-kick-row,
+  .m-card-top .m-banker {
     display: inline-flex;
     align-items: center;
     height: 22px;
@@ -275,6 +287,7 @@
     letter-spacing: 0.06em;
     flex: 0 0 auto;
     white-space: nowrap;
+    position: static;
   }
   .m-board-tag {
     background: var(--accent);
@@ -342,6 +355,7 @@
     padding: 8px 12px;
   }
   .m-kick-row { display: none !important; }
+  .m-card-top .m-kick-row { display: inline-flex !important; }
 
   .pick {
     margin: 4px 16px 8px;
