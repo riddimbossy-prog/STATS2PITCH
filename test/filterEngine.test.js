@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {diagnoseFilterFixture,buildFilterBoard,extractFilterOdds,isCupCompetition,ENGINE_ID} from '../server/filterEngine.js'
+import {diagnoseFilterFixture as diagnoseFilterFixtureV2} from '../server/filterEngineV2.js'
 import {buildBoard} from '../server/engine.js'
 import {parseSportyBet} from '../server/odds.js'
 
@@ -141,8 +142,8 @@ test('under 2.5 needs U2.5 under 1.52 and O1.5 over 1.60',()=>{
   assert.equal(result.pick.route,'under-25')
 })
 
-test('GG needs GG Yes under 1.50 and GG 2+ No over 1.30',()=>{
-  const result=diagnoseFilterFixture(fixture({
+test('V2 GG gate needs GG Yes under 1.50 and GG 2+ No over 1.30',()=>{
+  const result=diagnoseFilterFixtureV2(fixture({
     marketOdds:markets({homeWin:1.10,awayWin:8.00,over15:1.35,under35:1.40,ggYes:1.40,gg2No:1.45}),
     homeFixtures:venueRows(1,'home',homeOver),
     awayFixtures:venueRows(2,'away',awayOver)
@@ -150,7 +151,7 @@ test('GG needs GG Yes under 1.50 and GG 2+ No over 1.30',()=>{
   assert.equal(result.skip,null)
   assert.equal(result.pick.route,'gg')
   assert.equal(result.pick.market,'both-teams-score')
-  const miss=diagnoseFilterFixture(fixture({
+  const miss=diagnoseFilterFixtureV2(fixture({
     marketOdds:markets({homeWin:1.10,awayWin:8.00,over15:1.35,under35:1.40,ggYes:1.40,gg2No:1.30}),
     homeFixtures:venueRows(1,'home',homeOver),
     awayFixtures:venueRows(2,'away',awayOver)
