@@ -1,4 +1,4 @@
-const VIEWS=new Set(['all','var','filter','goals','bankers'])
+const VIEWS=new Set(['all','var','filter','goals','combo','bankers'])
 
 function slimMeta(meta={}){
   return{
@@ -17,6 +17,8 @@ function slimMeta(meta={}){
     filterTipsCount:meta.filterTipsCount,
     goalsBankersEngine:meta.goalsBankersEngine,
     goalsBankersCount:meta.goalsBankersCount,
+    comboEngine:meta.comboEngine,
+    comboCount:meta.comboCount,
     dailyBankersEngine:meta.dailyBankersEngine,
     safestBankersCount:meta.safestBankersCount,
     valueBankersCount:meta.valueBankersCount,
@@ -39,6 +41,7 @@ export function publicBoard(board={},view='all'){
     varTips:[],
     filterTips:[],
     goalsBankers:[],
+    comboPicks:[],
     dailyBankers:[],
     safestBankers:[],
     valueBankers:[],
@@ -63,6 +66,12 @@ export function publicBoard(board={},view='all'){
     empty.goalsBankers=Array.isArray(board?.goalsBankers)?board.goalsBankers:[]
     empty.goalsBankersMeta=board?.goalsBankersMeta||null
     empty.availableMarkets=markets(empty.goalsBankers)
+    return empty
+  }
+  if(v==='combo'){
+    empty.comboPicks=Array.isArray(board?.comboPicks)?board.comboPicks:[]
+    empty.comboMeta=board?.comboMeta||null
+    empty.availableMarkets=markets(empty.comboPicks)
     return empty
   }
   if(v==='bankers'){
