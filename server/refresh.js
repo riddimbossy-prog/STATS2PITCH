@@ -188,6 +188,7 @@ export async function refreshNow(date,onProgress=()=>{}){
   const comboBoard=buildComboBoard(fixtures,board.meta)
   board.comboPicks=comboBoard.bestPicks;board.comboMeta=comboBoard.meta
   board.meta.comboEngine=comboBoard.meta.engine;board.meta.comboCount=comboBoard.bestPicks.length
+  board.goalsBankers=[...(board.goalsBankers||[]),...board.comboPicks]
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}
