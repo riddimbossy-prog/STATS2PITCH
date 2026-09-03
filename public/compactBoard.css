@@ -286,12 +286,6 @@
   }
 }
 
-@media (max-width: 520px) {
-  .card.live .m-top-mid {
-    display: none !important;
-  }
-}
-
 @media (max-width: 380px) {
   .m-top-mid {
     display: none !important;
