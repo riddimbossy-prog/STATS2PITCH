@@ -85,6 +85,6 @@ test('Filter board exposes the V5 rules revision without changing the public eng
   })])
   assert.equal(FILTER_RULE_VERSION,'v5')
   assert.equal(board.meta.rulesVersion,'v5')
-  assert.equal(board.meta.safetyRevision,'v5.0-one-goal-trap')
+  assert.equal(board.meta.safetyRevision,'v5.1-all-market-safety')
   assert.equal(board.bestPicks.length,1)
 })
