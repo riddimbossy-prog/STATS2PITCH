@@ -1,0 +1,184 @@
+/* Compact live/settled cards: phone, tablet, Z Fold.
+   Desktop (≥1101px) never shows the bottom nav. */
+
+@media (min-width: 1101px) {
+  .mobile-nav,
+  .mobile-nav.bankers-nav {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .page-tabs {
+    display: none !important;
+  }
+  .mobile-nav,
+  .mobile-nav.bankers-nav {
+    display: flex !important;
+    grid-template-columns: none !important;
+    position: fixed !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    transform: translateX(-50%) !important;
+    width: min(96vw, 560px) !important;
+    z-index: 80 !important;
+  }
+
+  #todayStats,
+  #filterStats,
+  #varStats,
+  #goalsStats,
+  .league,
+  .banker-badge,
+  .filter-badge,
+  .var-badge,
+  .fav-badge,
+  .goals-badge,
+  .route-badge,
+  .match-badge,
+  .live-score-note,
+  .confidence,
+  .time,
+  .details,
+  .early-note {
+    display: none !important;
+  }
+
+  .card {
+    position: relative !important;
+    isolation: isolate;
+    overflow: hidden !important;
+    background: #141416 !important;
+    z-index: 1;
+  }
+  .kind-tabs,
+  .controls-shell,
+  #dates {
+    position: relative !important;
+    top: auto !important;
+    z-index: 0;
+  }
+  #cards {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 12px;
+  }
+
+  .m-card-top {
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px 14px 2px;
+    min-height: 34px;
+  }
+  .m-card-top .m-board-tag,
+  .m-card-top .m-fav-tag,
+  .m-card-top .m-result,
+  .m-card-top .m-kick-row,
+  .m-card-top .m-banker {
+    display: inline-flex !important;
+    align-items: center;
+    flex: 0 0 auto;
+    max-width: 46%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+  }
+  .m-card-top .m-fav-tag {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .m-card-top .m-result,
+  .m-card-top .m-kick-row {
+    margin-left: auto;
+    max-width: 42%;
+    font-size: 11px !important;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 999px;
+  }
+  .m-result.live {
+    background: rgba(255, 45, 85, 0.18) !important;
+    color: #ff6b88 !important;
+    border: 1px solid rgba(255, 45, 85, 0.4);
+  }
+  .m-result.won {
+    background: rgba(34, 197, 94, 0.18) !important;
+    color: #4ade80 !important;
+  }
+  .m-result.lost {
+    background: rgba(239, 68, 68, 0.18) !important;
+    color: #f87171 !important;
+  }
+
+  .crest-matchup,
+  .teams {
+    position: relative;
+    overflow: hidden;
+    z-index: 0;
+    margin: 6px 8px 10px !important;
+  }
+  .crest-matchup::before,
+  .teams::before {
+    z-index: 0;
+  }
+  .team,
+  .match-mid,
+  .versus {
+    z-index: 1;
+  }
+
+  .pick {
+    position: relative;
+    z-index: 1;
+    background: #141416 !important;
+    margin: 0 14px 6px !important;
+    padding: 8px 0 2px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center;
+    gap: 4px;
+  }
+  .pick-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+  }
+  .pick-result {
+    display: none !important;
+  }
+  .pick .odd:not(.odd-stack) {
+    display: none !important;
+  }
+  .m-footer {
+    position: relative;
+    z-index: 1;
+    background: #141416;
+  }
+  .m-why-row {
+    position: relative;
+    z-index: 1;
+    background: #141416;
+  }
+
+  body {
+    padding-bottom: 92px;
+  }
+}
+
+@media (max-width: 380px) {
+  .m-card-top .m-fav-tag {
+    display: none !important;
+  }
+}
