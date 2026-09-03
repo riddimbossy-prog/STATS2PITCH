@@ -37,8 +37,12 @@ export function normalizeFixtureStatus(f){
 }
 
 function comboPass(market,h,a){
-  const total=h+a,gg=h>0&&a>0,clean=h===0||a===0
-  const home=h>a,draw=h===a,away=a>h
+  const total=h+a;
+  const gg=h>0&&a>0;
+  const anyCleanSheet=h===0||a===0;
+  const home=h>a;
+  const draw=h===a;
+  const away=a>h;
   const map={
     'combo-home-over-25':home||total>2.5,
     'combo-home-under-25':home||total<2.5,
@@ -49,11 +53,11 @@ function comboPass(market,h,a){
     'combo-home-gg':home||gg,
     'combo-draw-gg':draw||gg,
     'combo-away-gg':away||gg,
-    'combo-home-clean-sheet':home||clean,
-    'combo-draw-clean-sheet':draw||clean,
-    'combo-away-clean-sheet':away||clean
-  }
-  return Object.prototype.hasOwnProperty.call(map,market)?map[market]:null
+    'combo-home-clean-sheet':home||anyCleanSheet,
+    'combo-draw-clean-sheet':draw||anyCleanSheet,
+    'combo-away-clean-sheet':away||anyCleanSheet
+  };
+  return Object.prototype.hasOwnProperty.call(map,market)?map[market]:null;
 }
 
 export function settlePick(pick,fixture){
