@@ -6,8 +6,6 @@ export const ENGINE_ID=V2.ENGINE_ID
 export const FILTER_RULE_VERSION='v5'
 export const RULES=Object.freeze({
   ...V2.RULES,
-  v5PublicationMinScore:78,
-  v5RiskyPublicationMinScore:82,
   v5RiskySeparationMin:10,
   v5Over15Under35HardMin:1.45,
   v5Over15ConditionalUnder35Min:1.50,
@@ -114,12 +112,6 @@ function deteriorationRatio(recent,baseline){
   return Number(recent)/Number(baseline)
 }
 
-function routeMinScore(route){
-  if(route==='over-25'||route==='gg')return RULES.v5RiskyPublicationMinScore
-  if(route==='straight-win'||route==='under-25')return 80
-  return RULES.v5PublicationMinScore
-}
-
 function isRiskyRoute(route){
   return route==='straight-win'||route==='over-25'||route==='under-25'||route==='gg'
 }
@@ -139,7 +131,6 @@ function commonSafety(fixture,result){
   const awayTrend=deteriorationRatio(recentAway,baselineAway)
   const severeDeterioration=(homeTrend!==null&&homeTrend<RULES.v5DeteriorationHardRatio)
     ||(awayTrend!==null&&awayTrend<RULES.v5DeteriorationHardRatio)
-  const minScore=routeMinScore(pick?.route)
   const score=num(pick?.filterScore)
   const separation=num(pick?.scoreSeparation)
   const missingValidation=homeProfile.sample<5
@@ -158,12 +149,10 @@ function commonSafety(fixture,result){
     trendRatio:{home:homeTrend,away:awayTrend},
     profiles:{home:homeProfile,away:awayProfile},
     score,
-    minScore,
     separation
   }
 
   if(missingValidation)return{...base,ok:false,skip:'v5-missing-validation',reason:'V5 blocked the pick because the full five-match venue validation set or publication score was not available.'}
-  if(score<minScore)return{...base,ok:false,skip:'v5-low-publication-score',reason:`V5 requires a publication score of at least ${minScore} for this market.`}
   if(severeDeterioration)return{...base,ok:false,skip:'v5-recent-deterioration',reason:'V5 blocked the pick because recent venue support has fallen below 80% of its longer baseline.'}
   if(isRiskyRoute(pick?.route)&&pick?.runnerUpRoute&&separation!==null&&separation<RULES.v5RiskySeparationMin){
     return{...base,ok:false,skip:'v5-market-separation',reason:`V5 requires at least ${RULES.v5RiskySeparationMin} evidence points of separation for this higher-risk market.`}
