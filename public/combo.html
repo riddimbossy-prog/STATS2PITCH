@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en" class="s2p-booting">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0b">
+  <title>Combo · Stats2Pitch</title>
+  <link rel="manifest" href="/manifest.webmanifest?v=5.7.0">
+  <link rel="icon" type="image/svg+xml" href="/assets/s2p-pitch-mark.svg?v=5.7.0">
+  <link rel="apple-touch-icon" href="/assets/stats2pitch-apple.png?v=5.7.0">
+  <link rel="preconnect" href="https://s.sporty.net" crossorigin>
+  <link rel="preconnect" href="https://img.sportradar.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/conceptD.css?v=5.16.0">
+  <link rel="stylesheet" href="/mobile2026.css?v=5.22.0">
+  <link rel="stylesheet" href="/goalsBankers.css?v=5.7.0">
+  <link rel="stylesheet" href="/fontPlus2.css?v=5.7.0">
+  <link rel="stylesheet" href="/compactBoard.css?v=5.22.1">
+  <link rel="stylesheet" href="/combo.css?v=1.0.0">
+  <style>html.s2p-booting{background:#000}.s2p-boot{position:fixed;inset:0;z-index:20000;background:#000}@media(max-width:1100px){.mobile-nav{display:flex!important}.page-tabs{display:none!important}}@media(min-width:1101px){.mobile-nav{display:none!important}}</style>
+</head>
+<body data-view="combo">
+  <div id="boot" class="s2p-boot" role="status" aria-live="polite" aria-label="Loading Stats2Pitch">
+    <video class="s2p-boot-video" autoplay muted loop playsinline preload="auto" poster="/assets/s2p-boot.jpg?v=5.7.0"><source src="/assets/s2p-boot.mp4?v=5.7.0" type="video/mp4"></video>
+  </div>
+  <script>
+    (function(){var b=document.getElementById('boot'),v=b&&b.querySelector('video'),shown=Date.now(),done=false;if(v){var p=v.play();if(p&&p.catch)p.catch(function(){})}window.s2pBootDone=function(){if(done)return;done=true;setTimeout(function(){if(b)b.classList.add('is-done');document.documentElement.classList.remove('s2p-booting');setTimeout(function(){try{if(v){v.pause();v.removeAttribute('src');v.load()}if(b)b.remove()}catch(e){}},520)},Math.max(0,650-(Date.now()-shown)))};setTimeout(function(){window.s2pBootDone()},14000)})();
+  </script>
+
+  <div class="app">
+    <header>
+      <div class="header-inner">
+        <div class="brand">
+          <img class="brand-mark" src="/assets/s2p-pitch-mark.svg?v=5.7.0" width="42" height="42" alt="Stats2Pitch">
+          <div class="brand-copy"><div class="brand-text">STATS<span>2</span>PITCH <em class="year-badge">2026</em></div><div class="brand-sub">Smart Football Picks</div></div>
+        </div>
+        <nav class="page-tabs">
+          <a class="page-tab" href="/">All Picks</a>
+          <a class="page-tab" href="/filter-tips.html">Filter Tips</a>
+          <a class="page-tab" href="/var-tips.html">VAR Tips</a>
+          <a class="page-tab" href="/goals-bankers.html">Goals Bankers</a>
+          <a class="page-tab active" href="/combo.html">Combo</a>
+          <a class="page-tab" href="/daily-bankers.html">Daily Bankers</a>
+          <a class="page-tab" href="/results.html">Results</a>
+        </nav>
+        <div class="header-actions">
+          <button id="installApp" hidden>Install</button>
+          <button class="icon-btn" id="notifyBell" aria-label="Refresh" title="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+          <button class="icon-btn" id="profileBtn" aria-label="Filters" title="Filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button>
+          <button id="refresh">Refresh</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <section class="combo-hero">
+        <div class="combo-hero-num"><b id="comboCount">0</b><small>picks</small></div>
+        <div class="combo-hero-copy">
+          <strong>Combo <em>TOP 2</em></strong>
+          <p>Like a smarter double chance across result + goals. Stats2Pitch checks venue split, recent form and H2H, ranks the listed Combo markets, and publishes only the two strongest routes per match. Minimum SportyBet price: <b>1.20</b>.</p>
+        </div>
+      </section>
+
+      <div class="combo-rules" aria-label="Combo engine rules">
+        <span>12 supported markets</span><span>Split + recent + H2H</span><span>Up to 2 per match</span><span>Odds ≥ 1.20</span>
+      </div>
+
+      <div class="controls-shell combo-controls">
+        <nav id="dates"></nav>
+        <div class="toolbar filters">
+          <select id="statusFilter" aria-label="Match status"><option value="all">All statuses</option><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="settled">Settled</option></select>
+          <select id="countryFilter" aria-label="Country"><option value="all">All countries</option></select>
+          <select id="leagueFilter" aria-label="League"><option value="all">All leagues</option></select>
+          <select id="familyFilter" aria-label="Combo type"><option value="all">All combo types</option><option value="result-goals">Result + O/U 2.5</option><option value="result-gg">Result + GG</option><option value="result-clean-sheet">Result + Clean Sheet</option></select>
+          <button id="clearFilters">Clear</button>
+          <span id="status">Loading…</span>
+        </div>
+      </div>
+      <div id="countryChips" class="country-chips" aria-label="Country shortcuts"></div>
+      <main id="comboCards" class="combo-board"><div class="empty">Loading Combo picks…</div></main>
+    </div>
+  </div>
+
+  <div id="modal" class="modal hidden"></div>
+  <nav class="mobile-nav bankers-nav">
+    <a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span>Picks</span></a>
+    <a href="/filter-tips.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg><span>Filter</span></a>
+    <a href="/var-tips.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg><span>VAR</span></a>
+    <a href="/goals-bankers.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg><span>Goals</span></a>
+    <a class="active" href="/combo.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h4l2 3h4M7 17h4l2-3h4"/><circle cx="5" cy="7" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="5" cy="17" r="2"/><circle cx="19" cy="17" r="2"/></svg><span>Combo</span></a>
+    <a href="/daily-bankers.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v6c0 5-3.4 7.8-8 9-4.6-1.2-8-4-8-9V7z"/></svg><span>Bankers</span></a>
+    <a href="/results.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Results</span></a>
+  </nav>
+
+  <script src="/runtime-config.js"></script>
+  <link rel="modulepreload" href="/net.js?v=5.17.0">
+  <script src="/leagueFlags.js?v=5.7.0"></script>
+  <script type="module" src="/combo.js?v=1.0.0"></script>
+  <script src="/pwa.js?v=5.17.0"></script>
+</body>
+</html>
