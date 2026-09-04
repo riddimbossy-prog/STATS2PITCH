@@ -40,13 +40,33 @@ test('a non-empty V5 refresh replaces old Goals Bankers instead of preserving V4
     bestPicks:[],varTips:[],filterTips:[],goalsBankers:[oldPick],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
     meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v4',sourceFixtures:20,scheduledFixtures:20}
   },{preservePublished:false})
-  const freshPick={fixtureId:'32',market:'home-team-goals',selection:'Over 1.5',route:'FAV_2PLUS',engine:'goals-bankers-v5',kickoff:`${date}T19:00:00Z`}
+  const freshPick={fixtureId:'32',market:'home-team-goals',selection:'Over 1.5',route:'FAV_2PLUS',engine:'goals-bankers-v5.1',kickoff:`${date}T19:00:00Z`}
   const saved=await saveBoard(date,{
     bestPicks:[],varTips:[],filterTips:[],goalsBankers:[freshPick],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
-    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5.1',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
   })
   assert.deepEqual(saved.goalsBankers.map(row=>row.fixtureId),['32'])
-  assert.equal(saved.goalsBankers[0].engine,'goals-bankers-v5')
+  assert.equal(saved.goalsBankers[0].engine,'goals-bankers-v5.1')
+  await clearBoard(date)
+})
+
+test('a non-empty V5.1 refresh removes V5 away picks that fail the corrected Over 2.5 entry gate',async()=>{
+  const date='2099-02-05'
+  await clearBoard(date)
+  const oldAwayPick={
+    fixtureId:'33',market:'away-team-goals',selection:'Over 1.5',route:'FAV_2PLUS',
+    engine:'goals-bankers-v5',kickoff:`${date}T19:00:00Z`
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[oldAwayPick],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5.1',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.goalsBankers,[])
+  assert.equal(saved.meta.goalsBankersCount,0)
   await clearBoard(date)
 })
 
