@@ -38,8 +38,8 @@ function mergeLive(map,liveRows,published){
   return map
 }
 async function resultPayload(date){
-  const board=await loadBoard(date)||{bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],dailyBankers:[],bankers:[],safestBankers:[],valueBankers:[],results:{}}
-  const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.comboPicks||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
+  const board=await loadBoard(date)||{bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],h2hPicks:[],dailyBankers:[],bankers:[],safestBankers:[],valueBankers:[],results:{}}
+  const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.comboPicks||[]),...(board.h2hPicks||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
   const eventIds=published.map(p=>p.sportyEventId||p.eventId).filter(Boolean)
   let fixtures=[]
   try{if(eventIds.length)fixtures=await sportyEventFixtures(eventIds)}catch{}
@@ -60,9 +60,10 @@ async function resultPayload(date){
   const split=splitGoalsAndCombo(board)
   const goalsBankers=compactResultRows(split.goalsBankers.map(withResult))
   const comboPicks=compactResultRows(split.comboPicks.map(withResult))
+  const h2hPicks=compactResultRows((board.h2hPicks||[]).map(withResult))
   const dailyBankers=compactResultRows((board.dailyBankers||[]).map(withResult))
   const bankers=compactResultRows([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])].map(withResult))
-  return{date,picks,varTips,filterTips,goalsBankers,comboPicks,dailyBankers,bankers,fixtures:[...map.values()]}
+  return{date,picks,varTips,filterTips,goalsBankers,comboPicks,h2hPicks,dailyBankers,bankers,fixtures:[...map.values()]}
 }
 async function api(req,res,url){
   if(url.pathname==='/api/health')return send(res,200,{ok:true,engineVersion:ENGINE_VERSION,version:'4.0.0'})
@@ -78,7 +79,7 @@ async function api(req,res,url){
   if(url.pathname==='/api/results'){
     const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today()
     const r=await resultPayload(date)
-    return send(res,200,{date:r.date,picks:r.picks,varTips:r.varTips,filterTips:r.filterTips,goalsBankers:r.goalsBankers,comboPicks:r.comboPicks,dailyBankers:r.dailyBankers,bankers:r.bankers})
+    return send(res,200,{date:r.date,picks:r.picks,varTips:r.varTips,filterTips:r.filterTips,goalsBankers:r.goalsBankers,comboPicks:r.comboPicks,h2hPicks:r.h2hPicks,dailyBankers:r.dailyBankers,bankers:r.bankers})
   }
   if(url.pathname==='/api/live-scores'){const date=dateOk(url.searchParams.get('date'))?url.searchParams.get('date'):today();const r=await resultPayload(date);return send(res,200,{date,fixtures:r.fixtures||[]})}
   if(url.pathname==='/api/performance'){
