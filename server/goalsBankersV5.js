@@ -10,7 +10,7 @@ import {
   statsFromFixture
 } from './goalsBankersV4.js'
 
-export const ENGINE_ID='goals-bankers-v5.2'
+export const ENGINE_ID='goals-bankers-v5.3'
 export const ENGINE_LABEL='Goals Bankers V5'
 export const MARKET_LABEL={...V4_LABEL,FAV_WIN:'Qualified team win',FAV_DNB:'Qualified team draw no bet',FAV_2PLUS:'Qualified team 2+'}
 export const V5_RULES=Object.freeze({
@@ -149,8 +149,8 @@ export function evaluateTwoInARowMarket(raw,opts={}){
   if(!finite(homeTable.position)||!finite(homeTable.size)||!finite(awayTable.position)||!finite(awayTable.size)){
     return skip('MISSING_TABLE_STANDINGS',{reason:'V5 requires verified overall league positions for both teams.'})
   }
-  if(top(homeTable)&&top(awayTable))return skip('BOTH_TOP_FIVE',{reason:'V5 skips every Top 5 versus Top 5 match.'})
   if(bottom(homeTable)&&bottom(awayTable))return skip('BOTH_BOTTOM_THREE',{reason:'V5 skips every Bottom 3 versus Bottom 3 match.'})
+  if(!top(homeTable)&&!top(awayTable))return skip('NEITHER_TOP_FIVE',{reason:'V5 requires at least one team to sit in the overall Top 5.'})
 
   const legacy=opts.legacyDecision||evaluateV4(raw,{fixtureId:opts.fixtureId,stats:opts.stats,earlySeason:opts.earlySeason,oddsOnly:!opts.stats})
   const gg=ggV5Gate(raw,legacy)

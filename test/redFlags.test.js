@@ -90,13 +90,20 @@ test('split top-five and bottom-three clashes hard-gate Goals Bankers',()=>{
     homeSplit:{position:1,size:20,sampleReady:true,ppg:2.4},
     awaySplit:{position:4,size:20,sampleReady:true,ppg:2.1}
   })
+  const neither=fixture({
+    homeSplit:{position:7,size:20,sampleReady:true,ppg:1.4},
+    awaySplit:{position:10,size:20,sampleReady:true,ppg:1.2},
+    homeStanding:{position:7,size:20},
+    awayStanding:{position:10,size:20}
+  })
   const bottom=fixture({
     homeSplit:{position:18,size:20,sampleReady:true,ppg:0.4},
     awaySplit:{position:20,size:20,sampleReady:true,ppg:0.2}
   })
   assert.equal(redFlagSkip(top),'both-top-five')
   assert.equal(redFlagSkip(bottom),'both-bottom-three')
-  assert.equal(diagnoseGoalsBankerFixture(top).skip,'both-top-five')
+  assert.notEqual(diagnoseGoalsBankerFixture(top).skip,'both-top-five')
+  assert.equal(diagnoseGoalsBankerFixture(neither).skip,'neither-top-five')
   assert.equal(diagnoseGoalsBankerFixture(bottom).skip,'both-bottom-three')
 })
 

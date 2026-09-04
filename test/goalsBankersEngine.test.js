@@ -85,7 +85,7 @@ function raw(extra={}){
 }
 
 test('Goals Bankers V5 is active and publishes exact rule metadata',()=>{
-  assert.equal(ENGINE_ID,'goals-bankers-v5.2')
+  assert.equal(ENGINE_ID,'goals-bankers-v5.3')
   const board=buildGoalsBankerBoard([fixture()])
   assert.equal(board.meta.engine,ENGINE_ID)
   assert.deepEqual(board.meta.rules,V5_RULES)
@@ -146,19 +146,22 @@ test('a qualified result outside the overall Top 3 is downgraded to DNB',()=>{
   assert.equal(pick.odds,1.24)
 })
 
-test('overall Top 5 clashes and Bottom 3 clashes are skipped',()=>{
-  assert.equal(diagnosed({homeStanding:{position:2,size:20},awayStanding:{position:5,size:20}}).skip,'both-top-five')
+test('at least one team must sit in the overall Top 5',()=>{
+  const clash=diagnosed({homeStanding:{position:2,size:20},awayStanding:{position:5,size:20}})
+  assert.notEqual(clash.skip,'both-top-five')
+  assert.ok(clash.pick)
+  assert.equal(diagnosed({homeStanding:{position:7,size:20},awayStanding:{position:10,size:20}}).skip,'neither-top-five')
   assert.equal(diagnosed({homeStanding:{position:18,size:20},awayStanding:{position:20,size:20}}).skip,'both-bottom-three')
 })
 
-test('two mid-table teams force goals even when result odds clear the win gate',()=>{
+test('two mid-table teams are skipped because neither is Top 5',()=>{
   const result=diagnosed({homeStanding:{position:7,size:20},awayStanding:{position:10,size:20}})
-  assert.equal(result.route,'FAV_2PLUS')
-  assert.equal(result.v3.midTableOverride,true)
+  assert.equal(result.pick,null)
+  assert.equal(result.skip,'neither-top-five')
 })
 
 test('GG keeps the old decision and adds balanced O0.5, 1.30, and Draw 3.60 gates',()=>{
-  const standingFixture=fixture({homeStanding:{position:6,size:20},awayStanding:{position:15,size:20}})
+  const standingFixture=fixture({homeStanding:{position:4,size:20},awayStanding:{position:15,size:20}})
   const legacy={finalPick:'GG',matchType:'BALANCED_GOALS',capabilities:null}
   assert.equal(evaluateTwoInARowMarket(raw(),{fixture:standingFixture,legacyDecision:legacy}).finalPick,'GG')
   assert.equal(evaluateTwoInARowMarket(raw({draw_odds:3.59}),{fixture:standingFixture,legacyDecision:legacy}).finalPick,'SKIP')

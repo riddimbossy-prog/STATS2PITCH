@@ -77,7 +77,7 @@ test('Goals Bankers is a dedicated public tab with slip rules and no method copy
   assert.match(html,/v3-badge/)
   assert.match(html,/Goals Bankers/)
   assert.match(js,/board\.goalsBankers/)
-  assert.match(js,/REQUIRED_ENGINES=new Set\(\['goals-bankers-v5\.1','goals-bankers-v5\.2'\]\)/)
+  assert.match(js,/REQUIRED_ENGINES=new Set\(\['goals-bankers-v5\.1','goals-bankers-v5\.2','goals-bankers-v5\.3'\]\)/)
   assert.match(js,/canAddAccaLeg/)
   assert.match(js,/max-1-result/)
   assert.match(js,/need-goals-leg/)

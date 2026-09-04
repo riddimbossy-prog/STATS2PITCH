@@ -4,7 +4,7 @@ import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRema
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"': '"',"'":'&#39;'}[c]))
-const REQUIRED_ENGINES=new Set(['goals-bankers-v5.1','goals-bankers-v5.2'])
+const REQUIRED_ENGINES=new Set(['goals-bankers-v5.1','goals-bankers-v5.2','goals-bankers-v5.3'])
 const BOARD_VIEW='goals'
 const SLIP_KEY='s2p-goals-slip'
 const PUBLISHED_ROUTES=new Set(['FAV_WIN','FAV_DNB','FAV_2PLUS','OVER_2.5','GG'])

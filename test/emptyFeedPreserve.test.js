@@ -92,6 +92,27 @@ test('a V5.2 refresh drops Goals Bankers that used Home Team Corners as Over 2.5
   await clearBoard(date)
 })
 
+test('a V5.3 refresh drops Goals Bankers that had no Top 5 team',async()=>{
+  const date='2099-02-07'
+  await clearBoard(date)
+  const midTablePick={
+    fixtureId:'mid',market:'home-team-goals',selection:'Over 1.5',route:'FAV_2PLUS',
+    engine:'goals-bankers-v5.2',odds:1.40,kickoff:`${date}T19:00:00Z`
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[midTablePick],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5.2',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5.3',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.goalsBankers,[])
+  assert.equal(saved.meta.goalsBankersCount,0)
+  assert.equal(saved.meta.goalsBankersEngine,'goals-bankers-v5.3')
+  await clearBoard(date)
+})
+
 test('a non-empty Combo V3 refresh removes preserved V2 rows rejected by the hard gates',async()=>{
   const date='2099-02-04'
   await clearBoard(date)
