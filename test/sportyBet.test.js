@@ -28,6 +28,18 @@ test('SportyBet markets parse 1X2, totals, team goals, BTTS and streak',()=>{
   assert.equal(by['goals-streak-2'].outcomes.find(o=>o.name==='Yes').odd,1.28)
 })
 
+test('SportyBet object specifiers still become Over 0.5 / Over 1.5 lines',()=>{
+  const rows=parseSportyBet([
+    {id:19,name:'Home O/U',specifiers:{total:'0.5'},outcomes:[{desc:'Over',odds:'1.22'},{desc:'Under',odds:'4.10'}]},
+    {id:19,name:'Home O/U',specifier:{total:1.5},outcomes:[{desc:'Over',odds:'2.05'}]},
+    {id:20,name:'Away O/U',specifiers:{total:'2.5'},outcomes:[{desc:'Over',odds:'3.40'}]}
+  ])
+  const by=Object.fromEntries(rows.map(r=>[r.marketKey,r]))
+  assert.equal(by['home-team-goals'].outcomes.find(o=>o.name==='Over 0.5').odd,1.22)
+  assert.equal(by['home-team-goals'].outcomes.find(o=>o.name==='Over 1.5').odd,2.05)
+  assert.equal(by['away-team-goals'].outcomes.find(o=>o.name==='Over 2.5').odd,3.40)
+})
+
 test('verified SportyBet odds feed VAR without API-Football',()=>{
   const form=Array.from({length:5},(_,i)=>({
     fixture:{id:i+1,date:`2026-08-0${i+1}T12:00:00Z`,status:{short:'FT'}},

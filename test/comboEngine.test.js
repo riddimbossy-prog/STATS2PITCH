@@ -6,10 +6,12 @@ import {settlePick} from '../server/settlement.js'
 const market=(name,yes)=>({name,outcomes:[{name:'Yes',odds:yes},{name:'No',odds:3.2}]})
 const ft=(id,homeId,awayId,h,a,date)=>({fixture:{id,date,status:{short:'FT'}},teams:{home:{id:homeId,name:`T${homeId}`},away:{id:awayId,name:`T${awayId}`}},goals:{home:h,away:a},score:{fulltime:{home:h,away:a},halftime:{home:0,away:0}}})
 function decisionOdds(overrides={}){
-  const odds={draw:3.00,homeO05:1.20,awayO05:1.25,homeO15:1.49,awayO15:2.20,homeO25:2.10,awayO25:3.40,...overrides}
+  const odds={draw:3.00,homeO05:1.20,awayO05:1.25,homeO15:1.49,awayO15:2.20,homeO25:2.10,awayO25:3.40,matchOver25:1.70,bttsYes:1.50,homeWin:1.55,awayWin:5.80,...overrides}
   const row=(marketKey,outcomes)=>({marketKey,source:'sportybet',outcomes:Object.entries(outcomes).filter(([,odd])=>odd!==null&&odd!==undefined).map(([name,odd])=>({name,odd}))})
   return[
-    row('match-winner',{Draw:odds.draw}),
+    row('match-winner',{Home:odds.homeWin,Draw:odds.draw,Away:odds.awayWin}),
+    row('total-goals',{'Over 2.5':odds.matchOver25}),
+    row('both-teams-score',{Yes:odds.bttsYes}),
     row('home-team-goals',{'Over 0.5':odds.homeO05,'Over 1.5':odds.homeO15,'Over 2.5':odds.homeO25}),
     row('away-team-goals',{'Over 0.5':odds.awayO05,'Over 1.5':odds.awayO15,'Over 2.5':odds.awayO25})
   ]
@@ -90,13 +92,11 @@ test('draw-or-over can qualify when winner is unclear but the failure state is r
 
 test('hard Combo odds gates apply the exact inclusive and exclusive thresholds',()=>{
   const base={marketOdds:decisionOdds()}
-  assert.deepEqual(COMBO_ODDS_THRESHOLDS,{
-    ggTeamOver05ExclusiveMax:1.30,
-    drawMax:3.00,
-    over25TeamOver25Max:2.10,
-    cleanSheetTeamOver05Min:1.80,
-    sideTeamOver15ExclusiveMax:1.50
-  })
+  assert.equal(COMBO_ODDS_THRESHOLDS.ggTeamOver05ExclusiveMax,1.30)
+  assert.equal(COMBO_ODDS_THRESHOLDS.drawMax,3.00)
+  assert.equal(COMBO_ODDS_THRESHOLDS.over25TeamOver25Max,2.10)
+  assert.equal(COMBO_ODDS_THRESHOLDS.cleanSheetTeamOver05Min,1.80)
+  assert.equal(COMBO_ODDS_THRESHOLDS.sideTeamOver15ExclusiveMax,1.50)
   assert.equal(comboThresholdGate(base,{result:'draw',second:'over25'}).ok,true)
   assert.equal(comboThresholdGate(base,{result:'home',second:'gg'}).ok,true)
 
@@ -107,11 +107,16 @@ test('hard Combo odds gates apply the exact inclusive and exclusive thresholds',
   assert.equal(comboThresholdGate({marketOdds:decisionOdds({homeO15:1.50,awayO15:1.50})},{result:'home',second:'under25'}).ok,false,'side route needs at least one price strictly below 1.50')
 })
 
-test('hard gate fails closed when required team-goal or Draw prices are missing',()=>{
+test('missing team-goal prices do not veto Combo; match-level odds are used instead',()=>{
   const empty={marketOdds:[]}
-  assert.equal(comboThresholdGate(empty,{result:'home',second:'gg'}).ok,false)
-  assert.equal(comboThresholdGate(empty,{result:'draw',second:'over25'}).ok,false)
-  assert.equal(comboThresholdGate(empty,{result:'away',second:'cleanSheet'}).ok,false)
+  assert.equal(comboThresholdGate(empty,{result:'home',second:'gg'}).ok,true)
+  assert.equal(comboThresholdGate(empty,{result:'draw',second:'over25'}).ok,true)
+  assert.equal(comboThresholdGate(empty,{result:'away',second:'cleanSheet'}).ok,true)
+
+  const noTeamTotals={marketOdds:decisionOdds({homeO05:null,awayO05:null,homeO15:null,awayO15:null,homeO25:null,awayO25:null,matchOver25:1.70,bttsYes:1.50,homeWin:1.55})}
+  assert.equal(comboThresholdGate(noTeamTotals,{result:'home',second:'over25'}).ok,true)
+  assert.equal(comboThresholdGate(noTeamTotals,{result:'home',second:'gg'}).ok,true)
+  assert.equal(comboThresholdGate({marketOdds:decisionOdds({homeO05:null,awayO05:null,homeO25:null,awayO25:null,matchOver25:1.90,bttsYes:1.80})},{result:'draw',second:'over25'}).ok,false)
 })
 
 test('qualified Combo why includes the new threshold evidence',()=>{
@@ -135,6 +140,14 @@ test('clean-sheet Combo accepts the 1.80 boundary and rejects 1.79',()=>{
   assert.equal(analyzeComboFixture(f).length,1)
   f.marketOdds=decisionOdds({homeO05:1.79,awayO05:1.79})
   assert.equal(analyzeComboFixture(f).length,0)
+})
+
+test('Home or Over 2.5 still qualifies when only match Over 2.5 is on the board',()=>{
+  const f=strongHomeFixture({markets:[market('Home Team or Over 2.5',1.44)]})
+  f.marketOdds=decisionOdds({homeO25:null,awayO25:null,matchOver25:1.72,homeO15:1.40})
+  const picks=analyzeComboFixture(f)
+  assert.equal(picks.length,1)
+  assert.match(picks[0].reasons.join(' '),/match Over 2\.5/)
 })
 
 test('rejects a Combo when either venue split hits below 80 percent',()=>{

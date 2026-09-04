@@ -1,4 +1,5 @@
 import {fetchJson} from './http.js'
+import {parseSportyBet} from './odds.js'
 
 const COUNTRY=String(process.env.SPORTYBET_COUNTRY||'gh').replace(/[^a-z]/gi,'').toLowerCase()||'gh'
 const BASE=String(process.env.SPORTYBET_BASE||'https://www.sportybet.com').replace(/\/+$/,'')
@@ -15,6 +16,12 @@ const looksCombo=m=>{
   const first=/\b(home(?: team)?|draw|away(?: team)?) or\b/.test(n)
   const second=/\b(over 2\.5|under 2\.5|gg|any clean sheet|clean sheet)\b/.test(n)||/both teams.*score/.test(n)
   return first&&second
+}
+const hasThresholdMarkets=markets=>{
+  const keys=new Set(parseSportyBet(markets||[]).map(r=>r.marketKey))
+  const hasHome=keys.has('home-team-goals')||keys.has('team-goals')
+  const hasAway=keys.has('away-team-goals')||keys.has('team-goals')
+  return keys.has('match-winner')&&hasHome&&hasAway
 }
 const eventQuery=f=>{
   const eventId=String(f?.sporty?.eventId||'').trim(),gameId=String(f?.sporty?.gameId||'').trim()
@@ -61,7 +68,10 @@ function mergeMarkets(a=[],b=[]){
 
 export async function hydrateSportyComboMarkets(fixtures,{concurrency=3}={}){
   const rows=Array.isArray(fixtures)?fixtures:[]
-  const missing=rows.filter(f=>!(f?.sporty?.markets||[]).some(looksCombo))
+  const missing=rows.filter(f=>{
+    const markets=f?.sporty?.markets||[]
+    return !markets.some(looksCombo)||!hasThresholdMarkets(markets)
+  })
   await mapLimit(missing,concurrency,async f=>{
     try{
       const ev=await detail(f),markets=marketBag(ev)

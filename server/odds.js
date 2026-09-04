@@ -80,8 +80,12 @@ function flattenStats(obj,fixture,rows=[],prefix='',depth=0){
   return rows
 }
 function specifierTotal(market){
-  const spec=String(market?.specifier||market?.specifiers||'')
-  const m=spec.match(/total=([0-9]+(?:\.[0-9]+)?)/i)
+  const spec=market?.specifier??market?.specifiers??''
+  if(spec&&typeof spec==='object'){
+    const t=spec.total??spec.goal??spec.goals??spec.hcp??spec.handicap
+    if(t!=null&&t!=='')return String(t)
+  }
+  const m=String(spec||'').match(/total=([0-9]+(?:\.[0-9]+)?)/i)
   return m?m[1]:null
 }
 function sportyKey(market){
