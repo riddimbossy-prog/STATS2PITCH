@@ -21,7 +21,9 @@ const looksCombo=m=>{
 export function keepEventMarket(m){
   if(!m)return false
   if(MATCH_MARKET_IDS.has(String(m.id??'')))return true
-  return looksCombo(m)
+  const n=norm(m?.name||m?.desc||'')
+  if(/corner|booking|card|throw in|offside|player|penalt|first half|1st half|second half|2nd half|half time|minute/i.test(n))return false
+  return looksCombo(m)||/1x2|double chance|draw no bet|over.?under|team goals|team total|home o\/u|away o\/u|gg\/ng|both teams to score/i.test(n)
 }
 const hasThresholdMarkets=markets=>{
   const keys=new Set(parseSportyBet(markets||[]).map(r=>r.marketKey))
