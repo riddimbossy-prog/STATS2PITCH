@@ -10,12 +10,12 @@ import {
   statsFromFixture
 } from './goalsBankersV4.js'
 
-export const ENGINE_ID='goals-bankers-v5'
+export const ENGINE_ID='goals-bankers-v5.1'
 export const ENGINE_LABEL='Goals Bankers V5'
 export const MARKET_LABEL={...V4_LABEL,FAV_WIN:'Qualified team win',FAV_DNB:'Qualified team draw no bet',FAV_2PLUS:'Qualified team 2+'}
 export const V5_RULES=Object.freeze({
   homeEntryOver25Max:2.10,
-  awayEntryOver15Max:2.10,
+  awayEntryOver25Max:2.10,
   winOddsExclusiveMax:1.58,
   winPpgMin:2.00,
   opponentOver05WinMin:1.60,
@@ -96,13 +96,13 @@ export function ggV5Gate(raw,legacy){
 
 function candidate(raw,fixture,side){
   const home=side==='home'
-  const entryPrice=num(home?raw?.homeO25:raw?.awayO15)
-  const qualifies=home?atMost(entryPrice,V5_RULES.homeEntryOver25Max):atMost(entryPrice,V5_RULES.awayEntryOver15Max)
+  const entryPrice=num(home?raw?.homeO25:raw?.awayO25)
+  const qualifies=home?atMost(entryPrice,V5_RULES.homeEntryOver25Max):atMost(entryPrice,V5_RULES.awayEntryOver25Max)
   if(!qualifies)return null
   const standing=tableRow(fixture,side)
   return{
     side,
-    entryMarket:home?'Home Team Over 2.5':'Away Team Over 1.5',
+    entryMarket:home?'Home Team Over 2.5':'Away Team Over 2.5',
     entryPrice,
     winOdds:num(home?raw?.homeWin:raw?.awayWin),
     dnbOdds:num(home?raw?.homeDnb:raw?.awayDnb),
@@ -162,7 +162,7 @@ export function evaluateTwoInARowMarket(raw,opts={}){
   }
 
   const row=chooseCandidate(raw,fixture)
-  if(!row)return skip('ENTRY_FILTER',{legacyV4:legacy,ggGate:gg,reason:'Neither Home Team Over 2.5 at 2.10 or below nor Away Team Over 1.5 at 2.10 or below qualified.'})
+  if(!row)return skip('ENTRY_FILTER',{legacyV4:legacy,ggGate:gg,reason:'Neither Home Team Over 2.5 at 2.10 or below nor Away Team Over 2.5 at 2.10 or below qualified.'})
   const bothMid=mid(homeTable)&&mid(awayTable)
   if(bothMid){
     return goalDecision(raw,row,'V5_MID_TABLE_GOALS',{

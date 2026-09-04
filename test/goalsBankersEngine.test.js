@@ -84,7 +84,7 @@ function raw(extra={}){
 }
 
 test('Goals Bankers V5 is active and publishes exact rule metadata',()=>{
-  assert.equal(ENGINE_ID,'goals-bankers-v5')
+  assert.equal(ENGINE_ID,'goals-bankers-v5.1')
   const board=buildGoalsBankerBoard([fixture()])
   assert.equal(board.meta.engine,ENGINE_ID)
   assert.deepEqual(board.meta.rules,V5_RULES)
@@ -93,7 +93,7 @@ test('Goals Bankers V5 is active and publishes exact rule metadata',()=>{
 
 test('home entry requires Home Team Over 2.5 at 2.10 or below',()=>{
   assert.equal(diagnosed({odds:{homeO25:2.10}}).route,'FAV_WIN')
-  const rejected=diagnosed({odds:{homeO25:2.11,awayO15:2.11}})
+  const rejected=diagnosed({odds:{homeO25:2.11,awayO25:2.11}})
   assert.equal(rejected.pick,null)
   assert.equal(rejected.skip,'entry-filter')
 })
@@ -115,13 +115,13 @@ test('home falls back to team 2+ unless away Over 0.5 is at most 1.50',()=>{
   assert.equal(over.market,'total-goals')
 })
 
-test('away entry mirrors the win and 2+ rules using Away Team Over 1.5 at 2.10 or below',()=>{
+test('away entry requires Away Team Over 2.5 at 2.10 or below',()=>{
   const base={
     homeStanding:{position:12,size:20},awayStanding:{position:2,size:20},
     homeSplit:{position:12,size:20,ppg:0.6,played:5},awaySplit:{position:2,size:20,ppg:2.0,played:5}
   }
-  assert.equal(diagnosed({...base,odds:{homeWin:6.50,awayWin:1.57,homeO25:2.30,awayO15:2.10,homeO05:1.61}}).route,'FAV_WIN')
-  const rejected=diagnosed({...base,odds:{homeWin:6.50,awayWin:1.57,homeO25:2.30,awayO15:2.11,homeO05:1.61}})
+  assert.equal(diagnosed({...base,odds:{homeWin:6.50,awayWin:1.57,homeO25:2.30,awayO15:1.81,awayO25:2.10,homeO05:1.61}}).route,'FAV_WIN')
+  const rejected=diagnosed({...base,odds:{homeWin:6.50,awayWin:1.57,homeO25:2.30,awayO15:1.81,awayO25:2.11,homeO05:1.61}})
   assert.equal(rejected.skip,'entry-filter')
 })
 
@@ -130,11 +130,11 @@ test('away only chooses Over 2.5 when weaker home Over 0.5 is at most 1.30',()=>
     homeStanding:{position:12,size:20},awayStanding:{position:2,size:20},
     homeSplit:{position:12,size:20,ppg:0.6,played:5},awaySplit:{position:2,size:20,ppg:1.8,played:5}
   }
-  assert.equal(diagnosed({...base,odds:{homeWin:6.50,awayWin:1.65,homeO25:2.30,awayO15:2.10,homeO05:1.30,awayO05:1.45,draw:3.40}}).route,'OVER_2.5')
-  const two=diagnosed({...base,odds:{homeWin:6.50,awayWin:1.65,homeO25:2.30,awayO15:2.10,homeO05:1.31,awayO05:1.45,draw:3.40}}).pick
+  assert.equal(diagnosed({...base,odds:{homeWin:6.50,awayWin:1.65,homeO25:2.30,awayO15:1.81,awayO25:2.10,homeO05:1.30,awayO05:1.45,draw:3.40}}).route,'OVER_2.5')
+  const two=diagnosed({...base,odds:{homeWin:6.50,awayWin:1.65,homeO25:2.30,awayO15:1.81,awayO25:2.10,homeO05:1.31,awayO05:1.45,draw:3.40}}).pick
   assert.equal(two.route,'FAV_2PLUS')
   assert.equal(two.market,'away-team-goals')
-  assert.equal(two.odds,2.10)
+  assert.equal(two.odds,1.81)
 })
 
 test('a qualified result outside the overall Top 3 is downgraded to DNB',()=>{
@@ -186,6 +186,7 @@ test('odds extraction includes DNB and all V5 team-total inputs',()=>{
   assert.equal(book.awayDnb,2.70)
   assert.equal(book.homeO25,2.10)
   assert.equal(book.awayO15,2.30)
+  assert.equal(book.awayO25,3.20)
   assert.equal(book.homeO05,1.18)
   assert.equal(book.awayO05,1.70)
 })
