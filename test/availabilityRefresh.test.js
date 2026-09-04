@@ -50,7 +50,7 @@ test('result rows compact to fixture id and outcome only',()=>{
 test('settle job includes Goals Bankers',async()=>{
   const [src,engine]=await Promise.all([read('scripts/settleResults.js'),read('server/settlement.js')])
   assert.match(src,/boardPicks/)
-  assert.match(src,/postponed/)
+  assert.match(engine,/postponed/)
   assert.match(engine,/goalsBankers/)
   assert.match(engine,/safestBankers/)
   assert.match(engine,/valueBankers/)
