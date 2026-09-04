@@ -3,7 +3,14 @@ import {attachWhy,fixtureHasStats} from './pickWhy.js'
 export const COMBO_MIN_ODD=Math.max(1.20,Number(process.env.COMBO_MIN_ODD||1.20))
 export const COMBO_MIN_SCORE=Math.max(80,Math.min(95,Number(process.env.COMBO_MIN_SCORE||80)))
 export const COMBO_MAX_PER_FIXTURE=2
-export const COMBO_ENGINE_VERSION='combo-v2-failure-state'
+export const COMBO_ENGINE_VERSION='combo-v3-hard-odds-gates'
+export const COMBO_ODDS_THRESHOLDS=Object.freeze({
+  ggTeamOver05ExclusiveMax:1.30,
+  drawMax:3.00,
+  over25TeamOver25Max:2.10,
+  cleanSheetTeamOver05Min:1.80,
+  sideTeamOver15ExclusiveMax:1.50
+})
 
 export const COMBO_MARKETS=Object.freeze([
   {route:'HOME_OVER_25',market:'combo-home-over-25',label:'Home Team or Over 2.5',result:'home',second:'over25',group:'result-goals'},
@@ -44,6 +51,63 @@ function marketRoute(raw){
 function oddFrom(v){
   const n=Number(v)
   return Number.isFinite(n)&&n>1.001&&n<20?n:null
+}
+function supportingOdd(v){
+  const n=Number(v)
+  return Number.isFinite(n)&&n>1.001&&n<1000?n:null
+}
+function marketOutcomeOdd(f,marketKey,outcomeName){
+  const rows=(f?.marketOdds||[]).filter(m=>norm(m?.marketKey)===norm(marketKey))
+  rows.sort((a,b)=>Number(norm(b?.source)==='sportybet')-Number(norm(a?.source)==='sportybet'))
+  for(const row of rows){
+    const hit=(row?.outcomes||[]).find(o=>norm(o?.name)===norm(outcomeName))
+    const price=supportingOdd(hit?.odd??hit?.odds??hit?.price)
+    if(price)return price
+  }
+  return null
+}
+function thresholdEvidence(f){
+  return{
+    draw:marketOutcomeOdd(f,'match-winner','Draw'),
+    homeOver05:marketOutcomeOdd(f,'home-team-goals','Over 0.5'),
+    awayOver05:marketOutcomeOdd(f,'away-team-goals','Over 0.5'),
+    homeOver15:marketOutcomeOdd(f,'home-team-goals','Over 1.5'),
+    awayOver15:marketOutcomeOdd(f,'away-team-goals','Over 1.5'),
+    homeOver25:marketOutcomeOdd(f,'home-team-goals','Over 2.5'),
+    awayOver25:marketOutcomeOdd(f,'away-team-goals','Over 2.5')
+  }
+}
+const fmtOdd=v=>finite(v)?Number(v).toFixed(2):'missing'
+
+export function comboThresholdGate(f,def){
+  const t=COMBO_ODDS_THRESHOLDS,evidence=thresholdEvidence(f),failures=[],reasons=[]
+  if(def?.second==='gg'){
+    const bothReady=finite(evidence.homeOver05)&&finite(evidence.awayOver05)
+    const bothBelow=bothReady&&evidence.homeOver05<t.ggTeamOver05ExclusiveMax&&evidence.awayOver05<t.ggTeamOver05ExclusiveMax
+    if(!bothBelow)failures.push(`GG conflict: both team Over 0.5 prices must be below ${t.ggTeamOver05ExclusiveMax.toFixed(2)} (home ${fmtOdd(evidence.homeOver05)}, away ${fmtOdd(evidence.awayOver05)}).`)
+    else reasons.push(`GG gate: home Over 0.5 ${fmtOdd(evidence.homeOver05)} and away Over 0.5 ${fmtOdd(evidence.awayOver05)} are both below ${t.ggTeamOver05ExclusiveMax.toFixed(2)}.`)
+  }
+  if(def?.result==='draw'){
+    const supported=finite(evidence.draw)&&evidence.draw<=t.drawMax
+    if(!supported)failures.push(`Draw conflict: Draw odds must be ${t.drawMax.toFixed(2)} or lower (found ${fmtOdd(evidence.draw)}).`)
+    else reasons.push(`Draw gate: Draw odds ${fmtOdd(evidence.draw)} are ${t.drawMax.toFixed(2)} or lower.`)
+  }
+  if(def?.second==='over25'){
+    const supported=[evidence.homeOver25,evidence.awayOver25].some(v=>finite(v)&&v<=t.over25TeamOver25Max)
+    if(!supported)failures.push(`Over 2.5 conflict: at least one team Over 2.5 price must be ${t.over25TeamOver25Max.toFixed(2)} or lower (home ${fmtOdd(evidence.homeOver25)}, away ${fmtOdd(evidence.awayOver25)}).`)
+    else reasons.push(`Over 2.5 gate: at least one team Over 2.5 price is ${t.over25TeamOver25Max.toFixed(2)} or lower (home ${fmtOdd(evidence.homeOver25)}, away ${fmtOdd(evidence.awayOver25)}).`)
+  }
+  if(def?.second==='cleanSheet'){
+    const supported=[evidence.homeOver05,evidence.awayOver05].some(v=>finite(v)&&v>=t.cleanSheetTeamOver05Min)
+    if(!supported)failures.push(`Clean-sheet conflict: at least one team Over 0.5 price must be ${t.cleanSheetTeamOver05Min.toFixed(2)} or higher (home ${fmtOdd(evidence.homeOver05)}, away ${fmtOdd(evidence.awayOver05)}).`)
+    else reasons.push(`Clean-sheet gate: at least one team Over 0.5 price is ${t.cleanSheetTeamOver05Min.toFixed(2)} or higher (home ${fmtOdd(evidence.homeOver05)}, away ${fmtOdd(evidence.awayOver05)}).`)
+  }
+  if(def?.result==='home'||def?.result==='away'){
+    const supported=[evidence.homeOver15,evidence.awayOver15].some(v=>finite(v)&&v<t.sideTeamOver15ExclusiveMax)
+    if(!supported)failures.push(`Side conflict: at least one team Over 1.5 price must be below ${t.sideTeamOver15ExclusiveMax.toFixed(2)} (home ${fmtOdd(evidence.homeOver15)}, away ${fmtOdd(evidence.awayOver15)}).`)
+    else reasons.push(`Side gate: at least one team Over 1.5 price is below ${t.sideTeamOver15ExclusiveMax.toFixed(2)} (home ${fmtOdd(evidence.homeOver15)}, away ${fmtOdd(evidence.awayOver15)}).`)
+  }
+  return{ok:failures.length===0,evidence,reasons,failures,reason:failures[0]||null}
 }
 function yesOdd(market){
   for(const o of market?.outcomes||[]){
@@ -298,6 +362,8 @@ export function analyzeComboFixture(f){
   if(!listed.length)return[]
   const candidates=[]
   for(const def of listed){
+    const thresholdCheck=comboThresholdGate(f,def)
+    if(!thresholdCheck.ok)continue
     const homeSplit=literalRate(homeRows,def),awaySplit=literalRate(awayRows,def)
     if((homeSplit.rate??0)<80||(awaySplit.rate??0)<80)continue
     if(homeSplit.failures>=2||awaySplit.failures>=2)continue
@@ -325,6 +391,7 @@ export function analyzeComboFixture(f){
     const reasons=[
       `${f.home.name} home split: ${homeSplit.hits}/${homeSplit.total} (${homeSplit.rate}%) for ${def.label}.`,
       `${f.away.name} away split: ${awaySplit.hits}/${awaySplit.total} (${awaySplit.rate}%) for ${def.label}.`,
+      ...thresholdCheck.reasons,
       `Exact failure state appeared ${combined.failures}/${combined.total} times across the two venue samples; neither split failed more than once.`,
       `Primary route: ${routes.primary.label} ${routes.primary.hits}/${routes.primary.total} (${routes.primary.rate}%). Insurance route: ${routes.insurance.label} ${routes.insurance.hits}/${routes.insurance.total} (${routes.insurance.rate}%).`,
       direction.reason,
@@ -346,6 +413,7 @@ export function analyzeComboFixture(f){
       recentHomeHit:homeRecent,recentAwayHit:awayRecent,h2hHit:h2h,
       homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,
       resultRoute:def.result,secondaryRoute:def.second,archetype:archetype(def),
+      oddsThresholdEvidence:thresholdCheck.evidence,
       primaryRoute:routes.primary,insuranceRoute:routes.insurance,combinedSplitHit:combined,
       failureState:{homeFailures:homeSplit.failures,awayFailures:awaySplit.failures,combinedFailures:combined.failures,total:combined.total,text:losingShape(def)},
       scoreBreakdown:scoring.breakdown,engineVersion:COMBO_ENGINE_VERSION,
@@ -381,7 +449,7 @@ export function buildComboBoard(fixtures,meta={}){
     meta:{
       engine:COMBO_ENGINE_VERSION,generatedAt:meta?.generatedAt||new Date().toISOString(),minOdd:COMBO_MIN_ODD,minScore:COMBO_MIN_SCORE,
       maxPerFixture:COMBO_MAX_PER_FIXTURE,supportedMarkets:COMBO_MARKETS.length,eligibleMarkets,fixturesWithListed,fixturesWithPicks,
-      splitSample:'last-5-home-vs-last-5-away',minSplitMatches:4,minSplitHitRate:80,picks:bestPicks.length,skipped
+      splitSample:'last-5-home-vs-last-5-away',minSplitMatches:4,minSplitHitRate:80,oddsThresholds:COMBO_ODDS_THRESHOLDS,picks:bestPicks.length,skipped
     }
   }
 }
