@@ -4,7 +4,7 @@ import {parseSportyBet} from './odds.js'
 export const COMBO_MIN_ODD=Math.max(1.20,Number(process.env.COMBO_MIN_ODD||1.20))
 export const COMBO_MIN_SCORE=Math.max(80,Math.min(95,Number(process.env.COMBO_MIN_SCORE||80)))
 export const COMBO_MAX_PER_FIXTURE=2
-export const COMBO_ENGINE_VERSION='combo-v3-hard-odds-gates'
+export const COMBO_ENGINE_VERSION='combo-v3.2-hard-gates-only'
 export const COMBO_ODDS_THRESHOLDS=Object.freeze({
   ggTeamOver05ExclusiveMax:1.30,
   drawMax:3.00,
@@ -397,58 +397,43 @@ function selectedCandidates(candidates){
 
 export function analyzeComboFixture(f,skipBag=null){
   const bump=k=>{if(skipBag)skipBag[k]=(skipBag[k]||0)+1}
-  if(!fixtureHasStats(f))return[]
-  const homeRows=recentRows(f?.home?.fixtures,5),awayRows=recentRows(f?.away?.fixtures,5)
-  if(homeRows.length<4||awayRows.length<4){bump('thinHistory');return[]}
   const listed=listedComboMarkets(f?.sportyMarkets||f?.sporty?.markets||[])
   if(!listed.length)return[]
+  const homeRows=recentRows(f?.home?.fixtures,5),awayRows=recentRows(f?.away?.fixtures,5)
   const candidates=[]
   for(const def of listed){
     const thresholdCheck=comboThresholdGate(f,def)
     if(!thresholdCheck.ok){bump('threshold');continue}
-    const homeSplit=literalRate(homeRows,def),awaySplit=literalRate(awayRows,def)
-    if((homeSplit.rate??0)<80||(awaySplit.rate??0)<80){bump('split');continue}
-    if(homeSplit.failures>=2||awaySplit.failures>=2){bump('splitFailures');continue}
 
+    const homeSplit=literalRate(homeRows,def),awaySplit=literalRate(awayRows,def)
     const homeResult=resultRate(homeRows,def),awayResult=resultRate(awayRows,def)
     const homeSecond=secondRate(homeRows,def),awaySecond=secondRate(awayRows,def)
     const routes=primaryInsurance(def,homeResult,awayResult,homeSecond,awaySecond)
-    const routeCheck=routeGate(def,routes)
-    if(!routeCheck.ok){bump('route');continue}
-
     const direction=directionalFoundation(f,def,homeResult,awayResult)
-    if(!direction.ok){bump('direction');continue}
-
     const homeRecent=projectedRate(f?.home?.lastMatches||homeRows,f?.home?.id,'home',def)
     const awayRecent=projectedRate(f?.away?.lastMatches||awayRows,f?.away?.id,'away',def)
     const h2h=h2hRate(f?.h2h,f?.home?.name,f?.away?.name,def)
-    if(h2hVeto(h2h)){bump('h2h');continue}
-
     const scoring=comboScore(f,def,homeSplit,awaySplit,homeResult,awayResult,homeSecond,awaySecond,homeRecent,awayRecent,h2h)
-    if(scoring.score<COMBO_MIN_SCORE){bump('score');continue}
-    const priceGate=oddsGate(def.odds,scoring.score,homeSplit,awaySplit)
-    if(!priceGate.ok){bump('price');continue}
-
     const combined=combinedRate(homeSplit,awaySplit)
     const reasons=[
-      `${f.home.name} home split: ${homeSplit.hits}/${homeSplit.total} (${homeSplit.rate}%) for ${def.label}.`,
-      `${f.away.name} away split: ${awaySplit.hits}/${awaySplit.total} (${awaySplit.rate}%) for ${def.label}.`,
+      `${f.home?.name||'Home'} home split: ${homeSplit.hits}/${homeSplit.total} (${homeSplit.rate??0}%) for ${def.label}.`,
+      `${f.away?.name||'Away'} away split: ${awaySplit.hits}/${awaySplit.total} (${awaySplit.rate??0}%) for ${def.label}.`,
       ...thresholdCheck.reasons,
-      `Exact failure state appeared ${combined.failures}/${combined.total} times across the two venue samples; neither split failed more than once.`,
-      `Primary route: ${routes.primary.label} ${routes.primary.hits}/${routes.primary.total} (${routes.primary.rate}%). Insurance route: ${routes.insurance.label} ${routes.insurance.hits}/${routes.insurance.total} (${routes.insurance.rate}%).`,
+      combined.total?`Exact failure state appeared ${combined.failures}/${combined.total} times across the two venue samples.` :null,
+      routes.primary.total||routes.insurance.total?`Primary route: ${routes.primary.label} ${routes.primary.hits}/${routes.primary.total} (${routes.primary.rate??0}%). Insurance route: ${routes.insurance.label} ${routes.insurance.hits}/${routes.insurance.total} (${routes.insurance.rate??0}%).`:null,
       direction.reason,
       splitReason(f),
       homeRecent.total?`Recent ${f.home.name} form projects the full Combo in ${homeRecent.hits}/${homeRecent.total} (${homeRecent.rate}%).`:null,
       awayRecent.total?`Recent ${f.away.name} form projects the full Combo in ${awayRecent.hits}/${awayRecent.total} (${awayRecent.rate}%).`:null,
-      h2h.total?`Recent H2H: ${h2h.hits}/${h2h.total} (${h2h.rate}%) supported this exact Combo.`:'H2H was neutral because there was not enough verified recent history.',
+      h2h.total?`Recent H2H: ${h2h.hits}/${h2h.total} (${h2h.rate}%) supported this exact Combo.`:null,
       losingShape(def),
-      `SportyBet Yes price ${def.odds.toFixed(2)} sits in the ${oddsTier(def.odds)} and passed its stricter evidence gate.`,
+      `Qualified on hard odds gates only · SportyBet Yes ${def.odds.toFixed(2)} (${oddsTier(def.odds)}).`,
       `Score breakdown — venue ${scoring.breakdown.venueHistory}/30, failure avoidance ${scoring.breakdown.failureAvoidance}/20, split strength ${scoring.breakdown.splitStrength}/15, market pattern ${scoring.breakdown.marketPattern}/15, recent form ${scoring.breakdown.recentForm}/8, H2H ${scoring.breakdown.h2h}/7, odds ${scoring.breakdown.odds}/5.`
     ].filter(Boolean)
 
     const pick={
       fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
-      home:f.home.name,away:f.away.name,homeId:f.home.id??null,awayId:f.away.id??null,homeLogo:f.home.logo||null,awayLogo:f.away.logo||null,
+      home:f.home?.name,away:f.away?.name,homeId:f.home?.id??null,awayId:f.away?.id??null,homeLogo:f.home?.logo||null,awayLogo:f.away?.logo||null,
       market:def.market,marketName:'Combo',selection:def.label,displaySelection:def.label,route:def.route,group:def.group,family:'Combo',
       odds:def.odds,oddsVerified:true,source:'SportyBet',sportyMarketId:def.sportyMarketId,
       comboScore:scoring.score,confidence:scoring.score,homeConsensus:homeSplit.rate,awayConsensus:awaySplit.rate,
@@ -467,7 +452,7 @@ export function analyzeComboFixture(f,skipBag=null){
 
   return selectedCandidates(candidates).map((p,i)=>({
     ...p,rank:i+1,
-    reasons:[`#${i+1} Combo for this match · strict failure-state score ${p.comboScore}/100.`,...(p.reasons||[])]
+    reasons:[`#${i+1} Combo for this match · hard-odds-gate score ${p.comboScore}/100.`,...(p.reasons||[])]
   }))
 }
 
@@ -476,10 +461,13 @@ export function buildComboBoard(fixtures,meta={}){
   let eligibleMarkets=0,fixturesWithListed=0,fixturesWithPicks=0
   const skipped={noStats:0,noComboOdds:0,rulesRejected:0}
   for(const f of fixtures||[]){
-    if(!fixtureHasStats(f)){skipped.noStats++;continue}
     const listed=listedComboMarkets(f?.sportyMarkets||f?.sporty?.markets||[])
     eligibleMarkets+=listed.length
-    if(!listed.length){skipped.noComboOdds++;continue}
+    if(!listed.length){
+      if(!fixtureHasStats(f))skipped.noStats++
+      else skipped.noComboOdds++
+      continue
+    }
     fixturesWithListed++
     const skipBag={}
     const picks=analyzeComboFixture(f,skipBag)
@@ -494,9 +482,10 @@ export function buildComboBoard(fixtures,meta={}){
   return{
     bestPicks,
     meta:{
-      engine:COMBO_ENGINE_VERSION,generatedAt:meta?.generatedAt||new Date().toISOString(),minOdd:COMBO_MIN_ODD,minScore:COMBO_MIN_SCORE,
+      engine:COMBO_ENGINE_VERSION,generatedAt:meta?.generatedAt||new Date().toISOString(),minOdd:COMBO_MIN_ODD,minScore:null,
       maxPerFixture:COMBO_MAX_PER_FIXTURE,supportedMarkets:COMBO_MARKETS.length,eligibleMarkets,fixturesWithListed,fixturesWithPicks,
-      splitSample:'last-5-home-vs-last-5-away',minSplitMatches:4,minSplitHitRate:80,oddsThresholds:COMBO_ODDS_THRESHOLDS,picks:bestPicks.length,skipped
+      splitSample:'informational-only',minSplitMatches:0,minSplitHitRate:0,oddsThresholds:COMBO_ODDS_THRESHOLDS,picks:bestPicks.length,skipped,
+      qualifyOn:'hard-odds-gates'
     }
   }
 }

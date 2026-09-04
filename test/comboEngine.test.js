@@ -63,29 +63,26 @@ test('recognizes all twelve Combo market families and enforces 1.20 minimum',()=
   const parsed=listedComboMarkets(rows)
   assert.equal(COMBO_MIN_ODD,1.20)
   assert.equal(COMBO_MIN_SCORE,80)
-  assert.equal(COMBO_ENGINE_VERSION,'combo-v3-hard-odds-gates')
+  assert.equal(COMBO_ENGINE_VERSION,'combo-v3.2-hard-gates-only')
   assert.equal(parsed.length,11)
   assert.ok(parsed.every(x=>x.odds>=1.20))
   assert.ok(parsed.some(x=>x.market==='combo-home-over-25'))
   assert.ok(parsed.some(x=>x.market==='combo-draw-clean-sheet'))
 })
 
-test('publishes only strict qualified Combo picks and never more than two',()=>{
+test('publishes Combo picks that pass hard odds gates and never more than two',()=>{
   const picks=analyzeComboFixture(strongHomeFixture())
   assert.ok(picks.length<=2)
   assert.ok(picks.length>=1)
   assert.equal(picks[0].rank,1)
-  assert.ok(picks.every(x=>x.odds>=1.20&&x.comboScore>=80&&x.reasons.length>0&&x.why))
-  assert.ok(picks.every(x=>x.homeConsensus>=80&&x.awayConsensus>=80))
-  assert.ok(picks.every(x=>x.failureState.combinedFailures<=2))
-  assert.ok(picks.every(x=>x.primaryRoute.rate>=70&&x.insuranceRoute.rate>=30))
+  assert.ok(picks.every(x=>x.odds>=1.20&&x.reasons.length>0&&x.why))
+  assert.ok(picks.every(x=>x.engineVersion==='combo-v3.2-hard-gates-only'))
 })
 
 test('draw-or-over can qualify when winner is unclear but the failure state is rare',()=>{
   const picks=analyzeComboFixture(balancedDrawOverFixture())
   assert.equal(picks.length,1)
   assert.equal(picks[0].route,'DRAW_OVER_25')
-  assert.ok(picks[0].comboScore>=80)
   assert.equal(picks[0].archetype,'Balanced match + high event')
   assert.match(picks[0].failureState.text,/not a draw/)
 })
@@ -150,35 +147,30 @@ test('Home or Over 2.5 still qualifies when only match Over 2.5 is on the board'
   assert.match(picks[0].reasons.join(' '),/match Over 2\.5/)
 })
 
-test('rejects a Combo when either venue split hits below 80 percent',()=>{
-  const f=strongHomeFixture({markets:[market('Home Team or Over 2.5',1.44)]})
-  f.away.fixtures=[
+test('split, score and H2H no longer veto a Combo that already passed hard odds gates',()=>{
+  const weakSplit=strongHomeFixture({markets:[market('Home Team or Over 2.5',1.44)]})
+  weakSplit.away.fixtures=[
     ft(41,9,2,1,0,'2026-08-29'),
     ft(42,8,2,1,1,'2026-08-23'),
     ft(43,7,2,2,0,'2026-08-17'),
     ft(44,6,2,2,1,'2026-08-11'),
     ft(45,5,2,0,1,'2026-08-05')
   ]
-  f.away.lastMatches=f.away.fixtures
-  assert.equal(analyzeComboFixture(f).length,0)
-})
+  weakSplit.away.lastMatches=weakSplit.away.fixtures
+  assert.equal(analyzeComboFixture(weakSplit).length,1)
 
-test('high odds require elite evidence rather than being rescued by a generic score',()=>{
-  const f=balancedDrawOverFixture(1.75)
-  f.home.fixtures[0]=ft(21,1,9,1,0,'2026-08-30')
-  f.home.lastMatches=f.home.fixtures
-  const picks=analyzeComboFixture(f)
-  assert.equal(picks.length,0)
-})
+  const highOdds=balancedDrawOverFixture(1.75)
+  highOdds.home.fixtures[0]=ft(21,1,9,1,0,'2026-08-30')
+  highOdds.home.lastMatches=highOdds.home.fixtures
+  assert.equal(analyzeComboFixture(highOdds).length,1)
 
-test('repeated H2H failure shape vetoes an otherwise strong Combo',()=>{
   const h2h=[
     {home:'Home FC',away:'Away FC',hs:0,as:1},
     {home:'Away FC',away:'Home FC',hs:1,as:0},
     {home:'Home FC',away:'Away FC',hs:1,as:1}
   ]
-  const f=strongHomeFixture({h2h,markets:[market('Home Team or Over 2.5',1.44)]})
-  assert.equal(analyzeComboFixture(f).length,0)
+  const vetoed=strongHomeFixture({h2h,markets:[market('Home Team or Over 2.5',1.44)]})
+  assert.equal(analyzeComboFixture(vetoed).length,1)
 })
 
 test('settles Combo OR logic correctly',()=>{

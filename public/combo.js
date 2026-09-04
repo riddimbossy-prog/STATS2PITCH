@@ -5,7 +5,7 @@ import {api,readBoardCache,writeBoardCache,scrollDateStrip,isSrlPick,bootDone} f
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const ESC={amp:"&"+"amp;",lt:"&"+"lt;",gt:"&"+"gt;",quot:"&"+"quot;",apos:"&"+"#39;"}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":ESC.amp,"<":ESC.lt,">":ESC.gt,'"':ESC.quot,"'":ESC.apos}[c]))
-const VIEW='combo-v3'
+const VIEW='combo-v3.2'
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'all',country:'all',league:'all',family:'all',timer:null}
 
 function flag(c){return typeof window.countryFlag==='function'?window.countryFlag(c):'🌍'}
