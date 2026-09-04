@@ -4,7 +4,7 @@ import {over25Gate} from './over25.js'
 import {buildTransitionProfile,evaluateTransitionSafety} from './transitionSafety.js'
 import {buildAwayFavBoard,venueMetrics,favouriteSide,extractOdds} from './awayFavEngine.js'
 import {buildFilterBoard} from './filterEngine.js'
-import {buildGoalsBankerBoard} from './goalsBankersEngine.js'
+import {buildGoalsBankerBoard,ENGINE_ID as GOALS_BANKERS_ENGINE} from './goalsBankersEngine.js'
 import {buildDailyBankersBoard} from './dailyBankersEngine.js'
 import {attachWhy,fixtureHasStats} from './pickWhy.js'
 import {redFlagSkip,favConflict} from './redFlags.js'
@@ -239,7 +239,7 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
       varTipsCount:Array.isArray(varBoard.bestPicks)?varBoard.bestPicks.length:0,
       filterTipsEngine:filterBoard.meta?.engine||'perfect-split-v1',
       filterTipsCount:Array.isArray(filterBoard.bestPicks)?filterBoard.bestPicks.length:0,
-      goalsBankersEngine:goalsBoard.meta?.engine||'goals-bankers-v5.1',
+      goalsBankersEngine:goalsBoard.meta?.engine||GOALS_BANKERS_ENGINE,
       goalsBankersCount:Array.isArray(goalsBoard.bestPicks)?goalsBoard.bestPicks.length:0,
       dailyBankersEngine:dailyBankersBoard.meta?.engine||'daily-bankers-v2',
       safestBankersCount:Array.isArray(dailyBankersBoard.safestBankers)?dailyBankersBoard.safestBankers.length:0,

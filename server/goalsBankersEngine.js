@@ -65,6 +65,10 @@ function isStreakName(key,market,name){
     ||key==='60010'
 }
 
+function isTeamGoalNoise(marketKey,market){
+  return /\bcorners?\b|\bcards?\b|\byellow\b|\bshots?\b|\bfouls?\b|\boffsides?\b|\btackles?\b|\bsubstitutions?\b|\bthrow ins?\b|\bgoal kicks?\b|\b1st half\b|\bfirst half\b|\b1h\b/.test(`${marketKey} ${market}`)
+}
+
 function teamGoalOdd(markets,side,line,teamName){
   const key=side==='home'?'home-team-goals':'away-team-goals'
   const labels=[`Over ${line}`,`O ${line}`]
@@ -72,6 +76,7 @@ function teamGoalOdd(markets,side,line,teamName){
   if(direct)return direct
   const wanted=norm(teamName)
   return scanOdd(markets,(marketKey,market,name)=>{
+    if(isTeamGoalNoise(marketKey,market))return false
     if(!labels.some(label=>norm(name)===norm(label)))return false
     if(marketKey===key)return true
     if(marketKey!=='team-goals'&&market!=='team goals'&&market!=='team total')return false

@@ -70,6 +70,28 @@ test('a non-empty V5.1 refresh removes V5 away picks that fail the corrected Ove
   await clearBoard(date)
 })
 
+test('a V5.2 refresh drops Goals Bankers that used Home Team Corners as Over 2.5',async()=>{
+  const date='2099-02-06'
+  await clearBoard(date)
+  const staleCornerPick={
+    fixtureId:'betis',market:'total-goals',selection:'Over 2.5',route:'OVER_2.5',
+    engine:'goals-bankers-v5.1',odds:1.15,kickoff:`${date}T19:00:00Z`,
+    oddsBook:{homeO25:1.29,homeO05:1.42,over25:1.15}
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[staleCornerPick],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5.1',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5.2',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.goalsBankers,[])
+  assert.equal(saved.meta.goalsBankersCount,0)
+  assert.equal(saved.meta.goalsBankersEngine,'goals-bankers-v5.2')
+  await clearBoard(date)
+})
+
 test('a non-empty Combo V3 refresh removes preserved V2 rows rejected by the hard gates',async()=>{
   const date='2099-02-04'
   await clearBoard(date)

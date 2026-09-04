@@ -85,7 +85,7 @@ function raw(extra={}){
 }
 
 test('Goals Bankers V5 is active and publishes exact rule metadata',()=>{
-  assert.equal(ENGINE_ID,'goals-bankers-v5.1')
+  assert.equal(ENGINE_ID,'goals-bankers-v5.2')
   const board=buildGoalsBankerBoard([fixture()])
   assert.equal(board.meta.engine,ENGINE_ID)
   assert.deepEqual(board.meta.rules,V5_RULES)

@@ -10,7 +10,7 @@ import {
   statsFromFixture
 } from './goalsBankersV4.js'
 
-export const ENGINE_ID='goals-bankers-v5.1'
+export const ENGINE_ID='goals-bankers-v5.2'
 export const ENGINE_LABEL='Goals Bankers V5'
 export const MARKET_LABEL={...V4_LABEL,FAV_WIN:'Qualified team win',FAV_DNB:'Qualified team draw no bet',FAV_2PLUS:'Qualified team 2+'}
 export const V5_RULES=Object.freeze({
