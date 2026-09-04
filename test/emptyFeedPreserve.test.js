@@ -50,6 +50,29 @@ test('a non-empty V5 refresh replaces old Goals Bankers instead of preserving V4
   await clearBoard(date)
 })
 
+test('a non-empty Combo V3 refresh removes preserved V2 rows rejected by the hard gates',async()=>{
+  const date='2099-02-04'
+  await clearBoard(date)
+  const legacyPick={
+    fixtureId:'41',market:'combo-home-gg',selection:'Home Team or GG',
+    engineVersion:'combo-v2-failure-state',kickoff:`${date}T18:00:00Z`
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[legacyPick],bankers:[],priority:[],results:{},availableMarkets:[],
+    comboMeta:{engine:'combo-v3-hard-odds-gates'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',comboEngine:'combo-v3-hard-odds-gates',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    comboMeta:{engine:'combo-v3-hard-odds-gates'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',comboEngine:'combo-v3-hard-odds-gates',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.comboPicks,[])
+  assert.equal(saved.meta.comboCount,0)
+  assert.equal(saved.meta.comboEngine,'combo-v3-hard-odds-gates')
+  await clearBoard(date)
+})
+
 test('a late refresh keeps already-published picks and Daily Bankers', async()=>{
   const date='2099-03-04'
   await clearBoard(date)

@@ -97,15 +97,22 @@ function mergeRows(oldRows,freshRows,now,existing,keyFn=p=>String(p?.fixtureId??
 function comboRowsFrom(board){
   return [...(Array.isArray(board?.comboPicks)?board.comboPicks:[]),...(Array.isArray(board?.goalsBankers)?board.goalsBankers:[])].filter(isComboBoardPick)
 }
-export function isolateComboBags(existing,incoming,now,{resetGoals=false}={}){
+export function isolateComboBags(existing,incoming,now,{resetGoals=false,resetCombo=false}={}){
   const goalsBankers=mergeRows(
     resetGoals?[]:(existing?.goalsBankers||[]).filter(r=>!isComboBoardPick(r)),
     (incoming?.goalsBankers||[]).filter(r=>!isComboBoardPick(r)),
     now,
     existing
   )
-  const comboPicks=mergeRows(comboRowsFrom(existing),comboRowsFrom(incoming),now,existing,p=>p?.proofKey||proofKey(p))
+  const comboPicks=mergeRows(resetCombo?[]:comboRowsFrom(existing),comboRowsFrom(incoming),now,existing,p=>p?.proofKey||proofKey(p))
   return{goalsBankers,comboPicks}
+}
+function comboEngineOf(board){
+  return String(board?.meta?.comboEngine||board?.comboMeta?.engine||'').trim()
+}
+function hasStaleComboRows(board,expectedEngine){
+  if(!expectedEngine)return false
+  return comboRowsFrom(board).some(row=>String(row?.engineVersion||row?.engine||'').trim()!==expectedEngine)
 }
 function countTips(board){
   return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.goalsBankers||[]).length+(board?.comboPicks||[]).length+(board?.dailyBankers||[]).length+(board?.safestBankers||[]).length+(board?.valueBankers||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
@@ -125,7 +132,11 @@ function mergePublished(existing,incoming){
   const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
   const filterTips=mergeRows(existing?.filterTips,incoming?.filterTips,now,existing)
   const goalsEngineChanged=String(existing?.meta?.goalsBankersEngine||'')!==String(incoming?.meta?.goalsBankersEngine||'')
-  const {goalsBankers,comboPicks}=isolateComboBags(existing,incoming,now,{resetGoals:goalsEngineChanged})
+  const incomingComboEngine=comboEngineOf(incoming)
+  const comboEngineChanged=Boolean(incomingComboEngine)&&(
+    comboEngineOf(existing)!==incomingComboEngine||hasStaleComboRows(existing,incomingComboEngine)
+  )
+  const {goalsBankers,comboPicks}=isolateComboBags(existing,incoming,now,{resetGoals:goalsEngineChanged,resetCombo:comboEngineChanged})
   const bankers=mergeRows(existing?.bankers,incoming?.bankers,now,existing)
   return attachCrests({
     ...incoming,
