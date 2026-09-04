@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal,learningChipHtml} from './whyPopup.js?v=5.16.0'
-import {api,readBoardCache,writeBoardCache,scrollDateStrip,isSrlPick,bootDone} from './net.js'
+import {api,readBoardCache,writeBoardCache,scrollDateStrip,isSrlPick,bootDone,loadLiveResults} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const ESC={amp:"&"+"amp;",lt:"&"+"lt;",gt:"&"+"gt;",quot:"&"+"quot;",apos:"&"+"#39;"}
@@ -162,10 +162,10 @@ function startPolling(){
   clearInterval(state.timer)
   const today=new Date().toISOString().slice(0,10)
   if(state.date!==today)return
-  state.timer=setInterval(async()=>{try{state.results=await api(`/results?date=${encodeURIComponent(state.date)}`);render()}catch{}},30000)
+  state.timer=setInterval(()=>{loadLiveResults(state.date,data=>{state.results=data;render()})},30000)
 }
 async function fetchComboBoard(date){
-  const combo=await api(`/board?date=${encodeURIComponent(date)}&view=combo`,{cache:'no-store'})
+  const combo=await api(`/board?date=${encodeURIComponent(date)}&view=combo`,{cache:'default'})
   return {...combo,comboPicks:comboRowsOf(combo),goalsBankers:[]}
 }
 async function load(){
@@ -174,16 +174,13 @@ async function load(){
   if(cached){state.board=cached;render();bootDone()}
   else{skeleton();$('#status').textContent='Loading…'}
   try{
-    const [board,res]=await Promise.all([
-      fetchComboBoard(state.date),
-      api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)
-    ])
+    const board=await fetchComboBoard(state.date)
     state.board=board
-    state.results=res
     writeBoardCache(state.date,VIEW,board)
     render()
     startPolling()
     bootDone()
+    loadLiveResults(state.date,data=>{state.results=data;render()})
   }catch(e){
     if(cached)return
     $('#status').textContent='Unavailable'

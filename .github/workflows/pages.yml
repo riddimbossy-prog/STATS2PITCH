@@ -37,6 +37,7 @@ jobs:
           rm -rf _site
           mkdir -p _site
           cp -R public/. _site/
+          rm -f _site/assets/fox-kicking-ball.mp4
           touch _site/.nojekyll
           node <<'NODE'
           const fs=require('fs')

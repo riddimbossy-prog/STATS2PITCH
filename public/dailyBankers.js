@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal,learningChipHtml} from './whyPopup.js?v=5.16.0'
-import {readBoardCache,writeBoardCache,dateStrip,isoToday,scrollDateStrip,bootDone,api,hasRemainingTips} from './net.js'
+import {readBoardCache,writeBoardCache,dateStrip,isoToday,scrollDateStrip,bootDone,api,hasRemainingTips,loadLiveResults} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
@@ -199,21 +199,21 @@ async function hopIfEmpty(){
   return false
 }
 
-function startPolling(){clearInterval(state.timer);if(state.date!==isoToday())return;state.timer=setInterval(async()=>{try{state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`);render()}catch{}},20000)}
+function startPolling(){clearInterval(state.timer);if(state.date!==isoToday())return;state.timer=setInterval(()=>{loadLiveResults(state.date,data=>{state.resultData=data;render()})},20000)}
 async function load(){
   renderDates()
   const cached=readBoardCache(state.date,VIEW)
   if(cached){state.board=cached;render();bootDone()}
   else{skeleton();$('#status').textContent='Loading…'}
   try{
-    const [board,res]=await Promise.all([bankerApi(state.date), api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)])
+    const board=await bankerApi(state.date)
     state.board=board
-    state.resultData=res
     writeBoardCache(state.date,VIEW,board)
     const loadedDate=state.date
     await hopIfEmpty()
-    if(state.date!==loadedDate){state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)}
+    if(state.date!==loadedDate) loadLiveResults(state.date,data=>{state.resultData=data;render()})
     render();startPolling();bootDone()
+    loadLiveResults(state.date,data=>{state.resultData=data;render()})
   }catch(e){
     if(cached)return
     $('#status').textContent='Unavailable'
