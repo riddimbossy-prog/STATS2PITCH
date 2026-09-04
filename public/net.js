@@ -32,26 +32,33 @@ export function endpoint(path){
 if(getToken())releaseAuth()
 
 export async function api(path,options={}){
-  const {cache='no-store',skipAuthWait=false,keepSession=false,...rest}=options
+  const {cache='no-store',skipAuthWait=false,keepSession=false,timeout=0,...rest}=options
   const token=getToken()
-  const res=await fetch(endpoint(path),{
-    ...rest,
-    headers:{
-      apikey:anon,
-      Authorization:`Bearer ${token||anon}`,
-      ...(rest.headers||{})
-    },
-    cache,
-    credentials:'omit',
-    mode:'cors'
-  })
-  const body=await res.json().catch(()=>null)
-  if(res.status===401){
-    if(!keepSession)clearSession()
-    throw new Error('Sign in required')
+  const ctrl=timeout&&typeof AbortController==='function'?new AbortController():null
+  const timer=ctrl?setTimeout(()=>ctrl.abort(),timeout):null
+  try{
+    const res=await fetch(endpoint(path),{
+      ...rest,
+      headers:{
+        apikey:anon,
+        Authorization:`Bearer ${token||anon}`,
+        ...(rest.headers||{})
+      },
+      cache,
+      credentials:'omit',
+      mode:'cors',
+      signal:rest.signal||ctrl?.signal
+    })
+    const body=await res.json().catch(()=>null)
+    if(res.status===401){
+      if(!keepSession)clearSession()
+      throw new Error('Sign in required')
+    }
+    if(!res.ok)throw new Error('Unable to load this right now')
+    return body
+  }finally{
+    if(timer)clearTimeout(timer)
   }
-  if(!res.ok)throw new Error('Unable to load this right now')
-  return body
 }
 
 function cacheKey(date,view){return `s2p-board:${view||'all'}:${date}`}
@@ -147,3 +154,27 @@ export function scrollDateStrip(host){
 }
 
 export function bootDone(){try{window.s2pBootDone?.()}catch{}}
+
+const resultInflight=new Map()
+export function loadLiveResults(date,apply){
+  if(!date||typeof apply!=='function')return
+  const key=`s2p-results:${date}`
+  try{
+    const raw=sessionStorage.getItem(key)
+    if(raw){
+      const row=JSON.parse(raw)
+      if(row?.data&&Date.now()-Number(row.at||0)<3*60*1000) apply(row.data)
+    }
+  }catch{}
+  const pending=resultInflight.get(date)
+  if(pending){pending.then(apply).catch(()=>{});return}
+  const job=api(`/results?date=${encodeURIComponent(date)}`,{cache:'default',timeout:8000})
+    .then(data=>{
+      try{sessionStorage.setItem(key,JSON.stringify({at:Date.now(),data}))}catch{}
+      apply(data)
+      return data
+    })
+    .catch(()=>null)
+    .finally(()=>{resultInflight.delete(date)})
+  resultInflight.set(date,job)
+}

@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal,learningChipHtml} from './whyPopup.js?v=5.16.0'
-import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick,bootDone} from './net.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick,bootDone,loadLiveResults} from './net.js'
 import {adviceFor} from './performanceAdvice.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
@@ -72,22 +72,20 @@ async function hopIfEmpty(){
   state.board=hop.board
   writeBoardCache(hop.date,BOARD_VIEW,hop.board)
   history.replaceState(null,'',`?date=${encodeURIComponent(hop.date)}`)
-  state.resultData=await api(`/results?date=${encodeURIComponent(hop.date)}`).catch(()=>null)
+  loadLiveResults(hop.date,data=>{state.resultData=data;renderBoard()})
   return true
 }
 async function loadBoardData(){
   const cached=readBoardCache(state.date,BOARD_VIEW)
   if(cached){state.board=cached;renderBoard();bootDone()}
-  const [board,res]=await Promise.all([
-    api(`/board?date=${encodeURIComponent(state.date)}&view=${BOARD_VIEW}`,{cache:'default'}),
-    api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)
-  ])
-  state.board=board;state.resultData=res
+  const board=await api(`/board?date=${encodeURIComponent(state.date)}&view=${BOARD_VIEW}`,{cache:'default'})
+  state.board=board
   writeBoardCache(state.date,BOARD_VIEW,board)
   await hopIfEmpty()
   renderBoard();startPolling();warmNeighbors(state.date,BOARD_VIEW)
+  loadLiveResults(state.date,data=>{state.resultData=data;renderBoard()})
 }
-function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.resultData=await api(`/results?date=${encodeURIComponent(state.date)}`);if(await hopIfEmpty()){renderBoard();startPolling();warmNeighbors(state.date,BOARD_VIEW);return}renderBoard()}catch{}},30000)}
+function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{loadLiveResults(state.date,async data=>{state.resultData=data;if(await hopIfEmpty()){renderBoard();startPolling();warmNeighbors(state.date,BOARD_VIEW);return}renderBoard()})},30000)}
 function performanceRows(){const dimension=state.performanceGroup;return(state.performance?.groups||[]).filter(x=>x.dimension===dimension)}
 function groupTitle(value){const label=esc(String(value||'Unknown').replaceAll('-',' '));return state.performanceGroup==='country'?`${flag(value)} ${label}`:label}
 function toneLabel(tone){return({bank:'Bank on',avoid:'Avoid',steady:'Steady',watch:'Mixed',thin:'Too few'})[tone]||''}

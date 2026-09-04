@@ -1,6 +1,6 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
 import {whySectionHtml,bindWhyModal,learningChipHtml} from './whyPopup.js?v=5.16.0'
-import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick,bootDone} from './net.js'
+import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick,bootDone,loadLiveResults} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
@@ -74,25 +74,23 @@ async function hopIfEmpty(){
   state.board=hop.board
   writeBoardCache(hop.date,BOARD_VIEW,hop.board)
   history.replaceState(null,'',`?date=${encodeURIComponent(hop.date)}`)
-  state.results=await api(`/results?date=${encodeURIComponent(hop.date)}`).catch(()=>null)
+  loadLiveResults(hop.date,data=>{state.results=data;render()})
   return true
 }
-function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(async()=>{try{state.results=await api(`/results?date=${encodeURIComponent(state.date)}`);if(await hopIfEmpty()){render();startPolling();warmNeighbors(state.date,BOARD_VIEW);return}render()}catch{}},30000)}
+function startPolling(){clearInterval(state.timer);const today=new Date().toISOString().slice(0,10);if(state.date!==today)return;state.timer=setInterval(()=>{loadLiveResults(state.date,async data=>{state.results=data;if(await hopIfEmpty()){render();startPolling();warmNeighbors(state.date,BOARD_VIEW);return}render()})},30000)}
 async function load(){
   renderDates()
   const cached=readBoardCache(state.date,BOARD_VIEW)
   if(cached){state.board=cached;render();bootDone()}
   else{skeleton();$('#status').textContent='Loading…'}
   try{
-    const [board,res]=await Promise.all([
-      api(`/board?date=${encodeURIComponent(state.date)}&view=${BOARD_VIEW}`,{cache:'default'}),
-      api(`/results?date=${encodeURIComponent(state.date)}`).catch(()=>null)
-    ])
-    state.board=board;state.results=res
+    const board=await api(`/board?date=${encodeURIComponent(state.date)}&view=${BOARD_VIEW}`,{cache:'default'})
+    state.board=board;state.results=null
     writeBoardCache(state.date,BOARD_VIEW,board)
     await hopIfEmpty()
     render();startPolling();warmNeighbors(state.date,BOARD_VIEW)
     bootDone()
+    loadLiveResults(state.date,data=>{state.results=data;render()})
   }catch(e){
     if(cached)return
     $('#status').textContent='Unavailable';$('#cards').innerHTML=`<div class="empty">${esc(e.message)}</div>`

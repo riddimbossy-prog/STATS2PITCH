@@ -30,7 +30,8 @@
   <link rel="preconnect" href="https://img.sportradar.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"></noscript>
   <link rel="stylesheet" href="/conceptD.css?v=5.16.0">
   <link rel="stylesheet" href="/mobile2026.css?v=5.23.0">
   <link rel="stylesheet" href="/filterTips.css?v=5.7.0">
@@ -52,7 +53,7 @@
       </svg>
       <b>2</b>
     </div>
-    <video class="s2p-boot-video" autoplay muted loop playsinline preload="auto" poster="/assets/s2p-boot.jpg?v=5.7.0">
+    <video class="s2p-boot-video" autoplay muted loop playsinline preload="metadata" poster="/assets/s2p-boot.jpg?v=5.7.0">
       <source src="/assets/s2p-boot.mp4?v=5.7.0" type="video/mp4">
     </video>
   </div>
@@ -69,7 +70,7 @@
       window.s2pBootDone=function(){
         if(done)return;
         done=true;
-        var wait=Math.max(0,800-(Date.now()-shown));
+        var wait=Math.max(0,80-(Date.now()-shown));
         setTimeout(function(){
           b.classList.add('is-done');
           document.documentElement.classList.remove('s2p-booting');
@@ -81,7 +82,7 @@
           },520);
         },wait);
       };
-      setTimeout(function(){window.s2pBootDone()},14000);
+      setTimeout(function(){window.s2pBootDone()},4000);
     })();
   </script>
   <div class="app">

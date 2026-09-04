@@ -77,3 +77,35 @@ test('public clients request a slim board view and reuse a cached board',async()
   assert.match(files[5],/registration\.unregister/)
   assert.doesNotMatch(files[5],/addEventListener\('fetch'/)
 })
+
+test('public board slims pick internals, unused results and fixture extras',()=>{
+  const board={
+    meta:{date:'2026-08-27',generatedAt:'2026-08-27T10:00:00Z'},
+    bestPicks:[{
+      fixtureId:1,
+      market:'match-winner',
+      over25Filter:{huge:true},
+      transitionSafety:{x:1},
+      why:{
+        lastMatchesHome:[{result:'W',home:'A',away:'B',hs:1,as:0,date:'2026-01-01',league:'X',extra:1}],
+        last5Home:[{result:'W',secret:'x'}],
+        h2h:[]
+      }
+    }],
+    results:{
+      1:{outcome:'won',matchState:'settled',homeScore:1,awayScore:0,secret:true},
+      99:{outcome:'lost'}
+    },
+    fixtures:[{fixtureId:1,homeLogo:'http://x',awayLogo:'http://y',availability:'qualified',league:'L'}]
+  }
+  const all=publicBoard(board,'all')
+  assert.equal(all.bestPicks[0].over25Filter,undefined)
+  assert.equal(all.bestPicks[0].transitionSafety,undefined)
+  assert.equal(all.bestPicks[0].why.lastMatchesHome.length,1)
+  assert.equal(all.bestPicks[0].why.lastMatchesHome[0].extra,undefined)
+  assert.equal(all.results['99'],undefined)
+  assert.equal(all.results['1'].outcome,'won')
+  assert.equal(all.results['1'].secret,undefined)
+  assert.equal(all.fixtures[0].availability,undefined)
+  assert.equal(all.fixtures[0].homeLogo,'http://x')
+})

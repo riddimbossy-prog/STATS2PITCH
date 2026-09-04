@@ -328,6 +328,59 @@ function slimMeta(meta:any={}){
     refresh:meta.refresh||null
   }
 }
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why'])
+function slimForm(rows:any){
+  return (Array.isArray(rows)?rows:[]).slice(0,5).map((x:any)=>({
+    result:x?.result||'',opponent:x?.opponent||'',home:x?.home||'',away:x?.away||'',
+    hs:x?.hs??null,as:x?.as??null,date:x?.date||'',venue:x?.venue||'',league:x?.league||''
+  }))
+}
+function slimStats(s:any){
+  if(!s||typeof s!=='object')return null
+  return{played:s.played??null,winPct:s.winPct??null,ppg:s.ppg??null,gf:s.gf??null,ga:s.ga??null,btts:s.btts??null,over15:s.over15??null,over25:s.over25??null}
+}
+function slimWhy(why:any){
+  if(!why||typeof why!=='object')return null
+  const lastHome=slimForm(why.lastMatchesHome||why.last5Home)
+  const lastAway=slimForm(why.lastMatchesAway||why.last5Away)
+  return{headline:why.headline||'',classification:why.classification||'',homeStats:slimStats(why.homeStats||why.homeAvg),awayStats:slimStats(why.awayStats||why.awayAvg),lastMatchesHome:lastHome,lastMatchesAway:lastAway,last5Home:lastHome,last5Away:lastAway,h2h:slimForm(why.h2h)}
+}
+function slimPick(row:any){
+  if(!row||typeof row!=='object')return row
+  const out:any={}
+  for(const k of PICK_KEEP) if(row[k]!==undefined) out[k]=row[k]
+  if(out.why) out.why=slimWhy(out.why)
+  if(Array.isArray(out.reasons)) out.reasons=out.reasons.slice(0,8)
+  return out
+}
+function slimPicks(rows:any){return (Array.isArray(rows)?rows:[]).map(slimPick)}
+function slimFixtures(rows:any){
+  return (Array.isArray(rows)?rows:[]).map((f:any)=>({fixtureId:f?.fixtureId??null,homeLogo:f?.homeLogo||null,awayLogo:f?.awayLogo||null}))
+}
+function slimResults(results:any,picks:any[]){
+  const src=results&&typeof results==='object'?results:{}
+  const ids=new Set((picks||[]).map((p:any)=>String(p?.fixtureId||'')).filter(Boolean))
+  const out:any={}
+  for(const id of ids){
+    const r=src[id]
+    if(!r)continue
+    out[id]={outcome:r.outcome||'pending',matchState:r.matchState||'pending',homeScore:r.homeScore??r.home?.score??null,awayScore:r.awayScore??r.away?.score??null,minute:r.minute||r.clock||null,status:r.status||'',live:r.live===true,finished:r.finished===true,postponed:r.postponed===true,cancelled:r.cancelled===true}
+  }
+  return out
+}
+function finalizePublic(empty:any){
+  const bags=['bestPicks','varTips','filterTips','goalsBankers','comboPicks','dailyBankers','safestBankers','valueBankers','bankers','priority']
+  const picks:any[]=[]
+  for(const k of bags){
+    if(Array.isArray(empty[k])){
+      empty[k]=slimPicks(empty[k])
+      picks.push(...empty[k])
+    }
+  }
+  empty.fixtures=slimFixtures(empty.fixtures)
+  empty.results=slimResults(empty.results,picks)
+  return empty
+}
 function publicBoard(board:any={},view='all'){
   const v=['all','var','filter','goals','combo','bankers'].includes(String(view||''))?String(view):'all'
   const split=splitGoalsAndCombo(board)
@@ -349,21 +402,21 @@ function publicBoard(board:any={},view='all'){
     bankers:[]
   }
   const markets=(rows:any[])=>[...new Set((rows||[]).map((x:any)=>x?.market).filter(Boolean))].sort()
-  if(v==='var'){empty.varTips=board?.varTips||[];empty.varTipsMeta=board?.varTipsMeta||null;empty.availableMarkets=markets(empty.varTips);return empty}
-  if(v==='filter'){empty.filterTips=board?.filterTips||[];empty.filterTipsMeta=board?.filterTipsMeta||null;empty.availableMarkets=markets(empty.filterTips);return empty}
-  if(v==='goals'){empty.goalsBankers=split.goalsBankers;empty.goalsBankersMeta=board?.goalsBankersMeta||null;empty.availableMarkets=markets(empty.goalsBankers);return empty}
-  if(v==='combo'){empty.comboPicks=split.comboPicks;empty.comboMeta=board?.comboMeta||null;empty.availableMarkets=markets(empty.comboPicks);return empty}
+  if(v==='var'){empty.varTips=board?.varTips||[];empty.varTipsMeta=board?.varTipsMeta||null;empty.availableMarkets=markets(empty.varTips);return finalizePublic(empty)}
+  if(v==='filter'){empty.filterTips=board?.filterTips||[];empty.filterTipsMeta=board?.filterTipsMeta||null;empty.availableMarkets=markets(empty.filterTips);return finalizePublic(empty)}
+  if(v==='goals'){empty.goalsBankers=split.goalsBankers;empty.goalsBankersMeta=board?.goalsBankersMeta||null;empty.availableMarkets=markets(empty.goalsBankers);return finalizePublic(empty)}
+  if(v==='combo'){empty.comboPicks=split.comboPicks;empty.comboMeta=board?.comboMeta||null;empty.availableMarkets=markets(empty.comboPicks);return finalizePublic(empty)}
   if(v==='bankers'){
     empty.dailyBankers=board?.dailyBankers||[]
     empty.safestBankers=board?.safestBankers||[]
     empty.valueBankers=board?.valueBankers||[]
     empty.dailyBankersMeta=board?.dailyBankersMeta||null
     empty.availableMarkets=markets([...empty.safestBankers,...empty.valueBankers,...empty.dailyBankers])
-    return empty
+    return finalizePublic(empty)
   }
   empty.bestPicks=board?.bestPicks||[]
   empty.availableMarkets=Array.isArray(board?.availableMarkets)&&board.availableMarkets.length?board.availableMarkets:markets(empty.bestPicks)
-  return empty
+  return finalizePublic(empty)
 }
 function compactResultRows(rows:any[]){return (rows||[]).map((p:any)=>({fixtureId:p?.fixtureId??null,result:p?.result||null}))}
 async function snapshot(date:string){
@@ -473,62 +526,47 @@ function mergeLive(map:Map<string,any>,liveRows:any[],published:any[]){
   }
   return map
 }
-async function liveScores(date:string){
-  const headers=sportyHeaders()
+async function liveScores(date:string, published:any[]=[]){
   const out:any[]=[]
-  let page=1,total=1
-  while(page<=total&&page<=20){
-    const url=new URL(`${SPORTYBET_BASE}/api/${SPORTYBET_COUNTRY}/factsCenter/pcUpcomingEvents`)
-    url.searchParams.set('sportId','sr:sport:1');url.searchParams.set('marketId','1');url.searchParams.set('pageSize','100');url.searchParams.set('pageNum',String(page));url.searchParams.set('timeline','48')
-    const response=await fetch(url,{headers}),body=await response.json().catch(()=>null)
-    if(!response.ok||body?.bizCode!==10000)break
-    const data=body?.data||{}
-    total=Math.max(1,Math.ceil(Number(data.totalNum||0)/100))
-    for(const tour of data.tournaments||[])for(const ev of tour.events||[]){
-      if(accraDate(ev?.estimateStartTime)===date)out.push(sportyToFixture(ev,tour))
-    }
-    page++
-  }
   try{
     const live=await sportyLiveEvents()
-    const byId=new Map(out.map((f:any)=>[String(f?.fixture?.id||''),f]))
-    for(const f of live){
-      const id=String(f?.fixture?.id||'')
-      if(id&&id!=='undefined'&&id!=='null')byId.set(id,f)
-      else out.push(f)
-    }
-    out.length=0
-    out.push(...byId.values())
+    out.push(...live)
   }catch{}
-  try{
-    const row=await snapshot(date)
-    const picks=[...(row?.board?.bestPicks||[]),...(row?.board?.varTips||[]),...(row?.board?.filterTips||[]),...(row?.board?.goalsBankers||[]),...(row?.board?.comboPicks||[]),...(row?.board?.dailyBankers||[]),...(row?.board?.safestBankers||[]),...(row?.board?.valueBankers||[]),...(row?.board?.bankers||[])]
-    const have=new Set(out.map(f=>String(f?.fixture?.id||'')))
-    const missing=picks.map((p:any)=>p?.fixtureId).filter((id:any)=>id!=null&&!have.has(String(id)))
-    for(const id of missing.slice(0,80)){
-      const n=nid(id);if(!n)continue
-      try{
-        const res=await fetch(`https://stats.fn.sportradar.com/common/en/Etc:UTC/gismo/stats_match_get/${n}`,{headers:{Accept:'application/json','User-Agent':'Mozilla/5.0',Referer:'https://www.sportybet.com/'}})
-        const body=await res.json().catch(()=>null)
-        const data=body?.doc?.[0]?.event==='exception'?null:body?.doc?.[0]?.data
-        if(!data)continue
-        const home=data?.teams?.home||{},away=data?.teams?.away||{}
-        const homeId=nid(home.uid||home._id),awayId=nid(away.uid||away._id)
-        const ftH=data?.result?.home??data?.periods?.ft?.home,ftA=data?.result?.away??data?.periods?.ft?.away
-        const finished=Number.isFinite(Number(ftH))&&Number.isFinite(Number(ftA))
-        const uts=Number(data?.time?.uts)
-        const short=data?.canceled||data?.cancelled?'CANC':data?.postponed?'PST':data?.walkover?'WO':finished?'FT':'NS'
-        const long=short==='CANC'?'Cancelled':short==='PST'?'Postponed':short==='WO'?'Walkover':finished?'Match Finished':'Not started'
-        out.push({
-          fixture:{id:n,date:Number.isFinite(uts)?new Date(uts*1000).toISOString():null,status:{short,long}},
-          league:{id:nid(data?._utid),name:data?.tournament?.name||'',country:data?.realcategory?.name||''},
-          teams:{home:{id:homeId,name:home.mediumname||home.name||'',logo:crest(homeId)},away:{id:awayId,name:away.mediumname||away.name||'',logo:crest(awayId)}},
-          goals:{home:finished?Number(ftH):null,away:finished?Number(ftA):null},
-          score:{fulltime:{home:finished?Number(ftH):null,away:finished?Number(ftA):null},halftime:{home:finite(data?.periods?.p1?.home)?Number(data.periods.p1.home):null,away:finite(data?.periods?.p1?.away)?Number(data.periods.p1.away):null}}
-        })
-      }catch{}
-    }
-  }catch{}
+  const have=new Set(out.map((f:any)=>String(f?.fixture?.id||'')))
+  const now=Date.now()
+  const missing=(published||[])
+    .map((p:any)=>p?.fixtureId)
+    .filter((id:any,i:number,arr:any[])=>id!=null&&arr.indexOf(id)===i&&!have.has(String(id)))
+    .filter((id:any)=>{
+      const row=(published||[]).find((p:any)=>String(p.fixtureId)===String(id))
+      const k=Date.parse(row?.kickoff||'')
+      return Number.isFinite(k)&&k<now
+    })
+    .slice(0,24)
+  const ctrl=typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function'?AbortSignal.timeout(3500):undefined
+  await Promise.all(missing.map(async(id:any)=>{
+    const n=nid(id);if(!n)return
+    try{
+      const res=await fetch(`https://stats.fn.sportradar.com/common/en/Etc:UTC/gismo/stats_match_get/${n}`,{headers:{Accept:'application/json','User-Agent':'Mozilla/5.0',Referer:'https://www.sportybet.com/'},signal:ctrl})
+      const body=await res.json().catch(()=>null)
+      const data=body?.doc?.[0]?.event==='exception'?null:body?.doc?.[0]?.data
+      if(!data)return
+      const home=data?.teams?.home||{},away=data?.teams?.away||{}
+      const homeId=nid(home.uid||home._id),awayId=nid(away.uid||away._id)
+      const ftH=data?.result?.home??data?.periods?.ft?.home,ftA=data?.result?.away??data?.periods?.ft?.away
+      const finished=Number.isFinite(Number(ftH))&&Number.isFinite(Number(ftA))
+      const uts=Number(data?.time?.uts)
+      const short=data?.canceled||data?.cancelled?'CANC':data?.postponed?'PST':data?.walkover?'WO':finished?'FT':'NS'
+      const long=short==='CANC'?'Cancelled':short==='PST'?'Postponed':short==='WO'?'Walkover':finished?'Match Finished':'Not started'
+      out.push({
+        fixture:{id:n,date:Number.isFinite(uts)?new Date(uts*1000).toISOString():null,status:{short,long}},
+        league:{id:nid(data?._utid),name:data?.tournament?.name||'',country:data?.realcategory?.name||''},
+        teams:{home:{id:homeId,name:home.mediumname||home.name||'',logo:crest(homeId)},away:{id:awayId,name:away.mediumname||away.name||'',logo:crest(awayId)}},
+        goals:{home:finished?Number(ftH):null,away:finished?Number(ftA):null},
+        score:{fulltime:{home:finished?Number(ftH):null,away:finished?Number(ftA):null},halftime:{home:finite(data?.periods?.p1?.home)?Number(data.periods.p1.home):null,away:finite(data?.periods?.p1?.away)?Number(data.periods.p1.away):null}}
+      })
+    }catch{}
+  }))
   return out.map(normalizeFixture)
 }
 function ou(s:any){const m=String(s||'').match(/\b(over|under)\s*([0-9]+(?:\.[0-9]+)?)/i);return m?{side:m[1].toLowerCase(),line:Number(m[2])}:null}
@@ -616,7 +654,7 @@ Deno.serve(async req=>{
     if(route==='/board'&&req.method==='GET'){
       const date=requestedDate(url),view=url.searchParams.get('view')||'all',row=await snapshot(date),status=snapshotState(date,row),board=attachCrests(row?.board||emptyBoard(date))
       const payload=publicBoard({...board,meta:{...(board.meta||{}),date,refresh:status,requiresRefresh:status.state!=='complete'}},view)
-      const cache=payload?.meta?.generatedAt?'public, max-age=20, stale-while-revalidate=60':'no-store'
+      const cache=payload?.meta?.generatedAt?'public, max-age=60, stale-while-revalidate=240':'no-store'
       return json(payload,200,cache)
     }
     if((route==='/export/elite'||route==='/api/export/elite')&&req.method==='GET'){
@@ -629,7 +667,7 @@ Deno.serve(async req=>{
     if(route==='/results'&&req.method==='GET'){
       const date=requestedDate(url),row=await snapshot(date),board=row?.board||emptyBoard(date)
       const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.comboPicks||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
-      let fixtures:any[]=[];try{fixtures=await liveScores(date)}catch{}
+      let fixtures:any[]=[];try{fixtures=await liveScores(date,published)}catch{}
       const map=mergeLive(new Map(),fixtures,published),stored=board?.results||{}
       const withResult=(rows:any[])=>compactResultRows((rows||[]).map((p:any)=>({...p,result:attachResult(p,map.get(String(p.fixtureId)),stored[String(p.fixtureId)])})))
       const picks=withResult(board?.bestPicks)
@@ -640,7 +678,7 @@ Deno.serve(async req=>{
       const comboPicks=withResult(split.comboPicks)
       const dailyBankers=withResult(board?.dailyBankers)
       const bankers=withResult([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])])
-      return json({date,picks,varTips,filterTips,goalsBankers,comboPicks,dailyBankers,bankers})
+      return json({date,picks,varTips,filterTips,goalsBankers,comboPicks,dailyBankers,bankers},200,'public, max-age=15, stale-while-revalidate=45')
     }
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}
     if(route==='/performance'&&req.method==='GET'){
