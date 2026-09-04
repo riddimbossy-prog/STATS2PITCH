@@ -17,8 +17,9 @@ import {
 } from './perfectSplit.js'
 
 export {ENGINE_ID, extractFilterOdds, isCupCompetition}
-export const FILTER_RULE_VERSION = 'perfect-split-v1'
+export const FILTER_MIN_ODD = Math.max(1.20, Number(process.env.ENGINE_MIN_ODD || 1.20))
 export const FILTER_VERSION = 'perfect-split-v1'
+export const FILTER_RULE_VERSION = FILTER_VERSION
 
 const finite = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v))
 const num = v => finite(v) ? Number(v) : null
@@ -209,6 +210,16 @@ export function diagnoseFilterFixture(fixture, learningState = null){
     return {
       pick: null,
       skip: diagnosis.skip,
+      homeProfile: diagnosis.homeProfile,
+      awayProfile: diagnosis.awayProfile,
+      consents: diagnosis.consents
+    }
+  }
+  const price = num(diagnosis.pick.odds)
+  if (price == null || price < FILTER_MIN_ODD) {
+    return {
+      pick: null,
+      skip: price == null ? 'missing-odds' : 'odds-too-short',
       homeProfile: diagnosis.homeProfile,
       awayProfile: diagnosis.awayProfile,
       consents: diagnosis.consents

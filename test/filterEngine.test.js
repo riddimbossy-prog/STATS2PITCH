@@ -193,3 +193,17 @@ test('filter board sorts published tips by kickoff',()=>{
   assert.equal(board.meta.engine,ENGINE_ID)
   assert.equal(board.meta.filterVersion,'perfect-split-v1')
 })
+
+test('Perfect Split skips prices below 1.20 instead of publishing 1.03 bankers',()=>{
+  const result=diagnoseFilterFixture(fixture({
+    marketOdds:markets({homeWin:1.03,awayWin:12.00})
+  }))
+  assert.equal(result.pick,null)
+  assert.equal(result.skip,'odds-too-short')
+})
+
+test('Perfect Split skips a consented market when SportyBet has no price',()=>{
+  const result=diagnoseFilterFixture(fixture({marketOdds:[]}))
+  assert.equal(result.pick,null)
+  assert.equal(result.skip,'missing-odds')
+})

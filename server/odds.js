@@ -2,6 +2,7 @@ import {MAX_RELATIVE_DIFF,REQUIRE_CROSS_SOURCE} from './config.js'
 
 const text=v=>String(v??'').trim()
 const norm=s=>text(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9.]+/g,' ').trim().replace(/\s+/g,' ')
+const compact=s=>norm(s).replace(/\s+/g,'')
 const odd=v=>{const n=Number(v);return Number.isFinite(n)&&n>1.001&&n<1000?n:null}
 const title=s=>text(s).replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())
 function sameTeam(a,b){const x=norm(a),y=norm(b);return !!x&&!!y&&(x===y||(Math.min(x.length,y.length)>=5&&(x.includes(y)||y.includes(x))))}
@@ -18,14 +19,48 @@ function sideName(raw,fixture){
   s=s.replace(/^o(?:ver)?\s*([0-9]+(?:\.[0-9]+)?)$/i,'Over $1').replace(/^u(?:nder)?\s*([0-9]+(?:\.[0-9]+)?)$/i,'Under $1')
   return title(s)
 }
+
+const MATCH_IDS=Object.freeze({
+  '1':'match-winner','10':'double-chance','11':'draw-no-bet','18':'total-goals',
+  '19':'home-team-goals','20':'away-team-goals','29':'both-teams-score',
+  '60000':'both-teams-score-2','60010':'goals-streak-2','60011':'goals-streak-2',
+  '60012':'goals-streak-2','60020':'goals-streak-3'
+})
+const HALF_IDS=Object.freeze({'60':'first-half-winner','68':'first-half-goals'})
+
+function isFirstHalfName(raw=''){
+  const n=compact(raw)
+  return /(?:1st|first)half/.test(n)||/^1h(?:alf)?/.test(n)
+}
+function isHalfName(raw=''){
+  const n=compact(raw)
+  return isFirstHalfName(raw)||/(?:2nd|second)half/.test(n)||/^2h(?:alf)?/.test(n)||n.startsWith('2nd')
+}
+export function isNoiseMarket(raw=''){
+  const s=text(raw),n=norm(s),c=compact(s)
+  if(/&/.test(s))return true
+  if(/corner|card|booking|yellow|red card|early goals|rest of match|\bminutes\b|never down|\b1up\b|\b2up\b/.test(n))return true
+  if(/halftime.?fulltime|ht\s*ft|htft/.test(n)||c.includes('halftimefulltime'))return true
+  if(/\b10 minutes\b|\bgoal bounds\b|\bexact goals\b|\bcorrect score\b/.test(n))return true
+  return false
+}
+function halfKey(raw=''){
+  if(!isFirstHalfName(raw))return null
+  const n=compact(raw)
+  if(n.includes('winner')||n.includes('result')||n.includes('1x2')||n.includes('matchodds'))return'first-half-winner'
+  if(n.includes('total')||n.includes('overunder')||n.includes('goals')||n.endsWith('ou')||n.includes('homeou')||n.includes('awayou'))return'first-half-goals'
+  return null
+}
 function key(raw=''){
-  const n=norm(raw).replace(/\s+/g,'')
+  if(isNoiseMarket(raw))return null
+  const half=halfKey(raw)
+  if(half)return half
+  if(isHalfName(raw))return null
+  const n=compact(raw)
   if(['matchwinner','winner','matchodds','1x2','matchresult','fulltimeresult','fulltime1x2'].includes(n))return'match-winner'
   if(n.includes('doublechance'))return'double-chance'
   if(n.includes('drawnobet')||n==='dnb')return'draw-no-bet'
   if(n.includes('bothteamstoscore')||n.includes('bothteamtoscore')||n==='btts')return'both-teams-score'
-  if((n.includes('firsthalf')||n.startsWith('1h'))&&(n.includes('winner')||n.includes('result')||n.includes('1x2')||n.includes('matchodds')))return'first-half-winner'
-  if((n.includes('firsthalf')||n.startsWith('1h'))&&(n.includes('total')||n.includes('overunder')||n.includes('goals')))return'first-half-goals'
   if(n.includes('hometeamtotal')||n.includes('hometeamgoals'))return'home-team-goals'
   if(n.includes('awayteamtotal')||n.includes('awayteamgoals'))return'away-team-goals'
   if(n.includes('teamtotal')||n.includes('teamgoals'))return'team-goals'
@@ -41,7 +76,9 @@ function marketName(k){return ({
 })[k]||k}
 function parseLineName(raw,line){
   const n=sideName(raw)
-  if(/^(Over|Under)$/i.test(n)&&line!==undefined&&line!==null&&line!=='')return`${n} ${line}`
+  if(line!==undefined&&line!==null&&line!==''){
+    if(/^(Over|Under)\b/i.test(n))return `${/^Under/i.test(n)?'Under':'Over'} ${line}`
+  }
   return n
 }
 function parseApiFootball(payload,fixture){
@@ -91,21 +128,32 @@ function specifierTotal(market){
 function sportyKey(market){
   const id=String(market?.id??'')
   const name=market?.name||market?.desc||''
-  if(id==='1'||/^1x2$/i.test(name))return'match-winner'
-  if(id==='10'||/double chance/i.test(name))return'double-chance'
-  if(id==='11'||/draw no bet/i.test(name))return'draw-no-bet'
-  if(id==='19'||/^home o\/u$/i.test(name)||/home team (?:goals|total|o\/u)/i.test(name))return'home-team-goals'
-  if(id==='20'||/^away o\/u$/i.test(name)||/away team (?:goals|total|o\/u)/i.test(name))return'away-team-goals'
-  if(id==='60000'||/gg\/ng\s*2/i.test(name)||/both teams.*2\+/i.test(name))return'both-teams-score-2'
-  if(id==='29'||/gg\/ng/i.test(name)||/both teams/i.test(name))return'both-teams-score'
-  if(id==='60020'||/3 or more goals in a row/i.test(name)||/3\+\s*goals? streak/i.test(name))return'goals-streak-3'
-  if(id==='60010'||/2 or more goals in a row/i.test(name)||/goals? streak/i.test(name))return'goals-streak-2'
-  if(id==='18'||/^over\/under$/i.test(name))return'total-goals'
+  if(isNoiseMarket(name))return null
+  if(MATCH_IDS[id])return MATCH_IDS[id]
+  if(HALF_IDS[id])return HALF_IDS[id]
+  if(isHalfName(name))return halfKey(name)
+  if(/^1x2$/i.test(name))return'match-winner'
+  if(/^double chance$/i.test(name))return'double-chance'
+  if(/^draw no bet$/i.test(name)||/^dnb$/i.test(name))return'draw-no-bet'
+  if(/^home o\/u$/i.test(name)||/home team (?:goals|total|o\/u)/i.test(name))return'home-team-goals'
+  if(/^away o\/u$/i.test(name)||/away team (?:goals|total|o\/u)/i.test(name))return'away-team-goals'
+  if(/gg\/ng\s*2/i.test(name)||/both teams.*2\+/i.test(name))return'both-teams-score-2'
+  if(/^gg\/ng$/i.test(name)||/^both teams to score$/i.test(name)||/^btts$/i.test(name))return'both-teams-score'
+  if(/3 or more goals in a row/i.test(name)||/3\+\s*goals? streak/i.test(name))return'goals-streak-3'
+  if(/2 or more goals in a row/i.test(name)||/^goals? streak/i.test(name))return'goals-streak-2'
+  if(/^over\/under$/i.test(name))return'total-goals'
   return key(name||id)
+}
+function marketRank(market){
+  const id=String(market?.id??'')
+  if(MATCH_IDS[id])return 0
+  if(HALF_IDS[id])return 2
+  return 1
 }
 export function parseSportyBet(markets){
   const byKey=new Map()
-  for(const market of markets||[]){
+  const ordered=[...(markets||[])].sort((a,b)=>marketRank(a)-marketRank(b))
+  for(const market of ordered){
     const k=sportyKey(market);if(!k)continue
     const line=specifierTotal(market)
     if(!byKey.has(k))byKey.set(k,{marketKey:k,market:marketName(k),bookmaker:'SportyBet',source:'sportybet',outcomes:[]})

@@ -11,11 +11,17 @@ const headers=()=>({
   'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 })
 const norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim().replace(/\s+/g,' ')
+const MATCH_MARKET_IDS=new Set(['1','10','11','18','19','20','29','60000','60010','60011','60012','60020','854','855','856','857','858','859','860','861','862'])
 const looksCombo=m=>{
   const n=norm(m?.name||m?.desc||'')
   const first=/\b(home(?: team)?|draw|away(?: team)?) or\b/.test(n)
   const second=/\b(over 2\.5|under 2\.5|gg|any clean sheet|clean sheet)\b/.test(n)||/both teams.*score/.test(n)
   return first&&second
+}
+export function keepEventMarket(m){
+  if(!m)return false
+  if(MATCH_MARKET_IDS.has(String(m.id??'')))return true
+  return looksCombo(m)
 }
 const hasThresholdMarkets=markets=>{
   const keys=new Set(parseSportyBet(markets||[]).map(r=>r.marketKey))
@@ -76,7 +82,7 @@ export async function hydrateSportyComboMarkets(fixtures,{concurrency=3}={}){
     try{
       const ev=await detail(f),markets=marketBag(ev)
       if(!f.sporty)f.sporty={}
-      if(markets.length)f.sporty.markets=mergeMarkets(f.sporty.markets||[],markets)
+      if(markets.length)f.sporty.markets=mergeMarkets(f.sporty.markets||[],markets.filter(keepEventMarket))
     }catch(error){
       console.warn(`Combo markets ${f?.fixture?.id||'unknown'}: ${error?.message||error}`)
     }

@@ -41,9 +41,9 @@ const dcRate=(p,type)=>eventRate(p,g=>type==='not-loss'?g.own>=g.opp:type==='not
 function ou(name){const m=String(name||'').match(/\b(Over|Under)\s*([0-9]+(?:\.[0-9]+)?)/i);return m?{side:m[1].toLowerCase(),line:Number(m[2])}:null}
 function sane(k,line){
   if(!finite(line))return false
-  if(k==='total-goals')return line>=0.5&&line<=6.5
-  if(k==='first-half-goals')return line>=0.5&&line<=3.5
-  if(['home-team-goals','away-team-goals','team-goals'].includes(k))return line>=0.5&&line<=4.5
+  if(k==='total-goals')return line===1.5||line===2.5||line===3.5
+  if(k==='first-half-goals')return line===0.5||line===1.5
+  if(['home-team-goals','away-team-goals','team-goals'].includes(k))return line===0.5||line===1.5||line===2.5
   return true
 }
 function support(f,m,o){
@@ -56,7 +56,6 @@ function support(f,m,o){
   if(k==='double-chance'){
     if(n.includes('home or draw')||n==='1x')return[dcRate(home,'not-loss'),dcRate(away,'not-win')]
     if(n.includes('draw or away')||n==='x2')return[dcRate(home,'not-win'),dcRate(away,'not-loss')]
-    if(n.includes('home or away')||n==='12')return[dcRate(home,'not-draw'),dcRate(away,'not-draw')]
   }
   if(k==='draw-no-bet'){
     if(n==='home'||n==='1')return[dcRate(home,'not-loss'),dcRate(away,'not-win')]

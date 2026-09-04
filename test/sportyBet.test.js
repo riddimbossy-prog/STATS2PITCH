@@ -1,8 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {parseSportyBet,verifiedMarkets} from '../server/odds.js'
+import {parseSportyBet,verifiedMarkets,isNoiseMarket} from '../server/odds.js'
 import {applyEventIcons,eventQuery,resetSportyCache,sportyEventToFixture} from '../server/sportyBet.js'
 import {extractOdds,diagnoseAwayFavFixture} from '../server/awayFavEngine.js'
+import {keepEventMarket} from '../server/comboMarketHydrator.js'
 
 const palaceMarkets=[
   {id:1,name:'1X2',outcomes:[{desc:'Home',odds:'5.13'},{desc:'Draw',odds:'4.27'},{desc:'Away',odds:'1.69'}]},
@@ -163,4 +164,73 @@ test('match-details crests replace sportradar placeholders and reuse the team ca
   },{name:'Friendly'})
   assert.equal(later.teams.home.logo,'https://s.sporty.net/common/main/res/monaco.png')
   assert.ok(String(later.teams.away.logo).includes('17.png'))
+})
+
+test('match Over 0.5 keeps the full-time price when 1H Over 0.5 is also listed',()=>{
+  const rows=parseSportyBet([
+    {id:68,name:'1st Half Over/Under',specifier:'total=0.5',outcomes:[{desc:'Over 0.5',odds:'1.24'},{desc:'Under 0.5',odds:'3.80'}]},
+    {id:18,name:'Over/Under',specifier:'total=0.5',outcomes:[{desc:'Over 0.5',odds:'1.02'},{desc:'Under 0.5',odds:'12.00'}]},
+    {id:18,name:'Over/Under',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'1.39'},{desc:'Under 2.5',odds:'2.90'}]}
+  ])
+  const by=Object.fromEntries(rows.map(r=>[r.marketKey,r]))
+  assert.equal(by['total-goals'].outcomes.find(o=>o.name==='Over 0.5').odd,1.02)
+  assert.equal(by['total-goals'].outcomes.find(o=>o.name==='Over 2.5').odd,1.39)
+  assert.equal(by['first-half-goals'].outcomes.find(o=>o.name==='Over 0.5').odd,1.24)
+})
+
+test('1H double chance is not treated as match double chance',()=>{
+  const rows=parseSportyBet([
+    {id:62,name:'1st Half Double Chance',outcomes:[{desc:'1X',odds:'1.12'},{desc:'12',odds:'1.08'},{desc:'X2',odds:'1.55'}]},
+    {id:10,name:'Double Chance',outcomes:[{desc:'1X',odds:'1.33'},{desc:'12',odds:'1.22'},{desc:'X2',odds:'1.90'}]}
+  ])
+  const by=Object.fromEntries(rows.map(r=>[r.marketKey,r]))
+  assert.equal(by['double-chance'].outcomes.find(o=>o.name==='Home or draw').odd,1.33)
+  assert.equal(by['double-chance'].outcomes.find(o=>o.name==='Home or away').odd,1.22)
+  assert.equal(by['first-half-winner'],undefined)
+})
+
+test('corners, early goals, HT/FT and 1X2&O/U hybrids are ignored',()=>{
+  assert.equal(isNoiseMarket('Corners Over/Under'),true)
+  assert.equal(isNoiseMarket('Early Goals'),true)
+  assert.equal(isNoiseMarket('1X2 & Over/Under'),true)
+  const rows=parseSportyBet([
+    {id:16,name:'Corners Over/Under',specifier:'total=8.5',outcomes:[{desc:'Over 8.5',odds:'1.70'}]},
+    {id:31,name:'Early Goals',specifier:'total=0.5',outcomes:[{desc:'Over 0.5',odds:'1.18'}]},
+    {id:47,name:'Halftime/Fulltime',outcomes:[{desc:'Home/Home',odds:'2.10'}]},
+    {id:99,name:'1X2 & Over/Under',outcomes:[{desc:'Home & Over 2.5',odds:'2.40'}]},
+    {id:18,name:'Over/Under',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'1.39'}]}
+  ])
+  assert.deepEqual(rows.map(r=>r.marketKey),['total-goals'])
+  assert.equal(rows[0].outcomes.find(o=>o.name==='Over 2.5').odd,1.39)
+})
+
+test('Asian Over 2 is kept as Over 2, not Over 2.5',()=>{
+  const rows=parseSportyBet([
+    {id:18,name:'Over/Under',specifier:'total=2',outcomes:[{desc:'Over 2.5',odds:'1.15'},{desc:'Under 2.5',odds:'5.50'}]},
+    {id:18,name:'Over/Under',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'1.39'},{desc:'Under 2.5',odds:'2.90'}]}
+  ])
+  const totals=rows.find(r=>r.marketKey==='total-goals')
+  assert.equal(totals.outcomes.find(o=>o.name==='Over 2').odd,1.15)
+  assert.equal(totals.outcomes.find(o=>o.name==='Over 2.5').odd,1.39)
+})
+
+test('2nd half over/under is dropped instead of becoming 1H or match totals',()=>{
+  const rows=parseSportyBet([
+    {id:77,name:'2nd Half Over/Under',specifier:'total=0.5',outcomes:[{desc:'Over 0.5',odds:'1.40'}]},
+    {id:18,name:'Over/Under',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'1.39'}]}
+  ])
+  const by=Object.fromEntries(rows.map(r=>[r.marketKey,r]))
+  assert.equal(by['total-goals'].outcomes.find(o=>o.name==='Over 2.5').odd,1.39)
+  assert.equal(by['first-half-goals'],undefined)
+  assert.equal(by['total-goals'].outcomes.find(o=>o.name==='Over 0.5'),undefined)
+})
+
+test('combo hydrator keeps match and combo markets, drops 1H and corners',()=>{
+  assert.equal(keepEventMarket({id:18,name:'Over/Under'}),true)
+  assert.equal(keepEventMarket({id:1,name:'1X2'}),true)
+  assert.equal(keepEventMarket({id:854,name:'Home Team or Over 2.5'}),true)
+  assert.equal(keepEventMarket({id:999,name:'Home Team or GG'}),true)
+  assert.equal(keepEventMarket({id:68,name:'1st Half Over/Under'}),false)
+  assert.equal(keepEventMarket({id:16,name:'Corners Over/Under'}),false)
+  assert.equal(keepEventMarket({id:99,name:'1X2 & Over/Under'}),false)
 })
