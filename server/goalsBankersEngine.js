@@ -67,17 +67,24 @@ function isStreakName(key,market,name){
 
 function teamGoalOdd(markets,side,line,teamName){
   const key=side==='home'?'home-team-goals':'away-team-goals'
-  const direct=oddOf(markets,key,[`Over ${line}`,`O ${line}`])
+  const labels=[`Over ${line}`,`O ${line}`]
+  const direct=oddOf(markets,key,labels)
   if(direct)return direct
   const wanted=norm(teamName)
   return scanOdd(markets,(marketKey,market,name)=>{
-    if(!/over/.test(name)||!name.includes(String(line)))return false
+    if(!labels.some(label=>norm(name)===norm(label)))return false
     if(marketKey===key)return true
-    if(marketKey!=='team-goals'&&!/team goals/.test(market)&&!/team total/.test(market))return false
-    if(side==='home'&&(/home/.test(name)||(wanted&&name.includes(wanted))))return true
-    if(side==='away'&&(/away/.test(name)||(wanted&&name.includes(wanted))))return true
+    if(marketKey!=='team-goals'&&market!=='team goals'&&market!=='team total')return false
+    if(side==='home'&&(name==='home'||(wanted&&name.includes(wanted))))return true
+    if(side==='away'&&(name==='away'||(wanted&&name.includes(wanted))))return true
     return false
   })
+}
+
+function longerLine(shorter,longer){
+  if(!finite(longer))return null
+  if(finite(shorter)&&Number(longer)<=Number(shorter)+0.02)return null
+  return Number(longer)
 }
 
 export function extractGoalsBankerOdds(fixture){
@@ -95,12 +102,12 @@ export function extractGoalsBankerOdds(fixture){
   const drawOrOver=scanOdd(markets,(key,market,name)=>/draw or over 2\.5/.test(`${key} ${market} ${name}`))
   const drawOrUnder=scanOdd(markets,(key,market,name)=>/draw or under 2\.5/.test(`${key} ${market} ${name}`))
   const drawOrGg=scanOdd(markets,(key,market,name)=>/draw or (gg|btts|both teams)/.test(`${key} ${market} ${name}`))
-  const homeO15=teamGoalOdd(markets,'home',1.5,homeName)
-  const awayO15=teamGoalOdd(markets,'away',1.5,awayName)
-  const homeO25=teamGoalOdd(markets,'home',2.5,homeName)
-  const awayO25=teamGoalOdd(markets,'away',2.5,awayName)
   const homeO05=teamGoalOdd(markets,'home',0.5,homeName)
   const awayO05=teamGoalOdd(markets,'away',0.5,awayName)
+  const homeO15=longerLine(homeO05,teamGoalOdd(markets,'home',1.5,homeName))
+  const awayO15=longerLine(awayO05,teamGoalOdd(markets,'away',1.5,awayName))
+  const homeO25=longerLine(homeO15||homeO05,teamGoalOdd(markets,'home',2.5,homeName))
+  const awayO25=longerLine(awayO15||awayO05,teamGoalOdd(markets,'away',2.5,awayName))
   let streak=scanOdd(markets,(key,market,name)=>isStreakName(key,market,name)&&/yes/.test(name))
   if(!streak)streak=oddOf(markets,'goals-streak-2',['Yes'])
   let favourite=null

@@ -40,6 +40,7 @@ export function isNoiseMarket(raw=''){
   const s=text(raw),n=norm(s),c=compact(s)
   if(/&/.test(s))return true
   if(/corner|card|booking|yellow|red card|early goals|rest of match|\bminutes\b|never down|\b1up\b|\b2up\b/.test(n))return true
+  if(/\bshots?\b|\bfouls?\b|\boffsides?\b|\btackles?\b|\bsubstitutions?\b|\bgoal kicks?\b|\bthrow ins?\b|\bwoodwork|\bcrossbars?\b/.test(n))return true
   if(/halftime.?fulltime|ht\s*ft|htft/.test(n)||c.includes('halftimefulltime'))return true
   if(/\b10 minutes\b|\bgoal bounds\b|\bexact goals\b|\bcorrect score\b/.test(n))return true
   return false
@@ -47,8 +48,9 @@ export function isNoiseMarket(raw=''){
 function halfKey(raw=''){
   if(!isFirstHalfName(raw))return null
   const n=compact(raw)
+  if(n.includes('homeou')||n.includes('awayou')||n.includes('hometeam')||n.includes('awayteam'))return null
   if(n.includes('winner')||n.includes('result')||n.includes('1x2')||n.includes('matchodds'))return'first-half-winner'
-  if(n.includes('total')||n.includes('overunder')||n.includes('goals')||n.endsWith('ou')||n.includes('homeou')||n.includes('awayou'))return'first-half-goals'
+  if(n.includes('total')||n.includes('overunder')||n.includes('goals')||n.endsWith('ou'))return'first-half-goals'
   return null
 }
 function key(raw=''){

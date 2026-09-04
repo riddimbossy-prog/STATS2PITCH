@@ -234,3 +234,18 @@ test('combo hydrator keeps match and combo markets, drops 1H and corners',()=>{
   assert.equal(keepEventMarket({id:16,name:'Corners Over/Under'}),false)
   assert.equal(keepEventMarket({id:99,name:'1X2 & Over/Under'}),false)
 })
+
+test('Home Team Total Corners and shots do not become Home O/U or match totals',()=>{
+  const rows=parseSportyBet([
+    {id:19,name:'Home O/U',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'7.40'}]},
+    {id:900300,name:'Home Team Total Corners',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'1.28'}]},
+    {id:900552,name:'Home Team Shots Over/Under',specifier:'total=12.5',outcomes:[{desc:'Over 12.5',odds:'2.00'}]},
+    {id:18,name:'Over/Under',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'1.39'}]}
+  ])
+  const by=Object.fromEntries(rows.map(r=>[r.marketKey,r]))
+  assert.equal(by['home-team-goals'].outcomes.find(o=>o.name==='Over 2.5').odd,7.4)
+  assert.equal(by['total-goals'].outcomes.find(o=>o.name==='Over 2.5').odd,1.39)
+  assert.equal(by['home-team-goals'].outcomes.length,1)
+  assert.equal(isNoiseMarket('Home Team Total Corners'),true)
+  assert.equal(isNoiseMarket('Home Team Shots Over/Under'),true)
+})

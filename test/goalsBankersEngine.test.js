@@ -9,6 +9,7 @@ import {
 } from '../server/goalsBankersEngine.js'
 import {V5_RULES,evaluateTwoInARowMarket} from '../server/goalsBankersV5.js'
 import {buildBoard} from '../server/engine.js'
+import {parseSportyBet} from '../server/odds.js'
 
 function finished(id,homeId,awayId,h,a){
   return{
@@ -210,4 +211,30 @@ test('slips allow only one result leg across win and DNB',()=>{
   assert.equal(canAddAccaLeg([win],dnb).reason,'max-1-result')
   assert.equal(canAddAccaLeg([dnb],win).reason,'max-1-result')
   assert.equal(canAddAccaLeg([win,two],over).ok,true)
+})
+
+test('Home Team Over 2.5 uses the goal line, not Home Team Total Corners',()=>{
+  const rows=parseSportyBet([
+    {id:19,name:'Home O/U',specifier:'total=0.5',outcomes:[{desc:'Over 0.5',odds:'1.42'}]},
+    {id:19,name:'Home O/U',specifier:'total=1.5',outcomes:[{desc:'Over 1.5',odds:'2.95'}]},
+    {id:19,name:'Home O/U',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'7.40'}]},
+    {id:900300,name:'Home Team Total Corners',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'1.28'}]},
+    {id:18,name:'Over/Under',specifier:'total=2',outcomes:[{desc:'Over 2',odds:'1.15'}]},
+    {id:18,name:'Over/Under',specifier:'total=2.5',outcomes:[{desc:'Over 2.5',odds:'1.39'}]}
+  ])
+  const odds=extractGoalsBankerOdds({home:{name:'Betis'},away:{name:'Real Madrid'},marketOdds:rows})
+  assert.equal(odds.homeO25,7.4)
+  assert.equal(odds.homeO15,2.95)
+  assert.equal(odds.homeO05,1.42)
+  assert.equal(odds.over25,1.39)
+})
+
+test('drops a Home Over 2.5 that is shorter than Home Over 0.5 or Over 1.5',()=>{
+  const odds=extractGoalsBankerOdds({
+    home:{name:'Home FC'},away:{name:'Away FC'},
+    marketOdds:markets({homeO05:1.31,homeO15:2.45,homeO25:1.18,over25:1.68})
+  })
+  assert.equal(odds.homeO25,null)
+  assert.equal(odds.homeO15,2.45)
+  assert.equal(odds.over25,1.68)
 })
