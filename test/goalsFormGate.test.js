@@ -24,6 +24,7 @@ function markets(){
   return[
     {marketKey:'goals-streak-2',market:'Goals Streak 2+',outcomes:[{name:'Yes',odd:1.22}]},
     {marketKey:'match-winner',market:'Match winner',outcomes:[{name:'Home',odd:1.28},{name:'Away',odd:8},{name:'Draw',odd:5}]},
+    {marketKey:'draw-no-bet',market:'Draw no bet',outcomes:[{name:'Home',odd:1.18},{name:'Away',odd:3.20}]},
     {marketKey:'total-goals',market:'Total goals',outcomes:[{name:'Over 2.5',odd:1.90}]},
     {marketKey:'both-teams-score',market:'Both teams to score',outcomes:[{name:'Yes',odd:1.90}]},
     {marketKey:'home-team-goals',market:'Home team goals',outcomes:[{name:'Over 1.5',odd:1.32},{name:'Over 2.5',odd:1.92},{name:'Over 0.5',odd:1.20}]},
@@ -87,26 +88,26 @@ test('top-half favourite with real PPG is allowed',()=>{
   assert.equal(weakFavouriteGate('FAV_2PLUS','home',split,{position:16,size:20}).ok,true)
 })
 
-test('diagnose skips a bottom-3 favourite that V3 would otherwise publish',()=>{
+test('V5 no longer hard-skips one bottom-3 team when a goals fallback is clear',()=>{
   const row=fixture()
   row.homeSplit={position:19,size:20,ppg:0.4,played:5,venue:'home'}
   const r=diagnoseGoalsBankerFixture(row)
-  assert.equal(r.pick,null)
-  assert.equal(r.skip,'weak-favourite')
+  assert.ok(r.pick)
+  assert.equal(r.pick.route,'FAV_2PLUS')
 })
 
-test('diagnose still publishes a strong favourite',()=>{
+test('V5 publishes DNB for a strong qualified team outside the overall Top 3',()=>{
   const r=diagnoseGoalsBankerFixture(fixture())
   assert.ok(r.pick)
-  assert.ok(['FAV_WIN','FAV_2PLUS','OVER_2.5','GG'].includes(r.pick.route))
+  assert.equal(r.pick.route,'FAV_DNB')
 })
 
-test('early-season poor form is not waived through',()=>{
+test('V5 result and goals routes use the explicit ladder instead of the old form veto',()=>{
   const row=fixture()
   row.earlySeason=true
   row.home.fixtures=venueRows(1,'home',[[0,2],[0,1],[1,2]])
   row.away.fixtures=venueRows(2,'away',[[2,0],[1,0],[3,1]])
   const r=diagnoseGoalsBankerFixture(row)
-  assert.equal(r.pick,null)
-  assert.ok(['form-fav-win','form-2plus','form-over25','form-gg'].includes(r.skip))
+  assert.ok(r.pick)
+  assert.equal(r.pick.formGate.v5,true)
 })

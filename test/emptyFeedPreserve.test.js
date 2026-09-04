@@ -32,6 +32,24 @@ test('empty upstream feed does not wipe an existing board, even if engine versio
   await clearBoard(date)
 })
 
+test('a non-empty V5 refresh replaces old Goals Bankers instead of preserving V4 rows',async()=>{
+  const date='2099-02-03'
+  await clearBoard(date)
+  const oldPick={fixtureId:'31',market:'match-winner',selection:'Home',route:'FAV_WIN',engine:'goals-bankers-v4',kickoff:`${date}T18:00:00Z`}
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[oldPick],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v4',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const freshPick={fixtureId:'32',market:'home-team-goals',selection:'Over 1.5',route:'FAV_2PLUS',engine:'goals-bankers-v5',kickoff:`${date}T19:00:00Z`}
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[freshPick],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.goalsBankers.map(row=>row.fixtureId),['32'])
+  assert.equal(saved.goalsBankers[0].engine,'goals-bankers-v5')
+  await clearBoard(date)
+})
+
 test('a late refresh keeps already-published picks and Daily Bankers', async()=>{
   const date='2099-03-04'
   await clearBoard(date)
