@@ -240,7 +240,7 @@ export function buildBoard(fixtures,meta={},learningProfiles=[]){
       varTipsCount:Array.isArray(varBoard.bestPicks)?varBoard.bestPicks.length:0,
       filterTipsEngine:filterBoard.meta?.engine||'sporty-filter-v1',
       filterTipsCount:Array.isArray(filterBoard.bestPicks)?filterBoard.bestPicks.length:0,
-      goalsBankersEngine:goalsBoard.meta?.engine||'goals-bankers-v3',
+      goalsBankersEngine:goalsBoard.meta?.engine||'goals-bankers-v5',
       goalsBankersCount:Array.isArray(goalsBoard.bestPicks)?goalsBoard.bestPicks.length:0,
       dailyBankersEngine:dailyBankersBoard.meta?.engine||'daily-bankers-v2',
       safestBankersCount:Array.isArray(dailyBankersBoard.safestBankers)?dailyBankersBoard.safestBankers.length:0,

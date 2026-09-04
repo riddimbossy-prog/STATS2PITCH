@@ -33,7 +33,7 @@ function finalMarket(row){
   if(market==='away-team-goals')return'Away team goals'
   if(market==='home-team-goals')return'Home team goals'
   if(market==='total-goals')return'Total goals'
-  if(market==='DNB')return'Draw No Bet'
+  if(market==='DNB'||market==='draw-no-bet')return'Draw No Bet'
   if(market==='DC')return text(row?.downgradeMarket)||'Double Chance'
   return market||text(row?.marketLabel)||'Market'
 }

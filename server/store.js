@@ -97,9 +97,9 @@ function mergeRows(oldRows,freshRows,now,existing,keyFn=p=>String(p?.fixtureId??
 function comboRowsFrom(board){
   return [...(Array.isArray(board?.comboPicks)?board.comboPicks:[]),...(Array.isArray(board?.goalsBankers)?board.goalsBankers:[])].filter(isComboBoardPick)
 }
-export function isolateComboBags(existing,incoming,now){
+export function isolateComboBags(existing,incoming,now,{resetGoals=false}={}){
   const goalsBankers=mergeRows(
-    (existing?.goalsBankers||[]).filter(r=>!isComboBoardPick(r)),
+    resetGoals?[]:(existing?.goalsBankers||[]).filter(r=>!isComboBoardPick(r)),
     (incoming?.goalsBankers||[]).filter(r=>!isComboBoardPick(r)),
     now,
     existing
@@ -124,7 +124,8 @@ function mergePublished(existing,incoming){
   const bestPicks=mergeRows(existing?.bestPicks,incoming?.bestPicks,now,existing)
   const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
   const filterTips=mergeRows(existing?.filterTips,incoming?.filterTips,now,existing)
-  const {goalsBankers,comboPicks}=isolateComboBags(existing,incoming,now)
+  const goalsEngineChanged=String(existing?.meta?.goalsBankersEngine||'')!==String(incoming?.meta?.goalsBankersEngine||'')
+  const {goalsBankers,comboPicks}=isolateComboBags(existing,incoming,now,{resetGoals:goalsEngineChanged})
   const bankers=mergeRows(existing?.bankers,incoming?.bankers,now,existing)
   return attachCrests({
     ...incoming,

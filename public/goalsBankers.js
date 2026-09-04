@@ -4,12 +4,12 @@ import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRema
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"': '"',"'":'&#39;'}[c]))
-const REQUIRED_ENGINES=new Set(['goals-bankers-v3','goals-bankers-v4'])
+const REQUIRED_ENGINES=new Set(['goals-bankers-v5'])
 const BOARD_VIEW='goals'
 const SLIP_KEY='s2p-goals-slip'
-const PUBLISHED_ROUTES=new Set(['FAV_WIN','FAV_2PLUS','OVER_2.5','GG'])
+const PUBLISHED_ROUTES=new Set(['FAV_WIN','FAV_DNB','FAV_2PLUS','OVER_2.5','GG'])
 const COMBO_ROUTES=new Set(['DRAW_OR_OVER_25','DRAW_OR_UNDER_25','DRAW_OR_GG'])
-const MARKET_CHIPS=[{id:'all',label:'All'},{id:'FAV_WIN',label:'Win'},{id:'FAV_2PLUS',label:'2+'},{id:'OVER_2.5',label:'Over 2.5'},{id:'GG',label:'GG'},{id:'COMBO',label:'Combo'}]
+const MARKET_CHIPS=[{id:'all',label:'All'},{id:'FAV_WIN',label:'Win'},{id:'FAV_DNB',label:'DNB'},{id:'FAV_2PLUS',label:'2+'},{id:'OVER_2.5',label:'Over 2.5'},{id:'GG',label:'GG'}]
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',route:'all',slip:loadSlip(),timer:null,note:''}
 
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
@@ -36,8 +36,8 @@ function topResult(r){const x=resultFor(r);return decided(x?.outcome)?`<span cla
 function pickLabel(r){return String(r.displaySelection||r.pick||r.selection||'Selection')}
 function isComboBoardPick(r){const m=String(r?.market||'');return m.startsWith('combo-')||String(r?.engineVersion||r?.engine||'').startsWith('combo-')}
 function isComboPick(r){if(isComboBoardPick(r))return false;return COMBO_ROUTES.has(String(r?.route||''))||String(r?.family||'')==='Combo'||String(r?.market||'').startsWith('draw-or-')}
-function marketName(r){const m=String(r.market||'');if(m==='both-teams-score')return'Both Teams To Score';if(m==='match-winner')return'Match winner';if(m==='away-team-goals')return'Away team goals';if(m==='home-team-goals')return'Home team goals';if(m==='total-goals')return'Total goals';if(m==='draw-or-over-25')return'Draw or Over 2.5';if(m==='draw-or-under-25')return'Draw or Under 2.5';if(m==='draw-or-gg')return'Draw or GG';return m.replaceAll('-',' ')||'Market'}
-function routeLabel(r){return({FAV_WIN:'WIN',FAV_2PLUS:'2+','OVER_2.5':'O2.5',GG:'GG',DRAW_OR_OVER_25:'D/O2.5',DRAW_OR_UNDER_25:'D/U2.5',DRAW_OR_GG:'D/GG'})[r.route]||(isComboPick(r)?'COMBO':'PICK')}
+function marketName(r){const m=String(r.market||'');if(m==='both-teams-score')return'Both Teams To Score';if(m==='match-winner')return'Match winner';if(m==='draw-no-bet')return'Draw no bet';if(m==='away-team-goals')return'Away team goals';if(m==='home-team-goals')return'Home team goals';if(m==='total-goals')return'Total goals';return m.replaceAll('-',' ')||'Market'}
+function routeLabel(r){return({FAV_WIN:'WIN',FAV_DNB:'DNB',FAV_2PLUS:'2+','OVER_2.5':'O2.5',GG:'GG'})[r.route]||'PICK'}
 function uniq(xs){return[...new Set(xs.filter(Boolean).map(String))].sort((a,b)=>a.localeCompare(b))}
 function options(el,values,current,label,fmt=v=>v){if(!el)return'all';const valid=current==='all'||values.includes(current)?current:'all';el.innerHTML=`<option value="all">${esc(label)}</option>`+values.map(v=>`<option value="${esc(v)}" ${v===valid?'selected':''}>${fmt(v)}</option>`).join('');return valid}
 function allRows(){return boardReady(state.board)?(state.board.goalsBankers||[]).filter(r=>!isSrlPick(r)&&!isComboBoardPick(r)):[]}
@@ -45,8 +45,8 @@ function filtered(rows){return rows.filter(r=>{const s=stateFor(r);if(state.stat
 function renderHero(rows){const el=$('#goalsHeroCount');if(el)el.textContent=String(rows.length)}
 function renderMarkets(rows){
   const host=$('#goalsMarkets');if(!host)return
-  const counts={all:rows.length,FAV_WIN:0,FAV_2PLUS:0,'OVER_2.5':0,GG:0,COMBO:0}
-  for(const r of rows){if(isComboPick(r))counts.COMBO++;else if(counts[r.route]!==undefined)counts[r.route]++}
+  const counts={all:rows.length,FAV_WIN:0,FAV_DNB:0,FAV_2PLUS:0,'OVER_2.5':0,GG:0}
+  for(const r of rows)if(counts[r.route]!==undefined)counts[r.route]++
   host.innerHTML=MARKET_CHIPS.map(chip=>`<button type="button" class="goals-market ${state.route===chip.id?'active':''}" data-route="${esc(chip.id)}">${esc(chip.label)}<b>${counts[chip.id]||0}</b></button>`).join('')
   host.querySelectorAll('[data-route]').forEach(b=>b.onclick=()=>{state.route=b.dataset.route;state.market='all';if($('#market'))$('#market').value='all';render()})
 }
@@ -64,7 +64,7 @@ function canAddAccaLeg(slip,pick){
   if(legs.length>=3)return{ok:false,reason:'max-3'}
   if(legs.some(row=>String(row.fixtureId)===String(pick.fixtureId)))return{ok:false,reason:'same-match'}
   const next=[...legs,pick]
-  if(next.filter(row=>row.route==='FAV_WIN').length>1)return{ok:false,reason:'max-1-fav-win'}
+  if(next.filter(row=>['FAV_WIN','FAV_DNB'].includes(row.route)).length>1)return{ok:false,reason:'max-1-result'}
   if(next.length===3&&!next.some(row=>row.route==='OVER_2.5'||row.route==='GG'))return{ok:false,reason:'need-goals-leg'}
   const hasLean=legs.some(row=>row.classification==='LEAN'||row.borderline===true)
   if(hasLean&&(pick.classification==='LEAN'||pick.borderline===true||pick.classification==='STRONG'))return{ok:false,reason:'borderline-lean'}
@@ -72,7 +72,7 @@ function canAddAccaLeg(slip,pick){
 }
 function slipCopy(code){return({
   'max-3':'Slip is full — max 3 legs.',
-  'max-1-fav-win':'Only one favourite-win leg is allowed.',
+  'max-1-result':'Only one win or DNB result leg is allowed.',
   'need-goals-leg':'A 3-leg slip needs Over 2.5 or GG.',
   'borderline-lean':'A lean pick cannot sit with another lean or strong pick.',
   'same-match':'That match is already on the slip.',
@@ -100,7 +100,7 @@ function renderSlip(){
 
 function card(r,i){
   const score=scoreFor(r),on=onSlip(r.fixtureId),odds=oddStr(r)
-  return`<article class="card ${stateFor(r)} ${decided(resultFor(r)?.outcome)?esc(resultFor(r).outcome):''}" data-i="${i}" role="button" tabindex="0" aria-label="Why ${esc(r.home)} vs ${esc(r.away)} was chosen"><div class="m-card-top"><span class="m-top-left"><span class="m-board-tag goals">GOALS · V4</span></span><span class="m-top-mid"><span class="m-fav-tag">${esc(routeLabel(r))}</span></span><span class="m-top-right">${topStatus(r)}</span></div><div class="league"><span class="league-flag" role="img" aria-label="${esc(r.country||'International')} flag">${flag(r.country)}</span><span>${esc(r.league||'League')}</span></div>${matchup(r,score)}<div class="pick"><div class="pick-copy"><span class="pick-kicker">PICK</span><strong>${esc(pickLabel(r))}</strong></div><span class="odd">${odds}</span></div>${learningChipHtml(r,esc)}<div class="m-footer"><div class="m-ev"><span>${esc(marketName(r))}</span></div><span class="odd odd-stack"><span class="odd-kicker">ODDS</span>${odds}</span></div><div class="time"><b>${esc(marketName(r))}</b> · ${formatDateTime(r.kickoff)}</div><button class="details" data-i="${i}" type="button">Why this pick?</button><button class="slip-add ${on?'on-slip':''}" data-slip="${i}" type="button">${on?'On slip':'Add to slip'}</button><div class="m-why-row">Why this pick ›</div></article>`
+  return`<article class="card ${stateFor(r)} ${decided(resultFor(r)?.outcome)?esc(resultFor(r).outcome):''}" data-i="${i}" role="button" tabindex="0" aria-label="Why ${esc(r.home)} vs ${esc(r.away)} was chosen"><div class="m-card-top"><span class="m-top-left"><span class="m-board-tag goals">GOALS · V5</span></span><span class="m-top-mid"><span class="m-fav-tag">${esc(routeLabel(r))}</span></span><span class="m-top-right">${topStatus(r)}</span></div><div class="league"><span class="league-flag" role="img" aria-label="${esc(r.country||'International')} flag">${flag(r.country)}</span><span>${esc(r.league||'League')}</span></div>${matchup(r,score)}<div class="pick"><div class="pick-copy"><span class="pick-kicker">PICK</span><strong>${esc(pickLabel(r))}</strong></div><span class="odd">${odds}</span></div>${learningChipHtml(r,esc)}<div class="m-footer"><div class="m-ev"><span>${esc(marketName(r))}</span></div><span class="odd odd-stack"><span class="odd-kicker">ODDS</span>${odds}</span></div><div class="time"><b>${esc(marketName(r))}</b> · ${formatDateTime(r.kickoff)}</div><button class="details" data-i="${i}" type="button">Why this pick?</button><button class="slip-add ${on?'on-slip':''}" data-slip="${i}" type="button">${on?'On slip':'Add to slip'}</button><div class="m-why-row">Why this pick ›</div></article>`
 }
 function open(r){const score=scoreFor(r),x=resultFor(r),modal=$('#modal');if(!modal)return;modal.innerHTML=`<div class="dialog" role="dialog" aria-modal="true" aria-label="Why this pick was chosen"><div class="league"><span class="league-flag" role="img" aria-label="${esc(r.country||'International')} flag">${flag(r.country)}</span><span>${esc(r.league||'League')}</span></div>${statusBadge(r)}${matchup(r,score)}<div class="pick"><strong>${esc(pickLabel(r))}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="time"><b>${esc(marketName(r))}</b> · ${formatDateTime(r.kickoff)}</div>${x?.matchState==='settled'?`<div class="settled-summary ${esc(x.outcome||'')}">${esc(outcomeLabel(x.outcome||'settled'))}${score?` · ${score.home}–${score.away}`:''}</div>`:''}${whySectionHtml(r)}${r.publishedAt?`<div class="proof-line">✓ Original published tip preserved</div>`:''}<button class="close" type="button">Close</button></div>`;bindCrestFallbacks(modal);bindWhyModal(modal)}
 function render(){
