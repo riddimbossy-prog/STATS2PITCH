@@ -26,16 +26,21 @@ window.addEventListener('touchmove',markScrolling,{passive:true})
 window.addEventListener('touchend',()=>{if(!root.classList.contains('is-scrolling'))return;clearTimeout(scrollNavTimer);scrollNavTimer=setTimeout(()=>root.classList.remove('is-scrolling'),450)},{passive:true})
 
 ;(function addComboLinks(){
+  const comboSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="7" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="5" cy="17" r="2"/><circle cx="19" cy="17" r="2"/><path d="M7 7h4l2 3h4M7 17h4l2-3h4"/></svg>'
   const desktop=document.querySelector('.page-tabs')
   if(desktop&&!desktop.querySelector('a[href="/combo.html"]')){
     const a=document.createElement('a');a.className='page-tab';a.href='/combo.html';a.textContent='Combo'
     desktop.insertBefore(a,desktop.querySelector('a[href="/daily-bankers.html"]'))
   }
   const mobile=document.querySelector('.mobile-nav')
-  if(mobile&&!mobile.querySelector('a[href="/combo.html"]')){
-    const a=document.createElement('a');a.href='/combo.html';a.setAttribute('aria-label','Combo');
-    const span=document.createElement('span');span.textContent='Combo';a.appendChild(span)
-    mobile.insertBefore(a,mobile.querySelector('a[href="/daily-bankers.html"]'))
+  if(!mobile)return
+  let link=mobile.querySelector('a[href="/combo.html"]')
+  if(!link){
+    link=document.createElement('a');link.href='/combo.html';link.setAttribute('aria-label','Combo')
+    link.innerHTML=comboSvg+'<span>Combo</span>'
+    mobile.insertBefore(link,mobile.querySelector('a[href="/daily-bankers.html"]'))
+  }else if(!link.querySelector('svg')){
+    link.insertAdjacentHTML('afterbegin',comboSvg)
   }
 })()
 

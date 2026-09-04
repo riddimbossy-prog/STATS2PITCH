@@ -20,8 +20,3 @@
   opacity: 0.68;
   margin: 8px 0;
 }
-
-@media (max-width: 600px) {
-  .mobile-nav a { min-width: 0; }
-  .mobile-nav span { font-size: 8px !important; }
-}
