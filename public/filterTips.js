@@ -4,7 +4,7 @@ import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRema
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
-const REQUIRED_ENGINES=new Set(['sporty-filter-v1','sporty-filter-v2'])
+const REQUIRED_ENGINES=new Set(['sporty-filter-v1','sporty-filter-v2','perfect-split-v1'])
 const BOARD_VIEW='filter'
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',timer:null}
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}

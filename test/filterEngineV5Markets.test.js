@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {diagnoseFilterFixture} from '../server/filterEngine.js'
+import {diagnoseFilterFixture} from '../server/filterEngineV5.js'
 
 function finished(id,homeId,awayId,h,a){
   return{

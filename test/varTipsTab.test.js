@@ -57,7 +57,7 @@ test('Filter Tips is a dedicated public tab',async()=>{
   assert.match(html,/data-view="filter-tips"/)
   assert.match(html,/filterTips\.js/)
   assert.match(js,/board\.filterTips/)
-  assert.match(js,/REQUIRED_ENGINES=new Set\(\['sporty-filter-v1','sporty-filter-v2'\]\)/)
+  assert.match(js,/REQUIRED_ENGINES=new Set\(\['sporty-filter-v1','sporty-filter-v2','perfect-split-v1'\]\)/)
   assert.match(js,/board\.filterTips\.length>0/)
   assert.match(css,/\.filter-intro/)
   assert.doesNotMatch(html,/1\.20|1\.55|GG 2\+|trade secret/i)

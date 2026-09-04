@@ -5,6 +5,7 @@ Generator for Stats2Pitch boards and sporty.codes Elite.
 ## Boards
 
 - **All Picks** — consensus engine (`stats2pitch-consensus-v4-over25`). Last-5 home/away form comes from SportyBet / Sportradar stats.
+- **Filter Tips** — Perfect Split (`perfect-split-v1`). Last-5 venue form: a market publishes only when both sides post a 5/5 split. Successor to sporty-filter-v2. Does not feed Elite.
 - **VAR Tips** — dedicated board (`away-fav-streak-v1`) for home and away favourites. This is the feed for sporty.codes Elite.
 - **Goals Bankers** — V4 team-capability + bookmaker router. One pick per match from favourite win, favourite 2+, Over 2.5 or GG (`goals-bankers-v4`). Skip is a valid result. Does not feed Elite.
 

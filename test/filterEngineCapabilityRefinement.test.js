@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {diagnoseFilterFixture,buildFilterBoard} from '../server/filterEngine.js'
+import {diagnoseFilterFixture,buildFilterBoard} from '../server/filterEngineV5.js'
 
 function match(id,homeId,awayId,h,a,date){
   return{
