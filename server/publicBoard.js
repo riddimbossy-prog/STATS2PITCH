@@ -1,5 +1,5 @@
-const VIEWS=new Set(['all','var','filter','goals','combo','bankers'])
-const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why'])
+const VIEWS=new Set(['all','var','filter','goals','combo','h2h','bankers'])
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why','occurrence','h2hHits','h2hMatches','userWhy'])
 
 function slimMeta(meta={}){
   return{
@@ -20,6 +20,8 @@ function slimMeta(meta={}){
     goalsBankersCount:meta.goalsBankersCount,
     comboEngine:meta.comboEngine,
     comboCount:meta.comboCount,
+    h2hEngine:meta.h2hEngine,
+    h2hCount:meta.h2hCount,
     dailyBankersEngine:meta.dailyBankersEngine,
     safestBankersCount:meta.safestBankersCount,
     valueBankersCount:meta.valueBankersCount,
@@ -127,7 +129,7 @@ function slimResults(results,picks){
 }
 
 function finalize(empty){
-  const bags=['bestPicks','varTips','filterTips','goalsBankers','comboPicks','dailyBankers','safestBankers','valueBankers','bankers','priority']
+  const bags=['bestPicks','varTips','filterTips','goalsBankers','comboPicks','h2hPicks','dailyBankers','safestBankers','valueBankers','bankers','priority']
   const picks=[]
   for(const k of bags){
     if(Array.isArray(empty[k])){
@@ -184,6 +186,7 @@ export function publicBoard(board={},view='all'){
     filterTips:[],
     goalsBankers:[],
     comboPicks:[],
+    h2hPicks:[],
     dailyBankers:[],
     safestBankers:[],
     valueBankers:[],
@@ -214,6 +217,12 @@ export function publicBoard(board={},view='all'){
     empty.comboPicks=split.comboPicks
     empty.comboMeta=board?.comboMeta||null
     empty.availableMarkets=markets(empty.comboPicks)
+    return finalize(empty)
+  }
+  if(v==='h2h'){
+    empty.h2hPicks=Array.isArray(board?.h2hPicks)?board.h2hPicks:[]
+    empty.h2hMeta=board?.h2hMeta||null
+    empty.availableMarkets=markets(empty.h2hPicks)
     return finalize(empty)
   }
   if(v==='bankers'){
