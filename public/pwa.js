@@ -44,6 +44,14 @@ window.addEventListener('touchend',()=>{if(!root.classList.contains('is-scrollin
   }
 })()
 
+;(function addH2HLinks(){
+  const icon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h10M7 17h10M9 4L5 7l4 3M15 14l4 3-4 3"/></svg>'
+  const desktop=document.querySelector('.page-tabs')
+  if(desktop&&!desktop.querySelector('a[href="/h2h.html"]')){const a=document.createElement('a');a.className='page-tab';a.href='/h2h.html';a.textContent='H2H';desktop.insertBefore(a,desktop.querySelector('a[href="/daily-bankers.html"]'))}
+  const mobile=document.querySelector('.mobile-nav')
+  if(mobile&&!mobile.querySelector('a[href="/h2h.html"]')){const a=document.createElement('a');a.href='/h2h.html';a.innerHTML=icon+'<span>H2H</span>';mobile.insertBefore(a,mobile.querySelector('a[href="/daily-bankers.html"]'))}
+})()
+
 const nav=document.querySelector('.mobile-nav')
 if(nav){
   let sx=0,sy=0,moved=false
