@@ -20,6 +20,6 @@ export function toBankerPageRows(picks=[]){
     safestBankers:safest,
     valueBankers:value,
     bestPicks:[...safest,...value],
-    meta:{engine:BANKER_ENGINE,safestCount:safest.length,valueCount:value.length,total:safest.length+value.length,source:'banker-totals-v1'}
+    meta:{engine:BANKER_ENGINE,safestCount:safest.length,valueCount:value.length,total:safest.length+value.length,source:BANKER_ENGINE}
   }
 }

@@ -35,13 +35,13 @@ Deno.serve(async req=>{
     const raw=url.searchParams.get('date')
     const date=dateOk(raw)?String(raw):today()
     const row=await snapshot(date)
-    if(!row)return json({meta:{date,generatedAt:null,engine:'banker-totals-v1'},fixtures:[],results:{},dailyBankers:[],safestBankers:[],valueBankers:[],bankers:[],dailyBankersMeta:null})
+    if(!row)return json({meta:{date,generatedAt:null,engine:'banker-totals-v1.1'},fixtures:[],results:{},dailyBankers:[],safestBankers:[],valueBankers:[],bankers:[],dailyBankersMeta:null})
     const board=row.payload||{}
     const dedicated=Array.isArray(board.bankers)?board.bankers:[]
     const safest=Array.isArray(board.safestBankers)?board.safestBankers:dedicated.filter((x:any)=>x?.kind!=='value'&&x?.rule!=='OPP_TT_OVER25'&&x?.rule!=='DRAW_OR_OVER25')
     const value=Array.isArray(board.valueBankers)?board.valueBankers:dedicated.filter((x:any)=>x?.kind==='value'||x?.rule==='OPP_TT_OVER25'||x?.rule==='DRAW_OR_OVER25')
     const daily=Array.isArray(board.dailyBankers)&&board.dailyBankers.length?board.dailyBankers:[...safest,...value]
-    const engine=board?.dailyBankersMeta?.engine||board?.meta?.bankerRulesEngine||board?.bankerRulesMeta?.engine||board?.meta?.dailyBankersEngine||'banker-totals-v1'
+    const engine=board?.dailyBankersMeta?.engine||board?.meta?.bankerRulesEngine||board?.bankerRulesMeta?.engine||board?.meta?.dailyBankersEngine||'banker-totals-v1.1'
     return json({
       meta:{date,generatedAt:board?.meta?.generatedAt||row.generatedAt,dailyBankersEngine:engine,safestBankersCount:safest.length,valueBankersCount:value.length,bankerRulesCount:dedicated.length},
       fixtures:Array.isArray(board.fixtures)?board.fixtures:[],

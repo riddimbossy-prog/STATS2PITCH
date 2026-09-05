@@ -261,3 +261,27 @@ test('a Combo V3.3 refresh replaces V3.2 rows so each match can publish two gate
   assert.equal(saved.meta.comboCount,2)
   await clearBoard(date)
 })
+
+test('a v1.1 refresh drops Daily Bankers that had no Top 5 team',async()=>{
+  const date='2099-02-08'
+  await clearBoard(date)
+  const midTablePick={
+    fixtureId:'gdansk',market:'total-goals',selection:'Over 2.5',displaySelection:'Over 2.5',
+    engine:'banker-totals-v1',odds:1.42,family:'Goals',rule:'OPP_TT_OVER25',kickoff:`${date}T10:00:00Z`
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[midTablePick],priority:[],results:{},availableMarkets:[],
+    bankerRulesMeta:{engine:'banker-totals-v1'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',bankerRulesEngine:'banker-totals-v1',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    bankerRulesMeta:{engine:'banker-totals-v1.1'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',bankerRulesEngine:'banker-totals-v1.1',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.bankers,[])
+  assert.equal(saved.meta.bankerRulesCount,0)
+  assert.equal(saved.dailyBankers.length,0)
+  assert.equal(saved.meta.bankerRulesEngine,'banker-totals-v1.1')
+  await clearBoard(date)
+})

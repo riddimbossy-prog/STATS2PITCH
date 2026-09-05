@@ -1,7 +1,7 @@
 import {FINISHED} from './config.js'
 import {isSrlMatch} from './redFlags.js'
 
-export const BANKER_ENGINE='banker-totals-v1'
+export const BANKER_ENGINE='banker-totals-v1.1'
 export const BANKER_RULES=Object.freeze({
   boardTeamOver25Max:2.05,
   oppOver05FavWinMin:1.70,
@@ -18,7 +18,7 @@ export const BANKER_RULES=Object.freeze({
   ggYesMax:1.50,
   gg2NoMin:1.30,
   topFive:5,
-  bottomFour:4,
+  bottomThree:3,
   formSample:5,
   formAvgSample:15,
   formMinPct:60,
@@ -210,24 +210,24 @@ function tableSize(f,side){
   return num(f?.[side==='home'?'homeStanding':'awayStanding']?.size)
 }
 
-function bothTopFive(f){
+function inBottomThree(position,size){
+  return finite(position)&&finite(size)&&size>=BANKER_RULES.bottomThree&&position>size-BANKER_RULES.bottomThree
+}
+
+function tableMatchup(f){
   const hp=tablePos(f,'home'),ap=tablePos(f,'away')
-  return finite(hp)&&finite(ap)&&hp<=BANKER_RULES.topFive&&ap<=BANKER_RULES.topFive
-}
-
-function inBottomFour(position,size){
-  return finite(position)&&finite(size)&&size>=BANKER_RULES.bottomFour&&position>size-BANKER_RULES.bottomFour
-}
-
-function bothBottomFour(f){
-  return inBottomFour(tablePos(f,'home'),tableSize(f,'home'))&&inBottomFour(tablePos(f,'away'),tableSize(f,'away'))
+  const hs=tableSize(f,'home'),as=tableSize(f,'away')
+  if(!finite(hp)||!finite(ap)||!finite(hs)||!finite(as))return{ok:false,skip:'missing-table-standings'}
+  if(inBottomThree(hp,hs)&&inBottomThree(ap,as))return{ok:false,skip:'both-bottom-three'}
+  if(hp>BANKER_RULES.topFive&&ap>BANKER_RULES.topFive)return{ok:false,skip:'neither-top-five'}
+  return{ok:true,skip:null}
 }
 
 function tableReason(f){
   const hp=tablePos(f,'home'),ap=tablePos(f,'away')
   const home=text(f?.home?.name||'Home'),away=text(f?.away?.name||'Away')
-  if(finite(hp)&&finite(ap))return `League table: ${home} ${ordinal(hp)} vs ${away} ${ordinal(ap)} — not Top-5 vs Top-5 or Bottom-4 vs Bottom-4.`
-  return 'League table places were not both confirmed, so Top-5 vs Top-5 and Bottom-4 vs Bottom-4 did not apply.'
+  if(finite(hp)&&finite(ap))return `League table: ${home} ${ordinal(hp)} vs ${away} ${ordinal(ap)} — at least one side sits in the Top 5.`
+  return 'League table places were not both confirmed, so the Top 5 matchup gate could not run.'
 }
 
 function venueRows(fixtures,teamId,venue){
@@ -414,23 +414,24 @@ function bumpCandidate(f,odds,published){
 }
 
 function emit(f,odds,rule,published,reasons){
+  const why=[tableReason(f),...(reasons||[])]
   if(!published)return{pick:null,skip:'odds-below-floor',odds}
   if(Number(published.odds)<BANKER_RULES.bumpMinOdds){
     const bump=bumpCandidate(f,odds,published)
     if(bump&&Number(bump.odds)>=BANKER_RULES.bumpMinOdds){
       const bumpForm=confirmLast5(f,bump,odds.favourite)
       if(bumpForm.ok){
-        reasons.push(`Qualified ${published.displaySelection} @ ${published.odds} is under ${BANKER_RULES.bumpMinOdds.toFixed(2)}. Last 5 form confirms ${bump.displaySelection}, so ${bump.displaySelection} @ ${bump.odds} is published.`)
-        reasons.push(...bumpForm.reasons)
-        return{pick:pack(f,odds,rule,bump,reasons,bumpForm),skip:null,odds}
+        why.push(`Qualified ${published.displaySelection} @ ${published.odds} is under ${BANKER_RULES.bumpMinOdds.toFixed(2)}. Last 5 form confirms ${bump.displaySelection}, so ${bump.displaySelection} @ ${bump.odds} is published.`)
+        why.push(...bumpForm.reasons)
+        return{pick:pack(f,odds,rule,bump,why,bumpForm),skip:null,odds}
       }
-      reasons.push(`${bump.displaySelection} last 5 did not confirm the bump, so ${published.displaySelection} @ ${published.odds} stays.`)
+      why.push(`${bump.displaySelection} last 5 did not confirm the bump, so ${published.displaySelection} @ ${published.odds} stays.`)
     }
   }
   const form=confirmLast5(f,published,odds.favourite)
   if(!form.ok)return{pick:null,skip:form.skip,odds,form}
-  reasons.push(...form.reasons)
-  return{pick:pack(f,odds,rule,published,reasons,form),skip:null,odds}
+  why.push(...form.reasons)
+  return{pick:pack(f,odds,rule,published,why,form),skip:null,odds}
 }
 
 function take(out,state){
@@ -441,6 +442,8 @@ function take(out,state){
 
 export function evaluateBankerFixture(f){
   if(isSrlMatch(f))return{pick:null,skip:'srl'}
+  const table=tableMatchup(f)
+  if(!table.ok)return{pick:null,skip:table.skip}
   const odds=extractBankerOdds(f)
   const over25=num(odds.over25)
   const oppO05=num(odds.oppO05)
@@ -519,15 +522,12 @@ export function evaluateBankerFixture(f){
   const over15Cheap=finite(over15)&&over15<BANKER_RULES.over15Max
   const under35Open=finite(under35)&&under35>BANKER_RULES.streakUnder35Min
   if(streakWindow&&over15Cheap&&under35Open){
-    if(bothTopFive(f))return{pick:null,skip:'both-top-five',odds}
-    if(bothBottomFour(f))return{pick:null,skip:'both-bottom-four',odds}
     const published=publishedOver(1.5,over15)
     if(published){
       const out=take(emit(f,odds,'STREAK_OVER15',published,[
         `Over 1.5 board: 3+ goals streak No is ${px(streak)} (${BANKER_RULES.streakNoMin.toFixed(2)}-${BANKER_RULES.streakNoMax.toFixed(2)}).`,
         `Over 1.5 is ${px(over15)} < ${BANKER_RULES.over15Max.toFixed(2)}.`,
-        `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`,
-        tableReason(f)
+        `Under 3.5 is ${px(under35)} > ${BANKER_RULES.streakUnder35Min.toFixed(2)}.`
       ]),state)
       if(out)return out
     }

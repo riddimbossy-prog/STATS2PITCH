@@ -191,6 +191,8 @@ export async function refreshNow(date,onProgress=()=>{}){
   board.meta.comboEngine=comboBoard.meta.engine;board.meta.comboCount=comboBoard.bestPicks.length
   Object.assign(board,sanitizeGoalsAndCombo(board))
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
+  board.meta.bankerRulesEngine=bankerRules.meta.engine
+  board.meta.bankerRulesCount=bankerRules.picks.length
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
   board.meta.diagnostics.varTipsSkipped=board.varTipsMeta?.skipped||{}
   board.meta.diagnostics.filterTips=(board.filterTips||[]).length

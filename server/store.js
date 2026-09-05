@@ -1,5 +1,4 @@
 import {ENGINE_VERSION} from './config.js'
-import {BANKER_ENGINE} from './bankerEngine.js'
 import {toBankerPageRows} from './bankerPage.js'
 import {isComboBoardPick} from './publicBoard.js'
 
@@ -40,18 +39,19 @@ export function attachCrests(board){
 function applyBankerPage(board){
   if(!board||!Array.isArray(board.bankers))return board
   const page=toBankerPageRows(board.bankers)
+  const engine=board?.meta?.bankerRulesEngine||board?.bankerRulesMeta?.engine||page.meta.engine
   return{
     ...board,
     safestBankers:page.safestBankers,
     valueBankers:page.valueBankers,
     dailyBankers:page.bestPicks,
-    dailyBankersMeta:page.meta,
+    dailyBankersMeta:{...page.meta,engine,source:engine},
     meta:{
       ...(board.meta||{}),
-      dailyBankersEngine:BANKER_ENGINE,
+      dailyBankersEngine:engine,
       safestBankersCount:page.safestBankers.length,
       valueBankersCount:page.valueBankers.length,
-      bankerRulesEngine:BANKER_ENGINE,
+      bankerRulesEngine:engine,
       bankerRulesCount:board.bankers.length
     }
   }
@@ -110,6 +110,9 @@ export function isolateComboBags(existing,incoming,now,{resetGoals=false,resetCo
 function comboEngineOf(board){
   return String(board?.meta?.comboEngine||board?.comboMeta?.engine||'').trim()
 }
+function bankerEngineOf(board){
+  return String(board?.meta?.bankerRulesEngine||board?.bankerRulesMeta?.engine||board?.dailyBankersMeta?.engine||'').trim()
+}
 function hasStaleComboRows(board,expectedEngine){
   if(!expectedEngine)return false
   return comboRowsFrom(board).some(row=>String(row?.engineVersion||row?.engine||'').trim()!==expectedEngine)
@@ -137,7 +140,10 @@ function mergePublished(existing,incoming){
     comboEngineOf(existing)!==incomingComboEngine||hasStaleComboRows(existing,incomingComboEngine)
   )
   const {goalsBankers,comboPicks}=isolateComboBags(existing,incoming,now,{resetGoals:goalsEngineChanged,resetCombo:comboEngineChanged})
-  const bankers=mergeRows(existing?.bankers,incoming?.bankers,now,existing)
+  const incomingBankerEngine=bankerEngineOf(incoming)
+  const existingBankerEngine=bankerEngineOf(existing)
+  const bankerEngineChanged=Boolean(incomingBankerEngine)&&Boolean(existingBankerEngine)&&existingBankerEngine!==incomingBankerEngine
+  const bankers=mergeRows(bankerEngineChanged?[]:(existing?.bankers||[]),incoming?.bankers,now,existing)
   return attachCrests({
     ...incoming,
     bestPicks,

@@ -44,16 +44,17 @@ function fixture(odds={},extra={}){
     away:{id:2,name:'Away FC',fixtures:form.away,formHistory:form.away,lastMatches:form.away},
     homeSplit:{position:extra.hpos??7,size:12,sampleReady:true},
     awaySplit:{position:extra.apos??10,size:12,sampleReady:true},
-    homeStanding:{position:extra.hstand??8,size:extra.hsize??12,played:5},
+    homeStanding:{position:extra.hstand??3,size:extra.hsize??12,played:5},
     awayStanding:{position:extra.astand??9,size:extra.asize??12,played:5},
     marketOdds:markets(odds),
     ...extra.rest
   }
 }
 
-test('engine id is banker-totals-v1',()=>{
+test('engine id is banker-totals-v1.1',()=>{
   const r=evaluateBankerFixture(fixture({awayO05:1.90,homeO25:1.90}))
   assert.equal(r.pick.engine,BANKER_ENGINE)
+  assert.equal(BANKER_ENGINE,'banker-totals-v1.1')
 })
 
 test('board starts only when a team total Over 2.5 is 2.05 or shorter',()=>{
@@ -189,32 +190,55 @@ test('streak No below 1.20 does not publish Over 1.5',()=>{
   assert.equal(r.skip,'streak-3plus-outside-window')
 })
 
-test('streak Over 1.5 never publishes when both overall table places are top 5',()=>{
+test('streak Over 1.5 publishes when both overall table places are Top 5',()=>{
   const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:10,apos:1,hstand:5,astand:2}))
-  assert.equal(r.pick,null)
-  assert.equal(r.skip,'both-top-five')
+  assert.equal(r.pick?.rule,'STREAK_OVER15')
+  assert.match(r.pick.whyText,/5th vs Away FC 2nd/)
+  assert.match(r.pick.whyText,/at least one side sits in the Top 5/)
 })
 
-test('streak Over 1.5 never publishes when both overall table places are bottom 4',()=>{
+test('Bottom 3 vs Bottom 3 is skipped even on the Over 1.5 board',()=>{
   const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:2,apos:4,hstand:11,astand:10,hsize:12,asize:12}))
   assert.equal(r.pick,null)
-  assert.equal(r.skip,'both-bottom-four')
+  assert.equal(r.skip,'both-bottom-three')
 })
 
-test('one side in the bottom 4 does not block Over 1.5',()=>{
-  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hstand:12,astand:8,hsize:12,asize:12}))
+test('Top 5 versus a bottom side still publishes Over 1.5',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hstand:3,astand:12,hsize:12,asize:12}))
   assert.equal(r.pick?.rule,'STREAK_OVER15')
-  assert.match(r.pick.whyText,/12th vs Away FC 8th/)
-  assert.match(r.pick.whyText,/Bottom-4 vs Bottom-4/)
+  assert.match(r.pick.whyText,/3rd vs Away FC 12th/)
+  assert.match(r.pick.whyText,/at least one side sits in the Top 5/)
   assert.doesNotMatch(r.pick.whyText,/is blocked/)
 })
 
-test('venue-split top 5 does not block Over 1.5 when the league table is not Top-5 vs Top-5',()=>{
-  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:2,apos:4,hstand:10,astand:8}))
+test('venue-split top 5 does not block Over 1.5 when the league table has one Top 5 side',()=>{
+  const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:2.30,over15:1.22,under35:1.55,streak:1.30},{hpos:2,apos:4,hstand:3,astand:8}))
   assert.equal(r.pick?.rule,'STREAK_OVER15')
-  assert.match(r.pick.whyText,/10th vs Away FC 8th/)
-  assert.match(r.pick.whyText,/not Top-5 vs Top-5 or Bottom-4 vs Bottom-4/)
+  assert.match(r.pick.whyText,/3rd vs Away FC 8th/)
+  assert.match(r.pick.whyText,/at least one side sits in the Top 5/)
   assert.doesNotMatch(r.pick.whyText,/is blocked/)
+})
+
+test('neither team in the overall Top 5 is skipped on every banker route',()=>{
+  const over=evaluateBankerFixture(fixture({over25:1.42,awayO05:1.46,under35:1.45,homeO05:1.18,homeO25:null,awayO25:2.05},{hstand:7,astand:10,hsize:18,asize:18}))
+  assert.equal(over.pick,null)
+  assert.equal(over.skip,'neither-top-five')
+  const win=evaluateBankerFixture(fixture({homeWin:1.40,awayWin:5.00,homeO25:1.80,awayO05:1.85,under35:1.40},{hstand:8,astand:11}))
+  assert.equal(win.skip,'neither-top-five')
+  const gg=evaluateBankerFixture(fixture({over25:1.80,homeO05:1.18,awayO05:1.22,ggYes:1.38,gg2No:1.45,homeO25:1.90},{hstand:6,astand:9}))
+  assert.equal(gg.skip,'neither-top-five')
+})
+
+test('missing overall table places fail closed',()=>{
+  const r=evaluateBankerFixture(fixture({homeWin:1.40,awayWin:5.00,homeO25:1.80,awayO05:1.85,under35:1.40},{rest:{homeStanding:null,awayStanding:null}}))
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'missing-table-standings')
+})
+
+test('Top 5 versus anyone else still publishes a favourite win',()=>{
+  const r=evaluateBankerFixture(fixture({homeWin:1.40,awayWin:5.00,homeO25:1.80,awayO05:1.85,under35:1.40},{hstand:2,astand:14,hsize:20,asize:20}))
+  assert.equal(r.pick?.rule,'OPP_O05_FAV_WIN')
+  assert.match(r.pick.whyText,/2nd vs Away FC 14th/)
 })
 
 test('overall table ranks current-season points then goal difference',()=>{
