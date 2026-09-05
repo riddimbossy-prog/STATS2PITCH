@@ -78,6 +78,8 @@ test('VAR Tips expose public why copy without streak method text',()=>{
 test('public why lines stay human readable',()=>{
   const lines=consensusReasons({home:'Arsenal',away:'Leeds',displaySelection:'Over 2.5',odds:1.33,homeConsensus:100,awayConsensus:80})
   assert.ok(lines.some(x=>x.includes('5/5')))
+  assert.ok(lines.some(x=>/Listed price 1\.33/.test(x)))
+  assert.ok(lines.every(x=>!/sporty\s*bet/i.test(x)))
   const varLines=varPublicReasons({home:'Arsenal',away:'Leeds',displaySelection:'BTTS · Yes',odds:1.40,favourite:'away'},{ppg:1.2,gf:1.8,ga:0.6},{ppg:2.1,gf:2.4,ga:0.8})
   assert.ok(varLines.some(x=>/Leeds is the priced favourite/.test(x)))
 })

@@ -434,7 +434,7 @@ function publicReasons(pick,home,away,direction,odds){
   const lines=[]
   if(pick.route==='straight-win'&&pick.favourite==='home')lines.push(`${homeName} is the priced favourite at ${Number(pick.odds).toFixed(2)}.`)
   else if(pick.route==='straight-win'&&pick.favourite==='away')lines.push(`${awayName} is the priced favourite at ${Number(pick.odds).toFixed(2)}.`)
-  else lines.push(`${label} cleared the SportyBet odds filter at ${Number(pick.odds).toFixed(2)}.`)
+  else lines.push(`${label} cleared the odds filter at ${Number(pick.odds).toFixed(2)}.`)
   for(const reason of pick?.filterReasons||[])if(!lines.includes(reason))lines.push(reason)
   if(direction?.recentHome!=null&&direction?.recentAway!=null)lines.push(`Last-5 venue support for ${label}: ${direction.recentHome}% home, ${direction.recentAway}% away.`)
   if(direction?.baselineHome!=null&&direction?.baselineAway!=null)lines.push(`Longer venue baseline: ${direction.baselineHome}% home, ${direction.baselineAway}% away.`)

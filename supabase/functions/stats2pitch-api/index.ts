@@ -429,6 +429,31 @@ function slimLearning(l:any){
   if(!l||typeof l!=='object')return null
   return{gate:l.gate||'',note:l.note||'',action:l.action||'',label:l.label||'',wins:l.wins??null,losses:l.losses??null,sample:l.sample??null,winRate:l.winRate??null}
 }
+function hideBookmakerCopy(value:any):any{
+  if(Array.isArray(value))return value.map(hideBookmakerCopy).filter((v:any)=>!(typeof v==='string'&&!v))
+  if(value&&typeof value==='object'){
+    const out:any={}
+    for(const [k,v] of Object.entries(value)) out[k]=hideBookmakerCopy(v)
+    return out
+  }
+  if(typeof value!=='string')return value
+  if(!/sporty\s*bet/i.test(value))return value
+  return value
+    .replace(/\band is currently listed by SportyBet\b/gi,' and is currently listed at a qualifying price')
+    .replace(/\bis currently listed by SportyBet\b/gi,'is currently listed at a qualifying price')
+    .replace(/\bcurrently listed by SportyBet\b/gi,'currently listed at a qualifying price')
+    .replace(/\blisted by SportyBet\b/gi,'listed at a qualifying price')
+    .replace(/\bSportyBet still lists it\b/gi,'it is still listed')
+    .replace(/\bSportyBet price\b/gi,'Listed price')
+    .replace(/\bcleared the SportyBet odds filter\b/gi,'cleared the odds filter')
+    .replace(/\bSportyBet Yes\b/gi,'listed Yes')
+    .replace(/\bSportyBet matches\b/gi,'matches')
+    .replace(/\bSportyBet market\b/gi,'market')
+    .replace(/sporty\s*bet/gi,'')
+    .replace(/[ \t]{2,}/g,' ')
+    .replace(/\s+([.,;:])/g,'$1')
+    .trim()
+}
 function slimPick(row:any){
   if(!row||typeof row!=='object')return row
   const out:any={}
@@ -436,7 +461,7 @@ function slimPick(row:any){
   if(out.why) out.why=slimWhy(out.why)
   if(out.learning) out.learning=slimLearning(out.learning)
   if(Array.isArray(out.reasons)) out.reasons=out.reasons.slice(0,8)
-  return out
+  return hideBookmakerCopy(out)
 }
 function slimPicks(rows:any){return (Array.isArray(rows)?rows:[]).map(slimPick)}
 function slimFixtures(rows:any){

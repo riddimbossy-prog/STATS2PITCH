@@ -124,7 +124,7 @@ export function consensusReasons(pick){
   if(pick?.awaySplit?.sampleReady)lines.push(`${away} sit ${pick.awaySplit.position}/${pick.awaySplit.size} in the away split table (${pick.awaySplit.ppg} PPG).`)
   if(pick?.homeTier&&pick?.awayTier&&pick.homeTier!==pick.awayTier)lines.push(`Venue split tiers differ (${home} ${pick.homeTier} vs ${away} ${pick.awayTier}).`)
   if(pick?.over25Filter?.grade)lines.push(`Over 2.5 filter passed at ${pick.over25Filter.grade} grade.`)
-  if(finite(pick?.odds))lines.push(`SportyBet price ${Number(pick.odds).toFixed(2)} is inside the ${Number(MIN_ODD).toFixed(2)}–${Number(MAX_ODD).toFixed(2)} window.`)
+  if(finite(pick?.odds))lines.push(`Listed price ${Number(pick.odds).toFixed(2)} is inside the ${Number(MIN_ODD).toFixed(2)}–${Number(MAX_ODD).toFixed(2)} window.`)
   return lines
 }
 

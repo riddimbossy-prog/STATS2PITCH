@@ -168,7 +168,7 @@ export function listedComboMarkets(sportyMarkets=[]){
     const odds=yesOdd(raw)
     if(!odds||odds<COMBO_MIN_ODD)continue
     const prior=found.get(def.route)
-    if(!prior||odds>prior.odds)found.set(def.route,{...def,odds:+odds.toFixed(2),source:'SportyBet',sportyMarketId:raw?.id??null})
+    if(!prior||odds>prior.odds)found.set(def.route,{...def,odds:+odds.toFixed(2),source:'listed',sportyMarketId:raw?.id??null})
   }
   return [...found.values()]
 }
@@ -417,7 +417,7 @@ export function analyzeComboFixture(f,skipBag=null){
       awayRecent.total?`Recent ${f.away.name} form projects the full Combo in ${awayRecent.hits}/${awayRecent.total} (${awayRecent.rate}%).`:null,
       h2h.total?`Recent H2H: ${h2h.hits}/${h2h.total} (${h2h.rate}%) supported this exact Combo.`:null,
       losingShape(def),
-      `Qualified on hard odds gates only · SportyBet Yes ${def.odds.toFixed(2)} (${oddsTier(def.odds)}).`,
+      `Qualified on hard odds gates only · listed Yes ${def.odds.toFixed(2)} (${oddsTier(def.odds)}).`,
       `Score breakdown — venue ${scoring.breakdown.venueHistory}/30, failure avoidance ${scoring.breakdown.failureAvoidance}/20, split strength ${scoring.breakdown.splitStrength}/15, market pattern ${scoring.breakdown.marketPattern}/15, recent form ${scoring.breakdown.recentForm}/8, H2H ${scoring.breakdown.h2h}/7, odds ${scoring.breakdown.odds}/5.`
     ].filter(Boolean)
 
@@ -425,7 +425,7 @@ export function analyzeComboFixture(f,skipBag=null){
       fixtureId:f.fixtureId,league:f.league,country:f.country,kickoff:f.kickoff,
       home:f.home?.name,away:f.away?.name,homeId:f.home?.id??null,awayId:f.away?.id??null,homeLogo:f.home?.logo||null,awayLogo:f.away?.logo||null,
       market:def.market,marketName:'Combo',selection:def.label,displaySelection:def.label,route:def.route,group:def.group,family:'Combo',
-      odds:def.odds,oddsVerified:true,source:'SportyBet',sportyMarketId:def.sportyMarketId,
+      odds:def.odds,oddsVerified:true,source:'listed',sportyMarketId:def.sportyMarketId,
       comboScore:scoring.score,confidence:scoring.score,homeConsensus:homeSplit.rate,awayConsensus:awaySplit.rate,
       recentHomeHit:homeRecent,recentAwayHit:awayRecent,h2hHit:h2h,
       homeSplit:f.homeSplit||null,awaySplit:f.awaySplit||null,

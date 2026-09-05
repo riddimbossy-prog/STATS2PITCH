@@ -212,3 +212,44 @@ test('H2H view drops Home or away and Home or draw then keeps the next option',(
   assert.deepEqual(view.h2hPicks.map(r=>`${r.fixtureId}:${r.selection}:${r.rank}`),['1:Over 1.5:1','2:Home:1'])
   assert.equal(view.meta.h2hCount,2)
 })
+
+function assertNoBookmaker(value){
+  const blob=JSON.stringify(value||{})
+  assert.doesNotMatch(blob,/sporty\s*bet/i)
+}
+
+test('public board never publishes SportyBet in page copy or Why text',()=>{
+  const board={
+    meta:{h2hEngine:'h2h-v1.3-no-12',filterTipsEngine:'perfect-split-v1'},
+    bestPicks:[{
+      fixtureId:1,market:'total-goals',selection:'Over 1.5',odds:1.33,
+      reasons:['SportyBet price 1.33 is inside the 1.20–1.90 window.'],
+      shortReason:'SportyBet price 1.33 is inside the 1.20–1.90 window.',
+      why:{headline:'Published from listed SportyBet odds.'}
+    }],
+    h2hPicks:[{
+      fixtureId:2,rank:1,market:'match-winner',selection:'Home',odds:1.50,occurrence:100,
+      userWhy:'The same home/away setup produced Home in 5 of 5 historical meetings (100%). It passes the strict 80% H2H gate and is currently listed by SportyBet.'
+    }],
+    filterTips:[{
+      fixtureId:3,engine:'perfect-split-v1',market:'total-goals',selection:'Over 1.5',odds:1.40,
+      reasons:['Over 1.5 cleared the SportyBet odds filter at 1.40.']
+    }],
+    comboPicks:[{
+      fixtureId:4,market:'combo-home-over-25',route:'HOME_OVER_25',family:'Combo',odds:1.44,
+      reasons:['Qualified on hard odds gates only · SportyBet Yes 1.44 (value).']
+    }]
+  }
+  const all=publicBoard(board,'all')
+  const h2h=publicBoard(board,'h2h')
+  const filter=publicBoard(board,'filter')
+  const combo=publicBoard(board,'combo')
+  assertNoBookmaker(all.bestPicks)
+  assertNoBookmaker(h2h.h2hPicks)
+  assertNoBookmaker(filter.filterTips)
+  assertNoBookmaker(combo.comboPicks)
+  assert.match(all.bestPicks[0].reasons[0],/Listed price 1\.33/)
+  assert.match(h2h.h2hPicks[0].userWhy,/currently listed at a qualifying price/)
+  assert.match(filter.filterTips[0].reasons[0],/cleared the odds filter at 1\.40/)
+  assert.match(combo.comboPicks[0].reasons[0],/listed Yes 1\.44/)
+})
