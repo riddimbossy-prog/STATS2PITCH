@@ -196,15 +196,30 @@ export function sanitizeBestPicks(rows){
   })
 }
 export function sanitizeH2HPicks(rows){
-  return (Array.isArray(rows)?rows:[]).filter(row=>{
+  const kept=(Array.isArray(rows)?rows:[]).filter(row=>{
     if(isHybridSelection(row))return false
     const odds=Number(row?.odds)
     if(!Number.isFinite(odds)||odds<H2H_MIN_ODD)return false
+    const sel=String(row?.selection||row?.displaySelection||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
+    if(sel==='12'||sel==='1x'||sel==='home away'||sel.includes('home or away')||sel.includes('home or draw'))return false
     const k=String(row?.market||'')
     if(!GOAL_KEYS.has(k))return true
     const line=goalLine(row?.selection)
     return line!=null&&Math.abs(line%1-0.5)<1e-9
   })
+  const groups=new Map()
+  for(const row of kept){
+    const id=String(row?.fixtureId||'')
+    if(!id)continue
+    if(!groups.has(id))groups.set(id,[])
+    groups.get(id).push(row)
+  }
+  const out=[]
+  for(const picks of groups.values()){
+    picks.sort((a,b)=>(a.rank||99)-(b.rank||99)||(b.occurrence||0)-(a.occurrence||0)||Number(a.odds)-Number(b.odds))
+    picks.slice(0,2).forEach((p,i)=>out.push({...p,rank:i+1}))
+  }
+  return out
 }
 export function sanitizeGoalsBankers(rows){
   return (Array.isArray(rows)?rows:[]).filter(row=>{

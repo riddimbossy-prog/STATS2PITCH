@@ -14,7 +14,7 @@ test('Asian Over 1 and 1X2&OU hybrids never publish as match totals',()=>{
     market(18,'Over/Under',[['Over 1.5','1.40'],['Under 1.5','2.80'],['Home/Draw & Over 1.5','3.80']],'total=1.5')
   ]
   const picks=analyzeH2HFixture(fixture(rows,markets))
-  assert.equal(H2H_ENGINE_VERSION,'h2h-v1.2-split-80')
+  assert.equal(H2H_ENGINE_VERSION,'h2h-v1.3-no-12')
   assert.ok(picks.every(x=>x.selection!=='Over 1'))
   assert.ok(picks.every(x=>!String(x.selection).includes('&')))
   assert.ok(picks.some(x=>x.selection==='Over 1.5'))
@@ -26,4 +26,17 @@ test('prices shorter than 1.20 never publish',()=>{
   assert.ok(picks.every(x=>Number(x.odds)>=1.20))
   assert.ok(picks.every(x=>x.selection!=='Home'))
   assert.ok(picks.some(x=>x.selection==='Over 1.5'))
+})
+test('Home or away and Home or draw never publish; next 80%+ market does',()=>{
+  const rows=[game(1,2,1),game(2,3,0),game(3,1,0),game(4,2,0),game(5,2,1)]
+  const markets=[
+    market(10,'Double Chance',[['Home or away','1.25'],['Home or draw','1.30'],['Draw or away','3.80']]),
+    market(18,'Over/Under',[['Over 1.5','1.40'],['Under 1.5','2.80']],'total=1.5'),
+    market(1,'1X2',[['Home','1.50'],['Draw','4.00'],['Away','6.00']])
+  ]
+  const picks=analyzeH2HFixture(fixture(rows,markets))
+  assert.equal(H2H_ENGINE_VERSION,'h2h-v1.3-no-12')
+  assert.ok(picks.length>=1)
+  assert.ok(picks.every(x=>!/home or away|home or draw|^12$|^1x$/i.test(String(x.selection))))
+  assert.ok(picks.some(x=>x.selection==='Home'||x.selection==='Over 1.5'))
 })

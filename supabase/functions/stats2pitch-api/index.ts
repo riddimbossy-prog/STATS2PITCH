@@ -336,15 +336,30 @@ function sanitizeBestPicks(rows:any){
   })
 }
 function sanitizeH2HPicks(rows:any){
-  return (Array.isArray(rows)?rows:[]).filter((row:any)=>{
+  const kept=(Array.isArray(rows)?rows:[]).filter((row:any)=>{
     if(isHybridSelection(row))return false
     const odds=Number(row?.odds)
     if(!Number.isFinite(odds)||odds<H2H_MIN_ODD)return false
+    const sel=String(row?.selection||row?.displaySelection||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
+    if(sel==='12'||sel==='1x'||sel==='home away'||sel.includes('home or away')||sel.includes('home or draw'))return false
     const k=String(row?.market||'')
     if(!GOAL_KEYS.has(k))return true
     const line=goalLine(row?.selection)
     return line!=null&&Math.abs(line%1-0.5)<1e-9
   })
+  const groups=new Map<string,any[]>()
+  for(const row of kept){
+    const id=String(row?.fixtureId||'')
+    if(!id)continue
+    if(!groups.has(id))groups.set(id,[])
+    groups.get(id)!.push(row)
+  }
+  const out:any[]=[]
+  for(const picks of groups.values()){
+    picks.sort((a,b)=>(a.rank||99)-(b.rank||99)||(b.occurrence||0)-(a.occurrence||0)||Number(a.odds)-Number(b.odds))
+    picks.slice(0,2).forEach((p,i)=>out.push({...p,rank:i+1}))
+  }
+  return out
 }
 function sanitizeGoalsBankers(rows:any){
   return (Array.isArray(rows)?rows:[]).filter((row:any)=>{
@@ -764,7 +779,7 @@ Deno.serve(async req=>{
       const split=splitGoalsAndCombo(board)
       const goalsBankers=withResult(split.goalsBankers)
       const comboPicks=withResult(split.comboPicks)
-      const h2hPicks=withResult(board?.h2hPicks)
+      const h2hPicks=withResult(sanitizeH2HPicks(board?.h2hPicks))
       const dailyBankers=withResult(board?.dailyBankers)
       const bankers=withResult([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])])
       return json({date,picks,varTips,filterTips,goalsBankers,comboPicks,h2hPicks,dailyBankers,bankers},200,'public, max-age=15, stale-while-revalidate=45')

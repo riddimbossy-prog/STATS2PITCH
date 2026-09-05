@@ -196,3 +196,19 @@ test('public picks drop oddsBook, splits and unused keep-fields',()=>{
   assert.equal(row.marketWhy,undefined)
   assert.equal(row.why.headline,'ok')
 })
+
+test('H2H view drops Home or away and Home or draw then keeps the next option',()=>{
+  const board={
+    meta:{h2hEngine:'h2h-v1.3-no-12'},
+    h2hPicks:[
+      {fixtureId:1,rank:1,market:'double-chance',selection:'Home or away',odds:1.25,occurrence:100},
+      {fixtureId:1,rank:2,market:'total-goals',selection:'Over 1.5',odds:1.36,occurrence:89},
+      {fixtureId:2,rank:1,market:'double-chance',selection:'Home or draw',odds:1.21,occurrence:100},
+      {fixtureId:2,rank:2,market:'draw-no-bet',selection:'Home',odds:1.34,occurrence:100},
+      {fixtureId:3,rank:1,market:'double-chance',selection:'Home or away',odds:1.20,occurrence:100}
+    ]
+  }
+  const view=publicBoard(board,'h2h')
+  assert.deepEqual(view.h2hPicks.map(r=>`${r.fixtureId}:${r.selection}:${r.rank}`),['1:Over 1.5:1','2:Home:1'])
+  assert.equal(view.meta.h2hCount,2)
+})

@@ -12,6 +12,26 @@ const outcomeLabel=o=>({won:'WON',lost:'LOST',void:'VOID',postponed:'POSTPONED'}
 const flag=c=>typeof window.countryFlag==='function'?window.countryFlag(c):'🌍'
 const pickLabel=r=>String(r.displaySelection||r.selection||'Selection')
 const oddStr=r=>{const n=Number(r.odds);return Number.isFinite(n)?n.toFixed(2):'—'}
+function blockedH2H(r){
+  const n=String(r?.selection||r?.displaySelection||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
+  return n==='12'||n==='1x'||n==='home away'||n.includes('home or away')||n.includes('home or draw')
+}
+function publishedH2H(list){
+  const kept=(list||[]).filter(r=>!blockedH2H(r))
+  const map=new Map()
+  for(const r of kept){
+    const id=String(r.fixtureId||'')
+    if(!id)continue
+    if(!map.has(id))map.set(id,[])
+    map.get(id).push(r)
+  }
+  const out=[]
+  for(const picks of map.values()){
+    picks.sort((a,b)=>(a.rank||99)-(b.rank||99)||(b.occurrence||0)-(a.occurrence||0)||Number(a.odds)-Number(b.odds))
+    picks.slice(0,2).forEach((p,i)=>out.push({...p,rank:i+1}))
+  }
+  return out
+}
 function fill(el,a,v,label){if(!el)return'all';const ok=v==='all'||a.includes(v)?v:'all';el.innerHTML=`<option value="all">${label}</option>`+a.map(x=>`<option ${x===ok?'selected':''}>${esc(x)}</option>`).join('');return ok}
 function liveHit(r){
   const id=String(r.fixtureId),market=String(r.market||''),sel=String(r.selection||'').trim()
@@ -91,7 +111,7 @@ function renderTodayStats(groups){
 }
 function render(){
   dates()
-  const all=state.board?.h2hPicks||[]
+  const all=publishedH2H(state.board?.h2hPicks||[])
   state.country=fill($('#countryFilter'),uniq(all.map(x=>x.country)),state.country,'All countries')
   state.league=fill($('#leagueFilter'),uniq(all.filter(x=>state.country==='all'||x.country===state.country).map(x=>x.league)),state.league,'All leagues')
   state.market=fill($('#marketFilter'),uniq(all.map(x=>x.family)),state.market,'All markets')

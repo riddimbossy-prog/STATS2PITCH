@@ -1,6 +1,6 @@
 import {parseSportyBet} from './odds.js'
 
-export const H2H_ENGINE_VERSION='h2h-v1.2-split-80'
+export const H2H_ENGINE_VERSION='h2h-v1.3-no-12'
 export const H2H_MIN_RATE=Math.max(80,Math.min(100,Number(process.env.H2H_MIN_RATE||80)))
 export const H2H_MIN_MATCHES=Math.max(3,Number(process.env.H2H_MIN_MATCHES||5))
 export const H2H_MAX_PER_FIXTURE=Math.max(1,Number(process.env.H2H_MAX_PER_FIXTURE||2))
@@ -13,12 +13,16 @@ const teamId=(r,side)=>String(r?.teams?.[side]?.id??r?.[`${side}Id`]??'')
 const line=s=>{const m=String(s||'').match(/^(over|under)\s+([0-9]+(?:\.[0-9]+)?)$/i);return m?{side:m[1].toLowerCase(),value:Number(m[2])}:null}
 const isHybrid=s=>/&/.test(String(s||''))
 const isHalfGoal=s=>{const p=line(s);return Boolean(p)&&Math.abs(p.value%1-0.5)<1e-9}
+export function isSkippedH2HSelection(name){
+  const n=norm(name)
+  return n==='12'||n==='1x'||n==='home away'||n.includes('home or away')||n.includes('home or draw')
+}
 function splitMeetings(f){const h=String(f?.home?.id??''),a=String(f?.away?.id??'');return(f?.h2hHistory||[]).filter(r=>score(r)&&teamId(r,'home')===h&&teamId(r,'away')===a).sort((x,y)=>Date.parse(y?.fixture?.date||y?.date||0)-Date.parse(x?.fixture?.date||x?.date||0))}
 function evaluator(key,name){
-  if(isHybrid(name))return null
+  if(isHybrid(name)||isSkippedH2HSelection(name))return null
   const n=norm(name),p=line(name)
   if(key==='match-winner'){if(n==='home'||n==='1')return(h,a)=>h>a;if(n==='draw'||n==='x')return(h,a)=>h===a;if(n==='away'||n==='2')return(h,a)=>a>h}
-  if(key==='double-chance'){if(n==='1x'||n.includes('home or draw'))return(h,a)=>h>=a;if(n==='x2'||n.includes('draw or away'))return(h,a)=>a>=h;if(n==='12'||n.includes('home or away'))return(h,a)=>h!==a}
+  if(key==='double-chance'){if(n==='x2'||n.includes('draw or away'))return(h,a)=>a>=h}
   if(key==='draw-no-bet'){if(n==='home'||n==='1')return(h,a)=>h>=a;if(n==='away'||n==='2')return(h,a)=>a>=h}
   if(key==='both-teams-score'){if(n==='yes')return(h,a)=>h>0&&a>0;if(n==='no')return(h,a)=>h===0||a===0}
   if(GOAL_KEYS.has(key)&&!isHalfGoal(name))return null
