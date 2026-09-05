@@ -18,7 +18,7 @@ test('combo engine picks are not treated as Goals Bankers',()=>{
 })
 
 test('view=goals strips merged combo picks and view=combo recovers them',()=>{
-  const goals={fixtureId:1,market:'match-winner',route:'FAV_WIN'}
+  const goals={fixtureId:1,market:'total-goals',route:'OVER_2.5'}
   const combo={fixtureId:2,market:'combo-draw-gg',route:'DRAW_GG',engineVersion:'combo-v2-failure-state'}
   const board={
     meta:{goalsBankersEngine:'goals-bankers-v4',comboEngine:'combo-v2-failure-state',comboCount:1},
@@ -29,7 +29,7 @@ test('view=goals strips merged combo picks and view=combo recovers them',()=>{
   const goalsView=publicBoard(board,'goals')
   const comboView=publicBoard(board,'combo')
   assert.equal(goalsView.goalsBankers.length,1)
-  assert.equal(goalsView.goalsBankers[0].market,'match-winner')
+  assert.equal(goalsView.goalsBankers[0].market,'total-goals')
   assert.equal(goalsView.comboPicks.length,0)
   assert.equal(comboView.comboPicks.length,1)
   assert.equal(comboView.comboPicks[0].market,'combo-draw-gg')
@@ -100,7 +100,7 @@ test('public combo view keeps rank and group so two options render per match',()
 })
 
 test('view=h2h returns only split H2H picks',()=>{
-  const pick={fixtureId:9,market:'match-winner',selection:'Home',occurrence:100,h2hHits:5,h2hMatches:5,userWhy:'same venue'}
+  const pick={fixtureId:9,market:'match-winner',selection:'Home',odds:1.50,occurrence:100,h2hHits:5,h2hMatches:5,userWhy:'same venue'}
   const board={
     meta:{h2hEngine:'h2h-v1-split-80',h2hCount:1},
     h2hPicks:[pick],
@@ -131,24 +131,68 @@ test('public board drops stale Filter V2, blank odds and sub-1.20 prices',()=>{
   assert.equal(view.meta.filterTipsCount,1)
 })
 
-test('public board drops leftover All Picks Asian totals and H2H hybrids',()=>{
+test('public board drops leftover All Picks Asian totals, team Over 0.5, and H2H hybrids or short prices',()=>{
   const board={
-    meta:{h2hEngine:'h2h-v1.1-split-80'},
+    meta:{h2hEngine:'h2h-v1.2-split-80'},
     bestPicks:[
       {fixtureId:1,market:'total-goals',selection:'Under 3',odds:1.26},
       {fixtureId:2,market:'total-goals',selection:'Over 0.5',odds:1.20},
       {fixtureId:3,market:'total-goals',selection:'Over 1.5',odds:1.33},
-      {fixtureId:4,market:'double-chance',selection:'Home or away',odds:1.22}
+      {fixtureId:4,market:'double-chance',selection:'Home or away',odds:1.22},
+      {fixtureId:8,market:'home-team-goals',selection:'Over 0.5',odds:1.28},
+      {fixtureId:9,market:'home-team-goals',selection:'Over 1.5',odds:1.45}
     ],
     h2hPicks:[
       {fixtureId:5,market:'total-goals',selection:'Over 1',odds:1.05,occurrence:90},
       {fixtureId:6,market:'total-goals',selection:'Home/Draw & Over 1.5',odds:3.80,occurrence:100},
-      {fixtureId:7,market:'total-goals',selection:'Over 0.5',odds:1.26,occurrence:100}
+      {fixtureId:7,market:'total-goals',selection:'Over 0.5',odds:1.26,occurrence:100},
+      {fixtureId:10,market:'match-winner',selection:'Home',odds:1.12,occurrence:100}
     ]
   }
   const all=publicBoard(board,'all')
-  assert.deepEqual(all.bestPicks.map(r=>r.selection),['Over 1.5','Home or away'])
+  assert.deepEqual(all.bestPicks.map(r=>r.selection),['Over 1.5','Home or away','Over 1.5'])
   const h2h=publicBoard(board,'h2h')
   assert.deepEqual(h2h.h2hPicks.map(r=>r.selection),['Over 0.5'])
   assert.equal(h2h.meta.h2hCount,1)
+})
+
+test('public board drops Goals 1X2/DNB leftovers and Daily Bankers shorter than 1.20',()=>{
+  const board={
+    goalsBankers:[
+      {fixtureId:1,market:'match-winner',route:'FAV_WIN',selection:'Home',odds:1.40},
+      {fixtureId:2,market:'draw-no-bet',route:'FAV_DNB',selection:'Home',odds:1.24},
+      {fixtureId:3,market:'total-goals',route:'OVER_2.5',selection:'Over 2.5',odds:1.72},
+      {fixtureId:4,market:'home-team-goals',route:'FAV_2PLUS',selection:'Over 1.5',odds:1.40}
+    ],
+    bankers:[
+      {fixtureId:5,selection:'Home',odds:1.10},
+      {fixtureId:6,selection:'Over 2.5',odds:1.32}
+    ]
+  }
+  const goals=publicBoard(board,'goals')
+  assert.deepEqual(goals.goalsBankers.map(r=>r.route),['OVER_2.5','FAV_2PLUS'])
+  const bankers=publicBoard(board,'bankers')
+  assert.deepEqual(bankers.bankers.map(r=>r.fixtureId),[6])
+})
+
+test('public picks drop oddsBook, splits and unused keep-fields',()=>{
+  const board={
+    varTips:[{
+      fixtureId:1,market:'away-team-goals',selection:'Over 1.5',odds:1.32,
+      oddsBook:{fav_odds:1.20},learningProfile:{matches:[{id:1}]},homeSplit:{position:2},
+      awaySplit:{position:12},bankerChecks:[{ok:true,label:'x'}],bankerApproved:true,
+      currentVenueSamples:{home:5,away:5},marketWhy:{headline:'fat'},why:{headline:'ok',last5Home:[{result:'W'}]}
+    }]
+  }
+  const view=publicBoard(board,'var')
+  const row=view.varTips[0]
+  assert.equal(row.oddsBook,undefined)
+  assert.equal(row.learningProfile,undefined)
+  assert.equal(row.homeSplit,undefined)
+  assert.equal(row.awaySplit,undefined)
+  assert.equal(row.bankerChecks,undefined)
+  assert.equal(row.bankerApproved,undefined)
+  assert.equal(row.currentVenueSamples,undefined)
+  assert.equal(row.marketWhy,undefined)
+  assert.equal(row.why.headline,'ok')
 })

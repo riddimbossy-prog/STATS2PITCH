@@ -25,7 +25,7 @@ test('public board drops internals and keeps only the requested view',()=>{
     filterTips:[{fixtureId:3,market:'total-goals'}],
     goalsBankers:[{fixtureId:4,market:'both-teams-score'}],
     priority:[{fixtureId:9,market:'hidden'}],
-    bankers:[{fixtureId:8}],
+    bankers:[{fixtureId:8,odds:1.32}],
     fixtures:[{fixtureId:1}]
   }
   const all=publicBoard(board,'all')

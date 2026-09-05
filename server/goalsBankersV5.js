@@ -10,7 +10,7 @@ import {
   statsFromFixture
 } from './goalsBankersV4.js'
 
-export const ENGINE_ID='goals-bankers-v5.3'
+export const ENGINE_ID='goals-bankers-v5.4'
 export const ENGINE_LABEL='Goals Bankers V5'
 export const MARKET_LABEL={...V4_LABEL,FAV_WIN:'Qualified team win',FAV_DNB:'Qualified team draw no bet',FAV_2PLUS:'Qualified team 2+'}
 export const V5_RULES=Object.freeze({
@@ -171,22 +171,8 @@ export function evaluateTwoInARowMarket(raw,opts={}){
     })
   }
 
-  const winGate=finite(row.winOdds)&&row.winOdds<V5_RULES.winOddsExclusiveMax
-    &&finite(row.ppg)&&row.ppg>=V5_RULES.winPpgMin
-    &&finite(row.opponentOver05)&&row.opponentOver05>V5_RULES.opponentOver05WinMin
-  if(winGate){
-    const route=top(row.standing,V5_RULES.straightWinTopN)?'FAV_WIN':'FAV_DNB'
-    const marketPrice=route==='FAV_WIN'?row.winOdds:row.dnbOdds
-    if(!finite(marketPrice))return skip(route==='FAV_DNB'?'MISSING_DNB_ODDS':'MISSING_WIN_ODDS',{side:row.side,legacyV4:legacy,ggGate:gg,reason:`V5 selected ${MARKET_LABEL[route]}, but its exact price is missing.`})
-    return finish(route,route==='FAV_WIN'?'V5_TOP3_WIN':'V5_OUTSIDE_TOP3_DNB',{
-      side:row.side,entryMarket:row.entryMarket,entryPrice:row.entryPrice,ppg:row.ppg,standing:row.standing,legacyV4:legacy,ggGate:gg,
-      matchType:'V5_RESULT_CONTROL',matchShape:'RESULT_CONTROL',
-      userWhy:`${MARKET_LABEL[route]} is the V5 banker. ${row.entryMarket} qualified at ${fmt(row.entryPrice)}, win odds are ${fmt(row.winOdds)} below 1.58, venue PPG is ${fmt(row.ppg)}, and the opponent Over 0.5 price is ${fmt(row.opponentOver05)} above 1.60.${route==='FAV_DNB'?` League position ${row.standing.position} is outside the Top 3, so V5 downgraded the result to DNB.`:''}`
-    })
-  }
-
-  return goalDecision(raw,row,'V5_WIN_GATE_FAILED',{
-    matchType:'V5_GOALS_FALLBACK',matchShape:'GOALS_FALLBACK',legacyV4:legacy,ggGate:gg,
-    reason:`The win gate failed: win ${fmt(row.winOdds)}, venue PPG ${fmt(row.ppg)}, opponent Over 0.5 ${fmt(row.opponentOver05)}.`
+  return goalDecision(raw,row,'V5_GOALS_ROUTE',{
+    matchType:'V5_GOALS',matchShape:'GOALS',legacyV4:legacy,ggGate:gg,
+    reason:`${row.entryMarket} qualified at ${fmt(row.entryPrice)}. Goals Bankers publishes Over 2.5, team 2+ or GG only.`
   })
 }

@@ -1,7 +1,7 @@
 import {FINISHED} from './config.js'
 import {isSrlMatch} from './redFlags.js'
 
-export const BANKER_ENGINE='banker-totals-v1.1'
+export const BANKER_ENGINE='banker-totals-v1.2'
 export const BANKER_RULES=Object.freeze({
   boardTeamOver25Max:2.05,
   oppOver05FavWinMin:1.70,
@@ -425,8 +425,10 @@ function emit(f,odds,rule,published,reasons){
         why.push(...bumpForm.reasons)
         return{pick:pack(f,odds,rule,bump,why,bumpForm),skip:null,odds}
       }
-      why.push(`${bump.displaySelection} last 5 did not confirm the bump, so ${published.displaySelection} @ ${published.odds} stays.`)
+      why.push(`${bump.displaySelection} last 5 did not confirm the bump from ${published.displaySelection} @ ${published.odds}, so the pick is skipped below ${BANKER_RULES.bumpMinOdds.toFixed(2)}.`)
+      return{pick:null,skip:'odds-below-floor',odds}
     }
+    return{pick:null,skip:'odds-below-floor',odds}
   }
   const form=confirmLast5(f,published,odds.favourite)
   if(!form.ok)return{pick:null,skip:form.skip,odds,form}

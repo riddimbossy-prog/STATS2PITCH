@@ -4,12 +4,12 @@ import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRema
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"': '"',"'":'&#39;'}[c]))
-const REQUIRED_ENGINES=new Set(['goals-bankers-v5.1','goals-bankers-v5.2','goals-bankers-v5.3'])
+const REQUIRED_ENGINES=new Set(['goals-bankers-v5.1','goals-bankers-v5.2','goals-bankers-v5.3','goals-bankers-v5.4'])
 const BOARD_VIEW='goals'
 const SLIP_KEY='s2p-goals-slip'
-const PUBLISHED_ROUTES=new Set(['FAV_WIN','FAV_DNB','FAV_2PLUS','OVER_2.5','GG'])
+const PUBLISHED_ROUTES=new Set(['FAV_2PLUS','OVER_2.5','GG'])
 const COMBO_ROUTES=new Set(['DRAW_OR_OVER_25','DRAW_OR_UNDER_25','DRAW_OR_GG'])
-const MARKET_CHIPS=[{id:'all',label:'All'},{id:'FAV_WIN',label:'Win'},{id:'FAV_DNB',label:'DNB'},{id:'FAV_2PLUS',label:'2+'},{id:'OVER_2.5',label:'Over 2.5'},{id:'GG',label:'GG'}]
+const MARKET_CHIPS=[{id:'all',label:'All'},{id:'FAV_2PLUS',label:'2+'},{id:'OVER_2.5',label:'Over 2.5'},{id:'GG',label:'GG'}]
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',route:'all',slip:loadSlip(),timer:null,note:''}
 
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
@@ -45,7 +45,7 @@ function filtered(rows){return rows.filter(r=>{const s=stateFor(r);if(state.stat
 function renderHero(rows){const el=$('#goalsHeroCount');if(el)el.textContent=String(rows.length)}
 function renderMarkets(rows){
   const host=$('#goalsMarkets');if(!host)return
-  const counts={all:rows.length,FAV_WIN:0,FAV_DNB:0,FAV_2PLUS:0,'OVER_2.5':0,GG:0}
+  const counts={all:rows.length,FAV_2PLUS:0,'OVER_2.5':0,GG:0}
   for(const r of rows)if(counts[r.route]!==undefined)counts[r.route]++
   host.innerHTML=MARKET_CHIPS.map(chip=>`<button type="button" class="goals-market ${state.route===chip.id?'active':''}" data-route="${esc(chip.id)}">${esc(chip.label)}<b>${counts[chip.id]||0}</b></button>`).join('')
   host.querySelectorAll('[data-route]').forEach(b=>b.onclick=()=>{state.route=b.dataset.route;state.market='all';if($('#market'))$('#market').value='all';render()})

@@ -51,10 +51,10 @@ function fixture(odds={},extra={}){
   }
 }
 
-test('engine id is banker-totals-v1.1',()=>{
+test('engine id is banker-totals-v1.2',()=>{
   const r=evaluateBankerFixture(fixture({awayO05:1.90,homeO25:1.90}))
   assert.equal(r.pick.engine,BANKER_ENGINE)
-  assert.equal(BANKER_ENGINE,'banker-totals-v1.1')
+  assert.equal(BANKER_ENGINE,'banker-totals-v1.2')
 })
 
 test('board starts only when a team total Over 2.5 is 2.05 or shorter',()=>{
@@ -77,13 +77,10 @@ test('opponent Over 0.5 above 1.70 publishes favourite win',()=>{
   assert.match(r.pick.whyText,/last 5 home: Home FC to Win in 4\/5/)
 })
 
-test('favourite win shorter than 1.20 stays when 2+ form does not confirm',()=>{
+test('favourite win shorter than 1.20 is skipped when 2+ form does not confirm',()=>{
   const r=evaluateBankerFixture(fixture({homeWin:1.15,awayWin:5.80,homeO25:1.80,awayO05:1.85,homeO15:1.33,under35:1.40},{formOpts:{homeScore:[1,0],awayScore:[0,1]}}))
-  assert.equal(r.pick?.rule,'OPP_O05_FAV_WIN')
-  assert.equal(r.pick?.displaySelection,'Home FC to Win')
-  assert.equal(r.pick?.odds,1.15)
-  assert.match(r.pick.whyText,/did not confirm the bump/)
-  assert.doesNotMatch(r.pick.whyText,/is blocked/)
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'odds-below-floor')
 })
 
 test('favourite win shorter than 1.20 bumps to 2+ when last 5 confirms',()=>{
@@ -110,12 +107,10 @@ test('Under 3.5 above 1.60 publishes favourite 2+',()=>{
   assert.equal(r.pick?.displaySelection,'Home FC 2+')
 })
 
-test('favourite 2+ shorter than 1.20 stays when 3+ form does not confirm',()=>{
+test('favourite 2+ shorter than 1.20 is skipped when 3+ form does not confirm',()=>{
   const r=evaluateBankerFixture(fixture({over25:1.90,awayO05:1.60,under35:1.75,homeO15:1.12,homeO25:1.95,over15:1.26},{formOpts:{homeScore:[2,0],awayScore:[0,2]}}))
-  assert.equal(r.pick?.rule,'U35_FAV_2PLUS')
-  assert.equal(r.pick?.displaySelection,'Home FC 2+')
-  assert.equal(r.pick?.odds,1.12)
-  assert.match(r.pick.whyText,/did not confirm the bump/)
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'odds-below-floor')
 })
 
 test('favourite 2+ shorter than 1.20 bumps to 3+ when last 5 confirms',()=>{
@@ -144,12 +139,10 @@ test('GG publishes when both sides are priced to score and BTTS Yes is under 1.5
   assert.match(r.pick.whyText,/Clears 60%/)
 })
 
-test('BTTS Yes shorter than 1.20 publishes at that price',()=>{
+test('BTTS Yes shorter than 1.20 is skipped',()=>{
   const r=evaluateBankerFixture(fixture({over25:1.80,homeO05:1.18,awayO05:1.22,ggYes:1.16,gg2No:1.45,homeO25:1.90}))
-  assert.equal(r.pick?.rule,'GG_BOTH_TT')
-  assert.equal(r.pick?.displaySelection,'BTTS · Yes')
-  assert.equal(r.pick?.odds,1.16)
-  assert.doesNotMatch(r.pick.whyText,/Next available/)
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'odds-below-floor')
 })
 
 test('Over 1.5 board starts on 3+ goals streak No 1.20-1.40',()=>{
@@ -160,13 +153,10 @@ test('Over 1.5 board starts on 3+ goals streak No 1.20-1.40',()=>{
   assert.match(r.pick.whyText,/3\+ goals streak No is 1\.2/)
 })
 
-test('Over 1.5 shorter than 1.20 stays when Over 2.5 form does not confirm',()=>{
+test('Over 1.5 shorter than 1.20 is skipped when Over 2.5 form does not confirm',()=>{
   const r=evaluateBankerFixture(fixture({homeO25:2.40,awayO25:2.50,over25:1.28,over15:1.08,under35:1.55,streak:1.24,awayO05:1.60},{formOpts:{homeScore:[2,0],awayScore:[0,2]}}))
-  assert.equal(r.pick?.rule,'STREAK_OVER15')
-  assert.equal(r.pick?.selection,'Over 1.5')
-  assert.equal(r.pick?.odds,1.08)
-  assert.match(r.pick.whyText,/did not confirm the bump/)
-  assert.doesNotMatch(r.pick.whyText,/is blocked/)
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'odds-below-floor')
 })
 
 test('Over 1.5 shorter than 1.20 bumps to Over 2.5 when last 5 confirms',()=>{

@@ -113,6 +113,27 @@ test('a V5.3 refresh drops Goals Bankers that had no Top 5 team',async()=>{
   await clearBoard(date)
 })
 
+test('a V5.4 refresh drops Goals Bankers leftover 1X2 rows',async()=>{
+  const date='2099-02-10'
+  await clearBoard(date)
+  const winPick={
+    fixtureId:'win',market:'match-winner',selection:'Home',route:'FAV_WIN',
+    engine:'goals-bankers-v5.3',odds:1.40,kickoff:`${date}T19:00:00Z`
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[winPick],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5.3',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',goalsBankersEngine:'goals-bankers-v5.4',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.goalsBankers,[])
+  assert.equal(saved.meta.goalsBankersCount,0)
+  assert.equal(saved.meta.goalsBankersEngine,'goals-bankers-v5.4')
+  await clearBoard(date)
+})
+
 test('a non-empty Combo V3 refresh removes preserved V2 rows rejected by the hard gates',async()=>{
   const date='2099-02-04'
   await clearBoard(date)
@@ -283,6 +304,29 @@ test('a v1.1 refresh drops Daily Bankers that had no Top 5 team',async()=>{
   assert.equal(saved.meta.bankerRulesCount,0)
   assert.equal(saved.dailyBankers.length,0)
   assert.equal(saved.meta.bankerRulesEngine,'banker-totals-v1.1')
+  await clearBoard(date)
+})
+
+test('a v1.2 refresh drops Daily Bankers shorter than 1.20',async()=>{
+  const date='2099-02-11'
+  await clearBoard(date)
+  const shortPick={
+    fixtureId:'minija',market:'match-winner',selection:'Home',displaySelection:'Minija to Win',
+    engine:'banker-totals-v1.1',odds:1.10,family:'1X2',rule:'OPP_O05_FAV_WIN',kickoff:`${date}T10:00:00Z`
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[shortPick],priority:[],results:{},availableMarkets:[],
+    bankerRulesMeta:{engine:'banker-totals-v1.1'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',bankerRulesEngine:'banker-totals-v1.1',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    bankerRulesMeta:{engine:'banker-totals-v1.2'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',bankerRulesEngine:'banker-totals-v1.2',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.bankers,[])
+  assert.equal(saved.meta.bankerRulesCount,0)
+  assert.equal(saved.meta.bankerRulesEngine,'banker-totals-v1.2')
   await clearBoard(date)
 })
 

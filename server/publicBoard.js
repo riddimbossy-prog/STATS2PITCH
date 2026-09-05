@@ -1,5 +1,5 @@
 const VIEWS=new Set(['all','var','filter','goals','combo','h2h','bankers'])
-const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why','occurrence','h2hHits','h2hMatches','userWhy'])
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','learning','why','occurrence','h2hHits','h2hMatches','userWhy'])
 
 function slimMeta(meta={}){
   return{
@@ -163,7 +163,10 @@ export function isComboBoardPick(r){
 
 const FILTER_ENGINE='perfect-split-v1'
 const FILTER_MIN_ODD=1.20
+const H2H_MIN_ODD=1.20
+const BANKER_MIN_ODD=1.20
 const GOAL_KEYS=new Set(['total-goals','home-team-goals','away-team-goals'])
+const GOALS_PUBLISHED=new Set(['FAV_2PLUS','OVER_2.5','GG'])
 function goalLine(sel){
   const m=String(sel||'').match(/^(over|under)\s+([0-9]+(?:\.[0-9]+)?)$/i)
   return m?Number(m[2]):null
@@ -187,7 +190,7 @@ export function sanitizeBestPicks(rows){
     const line=goalLine(row?.selection)
     if(k==='total-goals')return line===1.5||line===2.5||line===3.5
     if(k==='home-team-goals'||k==='away-team-goals'||k==='team-goals'){
-      return line===0.5||line===1.5||line===2.5
+      return line===1.5||line===2.5
     }
     return true
   })
@@ -195,10 +198,26 @@ export function sanitizeBestPicks(rows){
 export function sanitizeH2HPicks(rows){
   return (Array.isArray(rows)?rows:[]).filter(row=>{
     if(isHybridSelection(row))return false
+    const odds=Number(row?.odds)
+    if(!Number.isFinite(odds)||odds<H2H_MIN_ODD)return false
     const k=String(row?.market||'')
     if(!GOAL_KEYS.has(k))return true
     const line=goalLine(row?.selection)
     return line!=null&&Math.abs(line%1-0.5)<1e-9
+  })
+}
+export function sanitizeGoalsBankers(rows){
+  return (Array.isArray(rows)?rows:[]).filter(row=>{
+    const route=String(row?.route||'')
+    if(route)return GOALS_PUBLISHED.has(route)
+    const m=String(row?.market||'')
+    return m==='total-goals'||m==='home-team-goals'||m==='away-team-goals'||m==='both-teams-score'
+  })
+}
+export function sanitizeBankers(rows){
+  return (Array.isArray(rows)?rows:[]).filter(row=>{
+    const odds=Number(row?.odds)
+    return Number.isFinite(odds)&&odds>=BANKER_MIN_ODD
   })
 }
 
@@ -214,13 +233,14 @@ export function splitGoalsAndCombo(board={}){
 
 export function sanitizeGoalsAndCombo(board={}){
   const split=splitGoalsAndCombo(board)
+  const goalsBankers=sanitizeGoalsBankers(split.goalsBankers)
   return{
     ...board,
-    goalsBankers:split.goalsBankers,
+    goalsBankers,
     comboPicks:split.comboPicks,
     meta:{
       ...(board.meta||{}),
-      goalsBankersCount:split.goalsBankers.length,
+      goalsBankersCount:goalsBankers.length,
       comboCount:split.comboPicks.length,
       comboEngine:board?.meta?.comboEngine||board?.comboMeta?.engine||null
     }
@@ -263,9 +283,10 @@ export function publicBoard(board={},view='all'){
     return finalize(empty)
   }
   if(v==='goals'){
-    empty.goalsBankers=split.goalsBankers
+    empty.goalsBankers=sanitizeGoalsBankers(split.goalsBankers)
     empty.goalsBankersMeta=board?.goalsBankersMeta||null
     empty.availableMarkets=markets(empty.goalsBankers)
+    empty.meta.goalsBankersCount=empty.goalsBankers.length
     return finalize(empty)
   }
   if(v==='combo'){
@@ -282,17 +303,17 @@ export function publicBoard(board={},view='all'){
     return finalize(empty)
   }
   if(v==='bankers'){
-    empty.bankers=Array.isArray(board?.bankers)?board.bankers:[]
+    empty.bankers=sanitizeBankers(board?.bankers)
     empty.bankerRulesMeta=board?.bankerRulesMeta||null
-    empty.dailyBankers=Array.isArray(board?.dailyBankers)?board.dailyBankers:[]
-    empty.safestBankers=Array.isArray(board?.safestBankers)?board.safestBankers:[]
-    empty.valueBankers=Array.isArray(board?.valueBankers)?board.valueBankers:[]
+    empty.dailyBankers=sanitizeBankers(board?.dailyBankers)
+    empty.safestBankers=sanitizeBankers(board?.safestBankers)
+    empty.valueBankers=sanitizeBankers(board?.valueBankers)
     empty.dailyBankersMeta=board?.dailyBankersMeta||null
     empty.availableMarkets=markets([...empty.bankers,...empty.safestBankers,...empty.valueBankers,...empty.dailyBankers])
     return finalize(empty)
   }
   empty.bestPicks=sanitizeBestPicks(board?.bestPicks)
-  empty.bankers=Array.isArray(board?.bankers)?board.bankers:[]
+  empty.bankers=sanitizeBankers(board?.bankers)
   empty.availableMarkets=Array.isArray(board?.availableMarkets)&&board.availableMarkets.length?board.availableMarkets:markets(empty.bestPicks)
   empty.meta.publishedPicks=empty.bestPicks.length
   empty.meta.bestPicks=empty.bestPicks.length

@@ -85,22 +85,22 @@ function raw(extra={}){
 }
 
 test('Goals Bankers V5 is active and publishes exact rule metadata',()=>{
-  assert.equal(ENGINE_ID,'goals-bankers-v5.3')
+  assert.equal(ENGINE_ID,'goals-bankers-v5.4')
   const board=buildGoalsBankerBoard([fixture()])
   assert.equal(board.meta.engine,ENGINE_ID)
   assert.deepEqual(board.meta.rules,V5_RULES)
-  assert.deepEqual(board.meta.publishedRoutes,['FAV_WIN','FAV_DNB','FAV_2PLUS','OVER_2.5','GG'])
+  assert.deepEqual(board.meta.publishedRoutes,['FAV_2PLUS','OVER_2.5','GG'])
 })
 
 test('home entry requires Home Team Over 2.5 at 2.10 or below',()=>{
-  assert.equal(diagnosed({odds:{homeO25:2.10}}).route,'FAV_WIN')
+  assert.equal(diagnosed({odds:{homeO25:2.10}}).route,'FAV_2PLUS')
   const rejected=diagnosed({odds:{homeO25:2.11,awayO25:2.11}})
   assert.equal(rejected.pick,null)
   assert.equal(rejected.skip,'entry-filter')
 })
 
-test('home win needs odds below 1.58, 2.0 venue PPG, and away Over 0.5 above 1.60',()=>{
-  assert.equal(diagnosed({odds:{homeWin:1.57,awayO05:1.61},homeSplit:{position:2,size:20,ppg:2.0,played:5}}).route,'FAV_WIN')
+test('straight-win gates fall through to a goals route instead of 1X2',()=>{
+  assert.equal(diagnosed({odds:{homeWin:1.57,awayO05:1.61},homeSplit:{position:2,size:20,ppg:2.0,played:5}}).route,'FAV_2PLUS')
   assert.equal(diagnosed({odds:{homeWin:1.58,awayO05:1.61}}).route,'FAV_2PLUS')
   assert.equal(diagnosed({odds:{homeWin:1.57,awayO05:1.61},homeSplit:{position:2,size:20,ppg:1.99,played:5}}).route,'FAV_2PLUS')
   assert.equal(diagnosed({odds:{homeWin:1.57,awayO05:1.60}}).route,'FAV_2PLUS')
@@ -121,7 +121,7 @@ test('away entry requires Away Team Over 2.5 at 2.10 or below',()=>{
     homeStanding:{position:12,size:20},awayStanding:{position:2,size:20},
     homeSplit:{position:12,size:20,ppg:0.6,played:5},awaySplit:{position:2,size:20,ppg:2.0,played:5}
   }
-  assert.equal(diagnosed({...base,odds:{homeWin:6.50,awayWin:1.57,homeO25:2.30,awayO15:1.81,awayO25:2.10,homeO05:1.61}}).route,'FAV_WIN')
+  assert.equal(diagnosed({...base,odds:{homeWin:6.50,awayWin:1.57,homeO25:2.30,awayO15:1.81,awayO25:2.10,homeO05:1.61}}).route,'FAV_2PLUS')
   const rejected=diagnosed({...base,odds:{homeWin:6.50,awayWin:1.57,homeO25:2.30,awayO15:1.81,awayO25:2.11,homeO05:1.61}})
   assert.equal(rejected.skip,'entry-filter')
 })
@@ -138,12 +138,12 @@ test('away only chooses Over 2.5 when weaker home Over 0.5 is at most 1.30',()=>
   assert.equal(two.odds,1.81)
 })
 
-test('a qualified result outside the overall Top 3 is downgraded to DNB',()=>{
+test('a qualified result outside the overall Top 3 still publishes a goals route',()=>{
   const pick=diagnosed({homeStanding:{position:4,size:20},awayStanding:{position:12,size:20},odds:{homeDnb:1.24}}).pick
-  assert.equal(pick.route,'FAV_DNB')
-  assert.equal(pick.market,'draw-no-bet')
-  assert.equal(pick.selection,'Home')
-  assert.equal(pick.odds,1.24)
+  assert.equal(pick.route,'FAV_2PLUS')
+  assert.equal(pick.market,'home-team-goals')
+  assert.equal(pick.selection,'Over 1.5')
+  assert.notEqual(pick.market,'draw-no-bet')
 })
 
 test('at least one team must sit in the overall Top 5',()=>{
@@ -177,10 +177,10 @@ test('the old streak market is not a V5 entry gate or published market',()=>{
   assert.equal(pick.engine,ENGINE_ID)
 })
 
-test('missing exact route odds fail closed with a specific diagnostic',()=>{
+test('missing DNB odds do not skip a goals route',()=>{
   const result=diagnosed({homeStanding:{position:4,size:20},odds:{homeDnb:null}})
-  assert.equal(result.pick,null)
-  assert.equal(result.skip,'missing-dnb-odds')
+  assert.equal(result.pick.route,'FAV_2PLUS')
+  assert.equal(result.skip,null)
 })
 
 test('odds extraction includes DNB and all V5 team-total inputs',()=>{
@@ -195,10 +195,11 @@ test('odds extraction includes DNB and all V5 team-total inputs',()=>{
   assert.equal(book.awayO05,1.70)
 })
 
-test('board builder attaches V5 separately and exposes DNB',()=>{
+test('board builder attaches V5 separately and never exposes DNB',()=>{
   const dnb=fixture({homeStanding:{position:4,size:20},odds:{homeDnb:1.24}})
   const isolated=buildGoalsBankerBoard([dnb])
-  assert.equal(isolated.bestPicks[0].route,'FAV_DNB')
+  assert.equal(isolated.bestPicks[0].route,'FAV_2PLUS')
+  assert.ok(isolated.bestPicks.every(item=>item.route!=='FAV_DNB'&&item.route!=='FAV_WIN'))
   const board=buildBoard([dnb])
   assert.equal(board.meta.goalsBankersEngine,ENGINE_ID)
   assert.equal(board.goalsBankers[0].engine,ENGINE_ID)

@@ -345,5 +345,5 @@ export function buildGoalsBankerBoard(fixtures,meta={},learningState=null){
     {board:'goals',tightenMinScore:86}
   ).sort((a,b)=>Date.parse(a.kickoff||0)-Date.parse(b.kickoff||0)||Number(a.odds)-Number(b.odds))
   const skipped=diagnosed.filter(row=>!row.result.pick).reduce((map,row)=>{const key=row.result.skip||'unknown';map[key]=(map[key]||0)+1;return map},{})
-  return{meta:{...meta,engineVersion:ENGINE_VERSION,engine:ENGINE_ID,rules:V5_RULES,qualified:qualified.length,bestPicks:qualified.length,skipped,publishedRoutes:['FAV_WIN','FAV_DNB','FAV_2PLUS','OVER_2.5','GG']},priority:qualified,bestPicks:qualified,availableMarkets:[...new Set(qualified.map(row=>row.market))].sort()}
+  return{meta:{...meta,engineVersion:ENGINE_VERSION,engine:ENGINE_ID,rules:V5_RULES,qualified:qualified.length,bestPicks:qualified.length,skipped,publishedRoutes:['FAV_2PLUS','OVER_2.5','GG']},priority:qualified,bestPicks:qualified,availableMarkets:[...new Set(qualified.map(row=>row.market))].sort()}
 }

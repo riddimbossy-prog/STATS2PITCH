@@ -104,10 +104,11 @@ test('V5 still publishes when a Top 5 side faces a bottom-3 team',()=>{
   assert.ok(r.pick)
 })
 
-test('V5 publishes DNB for a strong qualified team outside the overall Top 3',()=>{
+test('V5 publishes a goals route for a strong qualified team outside the overall Top 3',()=>{
   const r=diagnoseGoalsBankerFixture(fixture())
   assert.ok(r.pick)
-  assert.equal(r.pick.route,'FAV_DNB')
+  assert.equal(r.pick.route,'FAV_2PLUS')
+  assert.notEqual(r.pick.route,'FAV_DNB')
 })
 
 test('V5 result and goals routes use the explicit ladder instead of the old form veto',()=>{

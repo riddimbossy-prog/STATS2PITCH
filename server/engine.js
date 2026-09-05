@@ -43,7 +43,7 @@ function sane(k,line){
   if(!finite(line))return false
   if(k==='total-goals')return line===1.5||line===2.5||line===3.5
   if(k==='first-half-goals')return line===0.5||line===1.5
-  if(['home-team-goals','away-team-goals','team-goals'].includes(k))return line===0.5||line===1.5||line===2.5
+  if(['home-team-goals','away-team-goals','team-goals'].includes(k))return line===1.5||line===2.5
   return true
 }
 function support(f,m,o){
