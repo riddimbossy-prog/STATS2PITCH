@@ -115,3 +115,40 @@ test('view=h2h returns only split H2H picks',()=>{
   assert.equal(view.bestPicks.length,0)
   assert.equal(view.meta.h2hEngine,'h2h-v1-split-80')
 })
+
+test('public board drops stale Filter V2, blank odds and sub-1.20 prices',()=>{
+  const board={
+    meta:{filterTipsEngine:'perfect-split-v1',filterTipsCount:3},
+    filterTips:[
+      {fixtureId:1,engine:'sporty-filter-v2',selection:'Over 1.5',odds:1.40,market:'total-goals'},
+      {fixtureId:2,engine:'perfect-split-v1',selection:'Over 1.5',odds:null,market:'total-goals'},
+      {fixtureId:3,engine:'perfect-split-v1',selection:'Over 0.5',odds:1.14,market:'home-team-goals'},
+      {fixtureId:4,engine:'perfect-split-v1',selection:'Over 1.5',odds:1.21,market:'total-goals'}
+    ]
+  }
+  const view=publicBoard(board,'filter')
+  assert.deepEqual(view.filterTips.map(r=>r.fixtureId),[4])
+  assert.equal(view.meta.filterTipsCount,1)
+})
+
+test('public board drops leftover All Picks Asian totals and H2H hybrids',()=>{
+  const board={
+    meta:{h2hEngine:'h2h-v1.1-split-80'},
+    bestPicks:[
+      {fixtureId:1,market:'total-goals',selection:'Under 3',odds:1.26},
+      {fixtureId:2,market:'total-goals',selection:'Over 0.5',odds:1.20},
+      {fixtureId:3,market:'total-goals',selection:'Over 1.5',odds:1.33},
+      {fixtureId:4,market:'double-chance',selection:'Home or away',odds:1.22}
+    ],
+    h2hPicks:[
+      {fixtureId:5,market:'total-goals',selection:'Over 1',odds:1.05,occurrence:90},
+      {fixtureId:6,market:'total-goals',selection:'Home/Draw & Over 1.5',odds:3.80,occurrence:100},
+      {fixtureId:7,market:'total-goals',selection:'Over 0.5',odds:1.26,occurrence:100}
+    ]
+  }
+  const all=publicBoard(board,'all')
+  assert.deepEqual(all.bestPicks.map(r=>r.selection),['Over 1.5','Home or away'])
+  const h2h=publicBoard(board,'h2h')
+  assert.deepEqual(h2h.h2hPicks.map(r=>r.selection),['Over 0.5'])
+  assert.equal(h2h.meta.h2hCount,1)
+})

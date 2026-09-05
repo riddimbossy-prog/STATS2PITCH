@@ -302,6 +302,44 @@ function sanitizeGoalsAndCombo(board:any={}){
     }
   }
 }
+const FILTER_ENGINE='perfect-split-v1'
+const FILTER_MIN_ODD=1.20
+const GOAL_KEYS=new Set(['total-goals','home-team-goals','away-team-goals'])
+function goalLine(sel:any){
+  const m=String(sel||'').match(/^(over|under)\s+([0-9]+(?:\.[0-9]+)?)$/i)
+  return m?Number(m[2]):null
+}
+function isHybridSelection(row:any){
+  return /&/.test(String(row?.selection||''))||/&/.test(String(row?.displaySelection||''))
+}
+function sanitizeFilterTips(rows:any,expectedEngine:any=FILTER_ENGINE){
+  const eng=String(expectedEngine||FILTER_ENGINE).trim()||FILTER_ENGINE
+  return (Array.isArray(rows)?rows:[]).filter((row:any)=>{
+    const got=String(row?.engine||row?.engineVersion||'').trim()
+    if(got&&got!==eng)return false
+    const odds=Number(row?.odds)
+    return Number.isFinite(odds)&&odds>=FILTER_MIN_ODD
+  })
+}
+function sanitizeBestPicks(rows:any){
+  return (Array.isArray(rows)?rows:[]).filter((row:any)=>{
+    if(isHybridSelection(row))return false
+    const k=String(row?.market||'')
+    const line=goalLine(row?.selection)
+    if(k==='total-goals')return line===1.5||line===2.5||line===3.5
+    if(k==='home-team-goals'||k==='away-team-goals'||k==='team-goals')return line===0.5||line===1.5||line===2.5
+    return true
+  })
+}
+function sanitizeH2HPicks(rows:any){
+  return (Array.isArray(rows)?rows:[]).filter((row:any)=>{
+    if(isHybridSelection(row))return false
+    const k=String(row?.market||'')
+    if(!GOAL_KEYS.has(k))return true
+    const line=goalLine(row?.selection)
+    return line!=null&&Math.abs(line%1-0.5)<1e-9
+  })
+}
 function slimMeta(meta:any={}){
   return{
     date:meta.date,
@@ -345,13 +383,18 @@ function slimWhy(why:any){
   if(!why||typeof why!=='object')return null
   const lastHome=slimForm(why.lastMatchesHome||why.last5Home)
   const lastAway=slimForm(why.lastMatchesAway||why.last5Away)
-  return{headline:why.headline||'',classification:why.classification||'',homeStats:slimStats(why.homeStats||why.homeAvg),awayStats:slimStats(why.awayStats||why.awayAvg),lastMatchesHome:lastHome,lastMatchesAway:lastAway,last5Home:lastHome,last5Away:lastAway,h2h:slimForm(why.h2h)}
+  return{headline:why.headline||'',classification:why.classification||'',homeStats:slimStats(why.homeStats||why.homeAvg),awayStats:slimStats(why.awayStats||why.awayAvg),lastMatchesHome:lastHome,lastMatchesAway:lastAway,h2h:slimForm(why.h2h)}
+}
+function slimLearning(l:any){
+  if(!l||typeof l!=='object')return null
+  return{gate:l.gate||'',note:l.note||'',action:l.action||'',label:l.label||'',wins:l.wins??null,losses:l.losses??null,sample:l.sample??null,winRate:l.winRate??null}
 }
 function slimPick(row:any){
   if(!row||typeof row!=='object')return row
   const out:any={}
   for(const k of PICK_KEEP) if(row[k]!==undefined) out[k]=row[k]
   if(out.why) out.why=slimWhy(out.why)
+  if(out.learning) out.learning=slimLearning(out.learning)
   if(Array.isArray(out.reasons)) out.reasons=out.reasons.slice(0,8)
   return out
 }
@@ -411,13 +454,20 @@ function publicBoard(board:any={},view='all'){
   }
   const markets=(rows:any[])=>[...new Set((rows||[]).map((x:any)=>x?.market).filter(Boolean))].sort()
   if(v==='var'){empty.varTips=board?.varTips||[];empty.varTipsMeta=board?.varTipsMeta||null;empty.availableMarkets=markets(empty.varTips);return finalizePublic(empty)}
-  if(v==='filter'){empty.filterTips=board?.filterTips||[];empty.filterTipsMeta=board?.filterTipsMeta||null;empty.availableMarkets=markets(empty.filterTips);return finalizePublic(empty)}
+  if(v==='filter'){
+    empty.filterTips=sanitizeFilterTips(board?.filterTips,board?.meta?.filterTipsEngine||board?.filterTipsMeta?.engine)
+    empty.filterTipsMeta=board?.filterTipsMeta||null
+    empty.availableMarkets=markets(empty.filterTips)
+    empty.meta.filterTipsCount=empty.filterTips.length
+    return finalizePublic(empty)
+  }
   if(v==='goals'){empty.goalsBankers=split.goalsBankers;empty.goalsBankersMeta=board?.goalsBankersMeta||null;empty.availableMarkets=markets(empty.goalsBankers);return finalizePublic(empty)}
   if(v==='combo'){empty.comboPicks=split.comboPicks;empty.comboMeta=board?.comboMeta||null;empty.availableMarkets=markets(empty.comboPicks);return finalizePublic(empty)}
   if(v==='h2h'){
-    empty.h2hPicks=Array.isArray(board?.h2hPicks)?board.h2hPicks:[]
+    empty.h2hPicks=sanitizeH2HPicks(board?.h2hPicks)
     empty.h2hMeta=board?.h2hMeta||null
     empty.availableMarkets=markets(empty.h2hPicks)
+    empty.meta.h2hCount=empty.h2hPicks.length
     return finalizePublic(empty)
   }
   if(v==='bankers'){
@@ -428,8 +478,10 @@ function publicBoard(board:any={},view='all'){
     empty.availableMarkets=markets([...empty.safestBankers,...empty.valueBankers,...empty.dailyBankers])
     return finalizePublic(empty)
   }
-  empty.bestPicks=board?.bestPicks||[]
+  empty.bestPicks=sanitizeBestPicks(board?.bestPicks)
   empty.availableMarkets=Array.isArray(board?.availableMarkets)&&board.availableMarkets.length?board.availableMarkets:markets(empty.bestPicks)
+  empty.meta.publishedPicks=empty.bestPicks.length
+  empty.meta.bestPicks=empty.bestPicks.length
   return finalizePublic(empty)
 }
 function compactResultRows(rows:any[]){return (rows||[]).map((p:any)=>({fixtureId:p?.fixtureId??null,market:p?.market||null,selection:p?.selection||null,result:p?.result||null}))}

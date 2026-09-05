@@ -72,9 +72,21 @@ function slimWhy(why){
     awayStats:slimStats(why.awayStats||why.awayAvg),
     lastMatchesHome:lastHome,
     lastMatchesAway:lastAway,
-    last5Home:lastHome,
-    last5Away:lastAway,
     h2h:slimForm(why.h2h)
+  }
+}
+
+function slimLearning(l){
+  if(!l||typeof l!=='object')return null
+  return{
+    gate:l.gate||'',
+    note:l.note||'',
+    action:l.action||'',
+    label:l.label||'',
+    wins:l.wins??null,
+    losses:l.losses??null,
+    sample:l.sample??null,
+    winRate:l.winRate??null
   }
 }
 
@@ -83,6 +95,7 @@ function slimPick(row){
   const out={}
   for(const k of PICK_KEEP) if(row[k]!==undefined) out[k]=row[k]
   if(out.why) out.why=slimWhy(out.why)
+  if(out.learning) out.learning=slimLearning(out.learning)
   if(Array.isArray(out.reasons)) out.reasons=out.reasons.slice(0,8)
   return out
 }
@@ -148,6 +161,47 @@ export function isComboBoardPick(r){
   return m.startsWith('combo-')||engine.startsWith('combo-')
 }
 
+const FILTER_ENGINE='perfect-split-v1'
+const FILTER_MIN_ODD=1.20
+const GOAL_KEYS=new Set(['total-goals','home-team-goals','away-team-goals'])
+function goalLine(sel){
+  const m=String(sel||'').match(/^(over|under)\s+([0-9]+(?:\.[0-9]+)?)$/i)
+  return m?Number(m[2]):null
+}
+function isHybridSelection(row){
+  return /&/.test(String(row?.selection||''))||/&/.test(String(row?.displaySelection||''))
+}
+export function sanitizeFilterTips(rows,expectedEngine=FILTER_ENGINE){
+  const eng=String(expectedEngine||FILTER_ENGINE).trim()||FILTER_ENGINE
+  return (Array.isArray(rows)?rows:[]).filter(row=>{
+    const got=String(row?.engine||row?.engineVersion||'').trim()
+    if(got&&got!==eng)return false
+    const odds=Number(row?.odds)
+    return Number.isFinite(odds)&&odds>=FILTER_MIN_ODD
+  })
+}
+export function sanitizeBestPicks(rows){
+  return (Array.isArray(rows)?rows:[]).filter(row=>{
+    if(isHybridSelection(row))return false
+    const k=String(row?.market||'')
+    const line=goalLine(row?.selection)
+    if(k==='total-goals')return line===1.5||line===2.5||line===3.5
+    if(k==='home-team-goals'||k==='away-team-goals'||k==='team-goals'){
+      return line===0.5||line===1.5||line===2.5
+    }
+    return true
+  })
+}
+export function sanitizeH2HPicks(rows){
+  return (Array.isArray(rows)?rows:[]).filter(row=>{
+    if(isHybridSelection(row))return false
+    const k=String(row?.market||'')
+    if(!GOAL_KEYS.has(k))return true
+    const line=goalLine(row?.selection)
+    return line!=null&&Math.abs(line%1-0.5)<1e-9
+  })
+}
+
 export function splitGoalsAndCombo(board={}){
   const rawGoals=Array.isArray(board?.goalsBankers)?board.goalsBankers:[]
   const dedicated=Array.isArray(board?.comboPicks)?board.comboPicks.filter(isComboBoardPick):[]
@@ -202,9 +256,10 @@ export function publicBoard(board={},view='all'){
     return finalize(empty)
   }
   if(v==='filter'){
-    empty.filterTips=Array.isArray(board?.filterTips)?board.filterTips:[]
+    empty.filterTips=sanitizeFilterTips(board?.filterTips,board?.meta?.filterTipsEngine||board?.filterTipsMeta?.engine)
     empty.filterTipsMeta=board?.filterTipsMeta||null
     empty.availableMarkets=markets(empty.filterTips)
+    empty.meta.filterTipsCount=empty.filterTips.length
     return finalize(empty)
   }
   if(v==='goals'){
@@ -220,9 +275,10 @@ export function publicBoard(board={},view='all'){
     return finalize(empty)
   }
   if(v==='h2h'){
-    empty.h2hPicks=Array.isArray(board?.h2hPicks)?board.h2hPicks:[]
+    empty.h2hPicks=sanitizeH2HPicks(board?.h2hPicks)
     empty.h2hMeta=board?.h2hMeta||null
     empty.availableMarkets=markets(empty.h2hPicks)
+    empty.meta.h2hCount=empty.h2hPicks.length
     return finalize(empty)
   }
   if(v==='bankers'){
@@ -235,9 +291,11 @@ export function publicBoard(board={},view='all'){
     empty.availableMarkets=markets([...empty.bankers,...empty.safestBankers,...empty.valueBankers,...empty.dailyBankers])
     return finalize(empty)
   }
-  empty.bestPicks=Array.isArray(board?.bestPicks)?board.bestPicks:[]
+  empty.bestPicks=sanitizeBestPicks(board?.bestPicks)
   empty.bankers=Array.isArray(board?.bankers)?board.bankers:[]
   empty.availableMarkets=Array.isArray(board?.availableMarkets)&&board.availableMarkets.length?board.availableMarkets:markets(empty.bestPicks)
+  empty.meta.publishedPicks=empty.bestPicks.length
+  empty.meta.bestPicks=empty.bestPicks.length
   return finalize(empty)
 }
 
