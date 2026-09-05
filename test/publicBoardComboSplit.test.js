@@ -150,7 +150,7 @@ test('public board drops leftover All Picks Asian totals, team Over 0.5, and H2H
     ]
   }
   const all=publicBoard(board,'all')
-  assert.deepEqual(all.bestPicks.map(r=>r.selection),['Over 1.5','Home or away','Over 1.5'])
+  assert.deepEqual(all.bestPicks.map(r=>r.selection),['Over 1.5','Over 1.5'])
   const h2h=publicBoard(board,'h2h')
   assert.deepEqual(h2h.h2hPicks.map(r=>r.selection),['Over 0.5'])
   assert.equal(h2h.meta.h2hCount,1)

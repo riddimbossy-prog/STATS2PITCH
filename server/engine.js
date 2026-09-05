@@ -48,13 +48,13 @@ function sane(k,line){
 }
 function support(f,m,o){
   const k=m.marketKey,n=norm(o.name),home=f.home,away=f.away
+  if(n==='12'||n==='1x'||n==='home away'||n.includes('home or away')||n.includes('home or draw'))return null
   if(k==='match-winner'){
     if(n==='home'||n==='1')return[resultRate(home,'win'),resultRate(away,'loss')]
     if(n==='away'||n==='2')return[resultRate(home,'loss'),resultRate(away,'win')]
     if(n==='draw'||n==='x')return[resultRate(home,'draw'),resultRate(away,'draw')]
   }
   if(k==='double-chance'){
-    if(n.includes('home or draw')||n==='1x')return[dcRate(home,'not-loss'),dcRate(away,'not-win')]
     if(n.includes('draw or away')||n==='x2')return[dcRate(home,'not-win'),dcRate(away,'not-loss')]
   }
   if(k==='draw-no-bet'){

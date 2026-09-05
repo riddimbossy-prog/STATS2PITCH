@@ -174,11 +174,16 @@ function goalLine(sel){
 function isHybridSelection(row){
   return /&/.test(String(row?.selection||''))||/&/.test(String(row?.displaySelection||''))
 }
+function isBlockedHomeOrPick(row){
+  const sel=String(row?.selection||row?.displaySelection||row?.pick||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
+  return sel==='12'||sel==='1x'||sel==='home away'||sel.includes('home or away')||sel.includes('home or draw')
+}
 export function sanitizeFilterTips(rows,expectedEngine=FILTER_ENGINE){
   const eng=String(expectedEngine||FILTER_ENGINE).trim()||FILTER_ENGINE
   return (Array.isArray(rows)?rows:[]).filter(row=>{
     const got=String(row?.engine||row?.engineVersion||'').trim()
     if(got&&got!==eng)return false
+    if(isBlockedHomeOrPick(row))return false
     const odds=Number(row?.odds)
     return Number.isFinite(odds)&&odds>=FILTER_MIN_ODD
   })
@@ -186,6 +191,7 @@ export function sanitizeFilterTips(rows,expectedEngine=FILTER_ENGINE){
 export function sanitizeBestPicks(rows){
   return (Array.isArray(rows)?rows:[]).filter(row=>{
     if(isHybridSelection(row))return false
+    if(isBlockedHomeOrPick(row))return false
     const k=String(row?.market||'')
     const line=goalLine(row?.selection)
     if(k==='total-goals')return line===1.5||line===2.5||line===3.5
@@ -200,8 +206,7 @@ export function sanitizeH2HPicks(rows){
     if(isHybridSelection(row))return false
     const odds=Number(row?.odds)
     if(!Number.isFinite(odds)||odds<H2H_MIN_ODD)return false
-    const sel=String(row?.selection||row?.displaySelection||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
-    if(sel==='12'||sel==='1x'||sel==='home away'||sel.includes('home or away')||sel.includes('home or draw'))return false
+    if(isBlockedHomeOrPick(row))return false
     const k=String(row?.market||'')
     if(!GOAL_KEYS.has(k))return true
     const line=goalLine(row?.selection)

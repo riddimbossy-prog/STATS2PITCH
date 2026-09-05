@@ -62,7 +62,11 @@ function renderBoard(){renderDates();const base=pickRows(state.board);refreshFil
 function open(r){const x=resultFor(r),score=scoreFor(r),modal=$('#modal');modal.classList.remove('hidden');modal.innerHTML=`<div class="dialog" role="dialog" aria-modal="true" aria-label="Why this pick was chosen">${leagueLine(r)}${statusBadge(r)}${matchup(r,score)}<div class="pick"><strong>${esc(marketLabel(r))}</strong><span class="odd">${Number(r.odds).toFixed(2)}</span></div><div class="time"><b>Kickoff</b> · ${formatDateTime(r.kickoff)}</div>${earlyNote(r)}${x?.matchState==='settled'?`<div class="settled-summary ${esc(x.outcome||'')}">${esc(outcomeLabel(x.outcome||'settled'))}${score?` · ${score.home}–${score.away}`:''}</div>`:''}${explanationHtml(r)}${proofLine(r)}<button class="close" type="button">Close</button></div>`;bindCrestFallbacks(modal);bindWhyModal(modal)}
 
 function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
-function pickRows(board){return (board?.bestPicks||[]).filter(r=>!isSrlPick(r))}
+function blockedHomeOr(r){
+  const n=String(r?.selection||r?.displaySelection||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
+  return n==='12'||n==='1x'||n==='home away'||n.includes('home or away')||n.includes('home or draw')
+}
+function pickRows(board){return (board?.bestPicks||[]).filter(r=>!isSrlPick(r)&&!blockedHomeOr(r))}
 async function hopIfEmpty(){
   if(view==='results'||state.status!=='upcoming')return false
   if(hasRemainingTips(pickRows(state.board)))return false
