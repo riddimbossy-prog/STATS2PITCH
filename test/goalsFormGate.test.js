@@ -88,12 +88,20 @@ test('top-half favourite with real PPG is allowed',()=>{
   assert.equal(weakFavouriteGate('FAV_2PLUS','home',split,{position:16,size:20}).ok,true)
 })
 
-test('V5 no longer hard-skips one bottom-3 team when a goals fallback is clear',()=>{
+test('V5 skips when neither side sits in the overall Top 5',()=>{
   const row=fixture()
   row.homeSplit={position:19,size:20,ppg:0.4,played:5,venue:'home'}
   const r=diagnoseGoalsBankerFixture(row)
+  assert.equal(r.pick,null)
+  assert.equal(r.skip,'neither-top-five')
+})
+
+test('V5 still publishes when a Top 5 side faces a bottom-3 team',()=>{
+  const row=fixture()
+  row.homeSplit={position:2,size:20,ppg:2.2,played:5,venue:'home'}
+  row.awaySplit={position:19,size:20,ppg:0.4,played:5,venue:'away'}
+  const r=diagnoseGoalsBankerFixture(row)
   assert.ok(r.pick)
-  assert.equal(r.pick.route,'FAV_2PLUS')
 })
 
 test('V5 publishes DNB for a strong qualified team outside the overall Top 3',()=>{

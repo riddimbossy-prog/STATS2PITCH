@@ -33,7 +33,7 @@ export function attachCrests(board){
     return{...row,homeLogo,awayLogo,homeId,awayId}
   }
   const next={...board}
-  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','comboPicks','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','comboPicks','h2hPicks','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
 }
 function applyBankerPage(board){
@@ -113,12 +113,24 @@ function comboEngineOf(board){
 function bankerEngineOf(board){
   return String(board?.meta?.bankerRulesEngine||board?.bankerRulesMeta?.engine||board?.dailyBankersMeta?.engine||'').trim()
 }
+function filterEngineOf(board){
+  return String(board?.meta?.filterTipsEngine||board?.filterTipsMeta?.engine||'').trim()
+}
 function hasStaleComboRows(board,expectedEngine){
   if(!expectedEngine)return false
   return comboRowsFrom(board).some(row=>String(row?.engineVersion||row?.engine||'').trim()!==expectedEngine)
 }
+function hasStaleFilterRows(board,expectedEngine){
+  if(!expectedEngine)return false
+  return (board?.filterTips||[]).some(row=>{
+    const eng=String(row?.engine||row?.engineVersion||'').trim()
+    if(eng&&eng!==expectedEngine)return true
+    const odds=Number(row?.odds)
+    return !Number.isFinite(odds)||odds<1.20
+  })
+}
 function countTips(board){
-  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.goalsBankers||[]).length+(board?.comboPicks||[]).length+(board?.dailyBankers||[]).length+(board?.safestBankers||[]).length+(board?.valueBankers||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
+  return (board?.bestPicks||[]).length+(board?.varTips||[]).length+(board?.filterTips||[]).length+(board?.goalsBankers||[]).length+(board?.comboPicks||[]).length+(board?.h2hPicks||[]).length+(board?.dailyBankers||[]).length+(board?.safestBankers||[]).length+(board?.valueBankers||[]).length+(board?.priority||[]).length+(board?.bankers||[]).length
 }
 function incomingFeedEmpty(board){
   const source=Number(board?.meta?.sourceFixtures??board?.meta?.diagnostics?.sourceFixtures??0)
@@ -133,7 +145,11 @@ function mergePublished(existing,incoming){
   if(!sameEngine)return countTips(incoming)>0?incoming:existing
   const bestPicks=mergeRows(existing?.bestPicks,incoming?.bestPicks,now,existing)
   const varTips=mergeRows(existing?.varTips,incoming?.varTips,now,existing)
-  const filterTips=mergeRows(existing?.filterTips,incoming?.filterTips,now,existing)
+  const incomingFilterEngine=filterEngineOf(incoming)
+  const filterEngineChanged=Boolean(incomingFilterEngine)&&(
+    filterEngineOf(existing)!==incomingFilterEngine||hasStaleFilterRows(existing,incomingFilterEngine)
+  )
+  const filterTips=mergeRows(filterEngineChanged?[]:(existing?.filterTips||[]),incoming?.filterTips,now,existing)
   const goalsEngineChanged=String(existing?.meta?.goalsBankersEngine||'')!==String(incoming?.meta?.goalsBankersEngine||'')
   const incomingComboEngine=comboEngineOf(incoming)
   const comboEngineChanged=Boolean(incomingComboEngine)&&(

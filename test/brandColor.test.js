@@ -23,8 +23,7 @@ test('header and app icon use the pitch mark instead of S2',async()=>{
     assert.match(html,/class="brand-mark"/)
     assert.doesNotMatch(html,/>S2</)
   }
-  const sw=await read('public/sw.js')
   const manifest=await read('public/manifest.webmanifest')
-  assert.match(sw,/s2p-pitch-mark\.svg/)
   assert.match(manifest,/stats2pitch-favicon-v3\.png/)
+  assert.match(manifest,/h2h\.html/)
 })

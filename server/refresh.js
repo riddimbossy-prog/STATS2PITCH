@@ -207,6 +207,8 @@ export async function refreshNow(date,onProgress=()=>{}){
   board.meta.diagnostics.goalsBankersSkipped=board.goalsBankersMeta?.skipped||{}
   board.meta.diagnostics.comboPicks=(board.comboPicks||[]).length
   board.meta.diagnostics.comboSkipped=board.comboMeta?.skipped||{}
+  board.meta.diagnostics.h2hPicks=(board.h2hPicks||[]).length
+  board.meta.diagnostics.h2hEngine=board.h2hMeta?.engine||board.meta?.h2hEngine||null
   board.meta.diagnostics.safestBankers=(board.safestBankers||[]).length
   board.meta.diagnostics.valueBankers=(board.valueBankers||[]).length
   board.meta.diagnostics.dailyBankersEngine=board.dailyBankersMeta?.engine||board.meta?.dailyBankersEngine||null
@@ -226,6 +228,6 @@ export function refreshStatus(date){return jobs.get(date)||{state:'idle',date}}
 export function startRefresh(date){
   if(jobs.get(date)?.state==='running')return jobs.get(date)
   const job={state:'running',date,startedAt:new Date().toISOString(),progress:{stage:'start'}};jobs.set(date,job)
-  refreshNow(date,p=>job.progress=p).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,varTips:board.varTips?.length||0,filterTips:board.filterTips?.length||0,goalsBankers:board.goalsBankers?.length||0,comboPicks:board.comboPicks?.length||0,bankers:board.bankers?.length||0,diagnostics:board.meta?.diagnostics||null}}).catch(e=>{job.state='failed';job.error=e.message;job.completedAt=new Date().toISOString()})
+  refreshNow(date,p=>job.progress=p).then(board=>{job.state='complete';job.completedAt=new Date().toISOString();job.result={bestPicks:board.bestPicks.length,qualified:board.priority.length,varTips:board.varTips?.length||0,filterTips:board.filterTips?.length||0,goalsBankers:board.goalsBankers?.length||0,comboPicks:board.comboPicks?.length||0,h2hPicks:board.h2hPicks?.length||0,bankers:board.bankers?.length||0,diagnostics:board.meta?.diagnostics||null}}).catch(e=>{job.state='failed';job.error=e.message;job.completedAt=new Date().toISOString()})
   return job
 }

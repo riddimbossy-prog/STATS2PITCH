@@ -285,3 +285,34 @@ test('a v1.1 refresh drops Daily Bankers that had no Top 5 team',async()=>{
   assert.equal(saved.meta.bankerRulesEngine,'banker-totals-v1.1')
   await clearBoard(date)
 })
+
+test('a Perfect Split refresh drops preserved Filter Tips from the old V2 engine',async()=>{
+  const date='2099-02-09'
+  await clearBoard(date)
+  const staleV2={
+    fixtureId:'legacy-filter',market:'total-goals',selection:'Over 1.5',odds:1.14,
+    engine:'sporty-filter-v2',kickoff:`${date}T12:00:00Z`
+  }
+  const missingOdds={
+    fixtureId:'no-price',market:'home-team-goals',selection:'Over 0.5',odds:null,
+    engine:'perfect-split-v1',kickoff:`${date}T13:00:00Z`
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[staleV2,missingOdds],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    filterTipsMeta:{engine:'perfect-split-v1'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',filterTipsEngine:'perfect-split-v1',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const fresh={
+    fixtureId:'split-home',market:'match-winner',selection:'Home',odds:1.35,
+    engine:'perfect-split-v1',kickoff:`${date}T15:00:00Z`
+  }
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[fresh],goalsBankers:[],comboPicks:[],bankers:[],priority:[],results:{},availableMarkets:[],
+    filterTipsMeta:{engine:'perfect-split-v1'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',filterTipsEngine:'perfect-split-v1',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.deepEqual(saved.filterTips.map(row=>row.fixtureId),['split-home'])
+  assert.equal(saved.filterTips[0].engine,'perfect-split-v1')
+  assert.equal(saved.filterTips[0].odds,1.35)
+  await clearBoard(date)
+})

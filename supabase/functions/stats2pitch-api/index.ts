@@ -273,10 +273,10 @@ function attachCrests(board:any){
     return{...row,homeLogo,awayLogo}
   }
   const next={...board}
-  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','comboPicks','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
+  for(const key of ['bestPicks','varTips','filterTips','goalsBankers','comboPicks','h2hPicks','dailyBankers','safestBankers','valueBankers','bankers','priority'])if(Array.isArray(board[key]))next[key]=board[key].map(patch)
   return next
 }
-function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,goalsBankersCount:0,comboCount:0,safestBankersCount:0,valueBankersCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],dailyBankers:[],safestBankers:[],valueBankers:[],fixtures:[],availableMarkets:[],results:{}}}
+function emptyBoard(date:string){return{meta:{date,generatedAt:null,qualified:0,bestPicks:0,varTipsCount:0,filterTipsCount:0,goalsBankersCount:0,comboCount:0,h2hCount:0,safestBankersCount:0,valueBankersCount:0,engineVersion:ENGINE_VERSION,requiresRefresh:true},priority:[],bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[],h2hPicks:[],dailyBankers:[],safestBankers:[],valueBankers:[],fixtures:[],availableMarkets:[],results:{}}}
 function isComboBoardPick(r:any){
   const m=String(r?.market||'')
   const engine=String(r?.engineVersion||r?.engine||'')
@@ -321,6 +321,8 @@ function slimMeta(meta:any={}){
     goalsBankersCount:meta.goalsBankersCount,
     comboEngine:meta.comboEngine,
     comboCount:meta.comboCount,
+    h2hEngine:meta.h2hEngine,
+    h2hCount:meta.h2hCount,
     dailyBankersEngine:meta.dailyBankersEngine,
     safestBankersCount:meta.safestBankersCount,
     valueBankersCount:meta.valueBankersCount,
@@ -328,7 +330,7 @@ function slimMeta(meta:any={}){
     refresh:meta.refresh||null
   }
 }
-const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why'])
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why','occurrence','h2hHits','h2hMatches','userWhy'])
 function slimForm(rows:any){
   return (Array.isArray(rows)?rows:[]).slice(0,5).map((x:any)=>({
     result:x?.result||'',opponent:x?.opponent||'',home:x?.home||'',away:x?.away||'',
@@ -374,7 +376,7 @@ function slimResults(results:any,picks:any[]){
   return out
 }
 function finalizePublic(empty:any){
-  const bags=['bestPicks','varTips','filterTips','goalsBankers','comboPicks','dailyBankers','safestBankers','valueBankers','bankers','priority']
+  const bags=['bestPicks','varTips','filterTips','goalsBankers','comboPicks','h2hPicks','dailyBankers','safestBankers','valueBankers','bankers','priority']
   const picks:any[]=[]
   for(const k of bags){
     if(Array.isArray(empty[k])){
@@ -387,7 +389,7 @@ function finalizePublic(empty:any){
   return empty
 }
 function publicBoard(board:any={},view='all'){
-  const v=['all','var','filter','goals','combo','bankers'].includes(String(view||''))?String(view):'all'
+  const v=['all','var','filter','goals','combo','h2h','bankers'].includes(String(view||''))?String(view):'all'
   const split=splitGoalsAndCombo(board)
   const empty:any={
     meta:slimMeta(board?.meta||{}),
@@ -399,6 +401,7 @@ function publicBoard(board:any={},view='all'){
     filterTips:[],
     goalsBankers:[],
     comboPicks:[],
+    h2hPicks:[],
     dailyBankers:[],
     safestBankers:[],
     valueBankers:[],
@@ -411,6 +414,12 @@ function publicBoard(board:any={},view='all'){
   if(v==='filter'){empty.filterTips=board?.filterTips||[];empty.filterTipsMeta=board?.filterTipsMeta||null;empty.availableMarkets=markets(empty.filterTips);return finalizePublic(empty)}
   if(v==='goals'){empty.goalsBankers=split.goalsBankers;empty.goalsBankersMeta=board?.goalsBankersMeta||null;empty.availableMarkets=markets(empty.goalsBankers);return finalizePublic(empty)}
   if(v==='combo'){empty.comboPicks=split.comboPicks;empty.comboMeta=board?.comboMeta||null;empty.availableMarkets=markets(empty.comboPicks);return finalizePublic(empty)}
+  if(v==='h2h'){
+    empty.h2hPicks=Array.isArray(board?.h2hPicks)?board.h2hPicks:[]
+    empty.h2hMeta=board?.h2hMeta||null
+    empty.availableMarkets=markets(empty.h2hPicks)
+    return finalizePublic(empty)
+  }
   if(v==='bankers'){
     empty.dailyBankers=board?.dailyBankers||[]
     empty.safestBankers=board?.safestBankers||[]
@@ -673,7 +682,7 @@ Deno.serve(async req=>{
     }
     if(route==='/results'&&req.method==='GET'){
       const date=requestedDate(url),row=await snapshot(date),board=row?.board||emptyBoard(date)
-      const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.comboPicks||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
+      const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.comboPicks||[]),...(board.h2hPicks||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
       let fixtures:any[]=[];try{fixtures=await liveScores(date,published)}catch{}
       const map=mergeLive(new Map(),fixtures,published),stored=board?.results||{}
       const withResult=(rows:any[])=>compactResultRows((rows||[]).map((p:any)=>({...p,result:attachResult(p,map.get(String(p.fixtureId)),storedForPick(stored,p))})))
@@ -683,9 +692,10 @@ Deno.serve(async req=>{
       const split=splitGoalsAndCombo(board)
       const goalsBankers=withResult(split.goalsBankers)
       const comboPicks=withResult(split.comboPicks)
+      const h2hPicks=withResult(board?.h2hPicks)
       const dailyBankers=withResult(board?.dailyBankers)
       const bankers=withResult([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])])
-      return json({date,picks,varTips,filterTips,goalsBankers,comboPicks,dailyBankers,bankers},200,'public, max-age=15, stale-while-revalidate=45')
+      return json({date,picks,varTips,filterTips,goalsBankers,comboPicks,h2hPicks,dailyBankers,bankers},200,'public, max-age=15, stale-while-revalidate=45')
     }
     if(route==='/live-scores'&&req.method==='GET'){const date=requestedDate(url);return json({date,fixtures:await liveScores(date)})}
     if(route==='/performance'&&req.method==='GET'){

@@ -98,3 +98,20 @@ test('public combo view keeps rank and group so two options render per match',()
   assert.equal(view.comboPicks[0].rank,1)
   assert.equal(view.comboPicks[0].group,'result-gg')
 })
+
+test('view=h2h returns only split H2H picks',()=>{
+  const pick={fixtureId:9,market:'match-winner',selection:'Home',occurrence:100,h2hHits:5,h2hMatches:5,userWhy:'same venue'}
+  const board={
+    meta:{h2hEngine:'h2h-v1-split-80',h2hCount:1},
+    h2hPicks:[pick],
+    comboPicks:[{fixtureId:2,market:'combo-home-gg'}],
+    bestPicks:[{fixtureId:1,market:'total-goals'}]
+  }
+  const view=publicBoard(board,'h2h')
+  assert.equal(view.h2hPicks.length,1)
+  assert.equal(view.h2hPicks[0].occurrence,100)
+  assert.equal(view.h2hPicks[0].userWhy,'same venue')
+  assert.equal(view.comboPicks.length,0)
+  assert.equal(view.bestPicks.length,0)
+  assert.equal(view.meta.h2hEngine,'h2h-v1-split-80')
+})

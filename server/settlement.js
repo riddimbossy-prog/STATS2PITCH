@@ -177,6 +177,7 @@ export function boardPicks(board){
     ...(board?.filterTips||[]),
     ...(board?.goalsBankers||[]),
     ...(board?.comboPicks||[]),
+    ...(board?.h2hPicks||[]),
     ...(board?.dailyBankers||[]),
     ...(board?.safestBankers||[]),
     ...(board?.valueBankers||[]),

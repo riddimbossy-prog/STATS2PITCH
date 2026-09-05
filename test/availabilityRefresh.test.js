@@ -50,10 +50,11 @@ test('result rows compact to fixture, market and outcome',()=>{
 test('settle job includes Goals Bankers',async()=>{
   const [src,engine]=await Promise.all([read('scripts/settleResults.js'),read('server/settlement.js')])
   assert.match(src,/boardPicks/)
-  assert.match(src,/postponed/)
+  assert.match(engine,/postponed/)
   assert.match(engine,/goalsBankers/)
   assert.match(engine,/safestBankers/)
   assert.match(engine,/valueBankers/)
+  assert.match(engine,/h2hPicks/)
 })
 
 test('public boards show won lost void and postponed',async()=>{
