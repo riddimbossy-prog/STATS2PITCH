@@ -11,6 +11,7 @@ import {buildLearningState, publicLearning} from './learning.js'
 import {SCHEDULED,FORM_SAMPLE} from './config.js'
 import {h2hSnapshot,last5Overall,teamStats} from './pickWhy.js'
 import {sanitizeGoalsAndCombo} from './publicBoard.js'
+import {buildH2HBoard} from './h2hEngine.js'
 
 
 const jobs=new Map(),leagueCache=new Map(),teamCache=new Map(),splitCache=new Map(),standingCache=new Map(),eventCache=new Map()
@@ -171,9 +172,11 @@ export async function refreshNow(date,onProgress=()=>{}){
       const marketOdds=verifiedMarkets({sportyMarkets:f?.sporty?.markets,fixture:f})
       if(marketOdds.length)statsVerified++
       const over25Profile=buildOver25Profile(mergeUnique(current,previous,history),homeId,awayId)
-      const h2h=h2hSnapshot(versusRows.length?versusRows:history,homeId,awayId)
+      const h2hSource=versusRows.length?versusRows:history
+      const h2h=h2hSnapshot(h2hSource,homeId,awayId,20)
       let record={fixtureId:f.fixture.id,league:f.league?.name||'',country:f.league?.country||'',kickoff:f.fixture.date,home:{id:homeId,name:f.teams.home.name,logo:f.teams.home.logo||null,fixtures:homeFixtures,formHistory:homeFormHistory,lastMatches:lastMatchesHome},away:{id:awayId,name:f.teams.away.name,logo:f.teams.away.logo||null,fixtures:awayFixtures,formHistory:awayFormHistory,lastMatches:lastMatchesAway},earlySeason,earlySeasonHome,earlySeasonAway,currentVenueSamples:{home:currentHomeFixtures.length,away:currentAwayFixtures.length},bankerLeagueProfile,over25Profile,homeSplit,awaySplit,homeStanding,awayStanding,marketOdds,sportyMarkets:f?.sporty?.markets||[],formReady,statsReady,sportyEventId:f?.sporty?.eventId||null,sportyGameId:f?.sporty?.gameId||null,feed,leagueHistoryReady:current.length+previous.length>0,h2h,homeStats:teamStats(last5Overall(lastMatchesHome,homeId)),awayStats:teamStats(last5Overall(lastMatchesAway,awayId))}
 
+      record.h2hHistory=h2hSource
       if(!statsReady){
         done++;onProgress({stage:'analyzing',done,total:scheduled.length,statsVerified,fallbackTeams,insufficientHistory,analysisErrors,transitionHydratedFixtures,skippedNoStats})
         return record
@@ -189,6 +192,9 @@ export async function refreshNow(date,onProgress=()=>{}){
   const comboBoard=buildComboBoard(fixtures,board.meta)
   board.comboPicks=comboBoard.bestPicks;board.comboMeta=comboBoard.meta
   board.meta.comboEngine=comboBoard.meta.engine;board.meta.comboCount=comboBoard.bestPicks.length
+  const h2hBoard=buildH2HBoard(fixtures,board.meta)
+  board.h2hPicks=h2hBoard.picks;board.h2hMeta=h2hBoard.meta
+  board.meta.h2hEngine=h2hBoard.meta.engine;board.meta.h2hCount=h2hBoard.picks.length
   Object.assign(board,sanitizeGoalsAndCombo(board))
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
   board.meta.bankerRulesEngine=bankerRules.meta.engine
