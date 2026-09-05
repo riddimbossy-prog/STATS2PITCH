@@ -778,9 +778,9 @@ Deno.serve(async req=>{
       let fixtures:any[]=[];try{fixtures=await liveScores(date,published)}catch{}
       const map=mergeLive(new Map(),fixtures,published),stored=board?.results||{}
       const withResult=(rows:any[])=>compactResultRows((rows||[]).map((p:any)=>({...p,result:attachResult(p,map.get(String(p.fixtureId)),storedForPick(stored,p))})))
-      const picks=withResult(board?.bestPicks)
+      const picks=withResult(sanitizeBestPicks(board?.bestPicks))
       const varTips=withResult(board?.varTips)
-      const filterTips=withResult(board?.filterTips)
+      const filterTips=withResult(sanitizeFilterTips(board?.filterTips,board?.meta?.filterTipsEngine||board?.filterTipsMeta?.engine))
       const split=splitGoalsAndCombo(board)
       const goalsBankers=withResult(split.goalsBankers)
       const comboPicks=withResult(split.comboPicks)

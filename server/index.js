@@ -10,7 +10,7 @@ import {normalizeFixtureStatus,resolveResult,fixtureForPick,storedResultForPick}
 import {buildLearningProfiles,buildLearningState,publicLearning} from './learning.js'
 import {ENGINE_VERSION} from './config.js'
 import {eliteFeedAuthorized,buildEliteFeed} from './eliteExport.js'
-import {publicBoard,compactResultRows,splitGoalsAndCombo} from './publicBoard.js'
+import {publicBoard,compactResultRows,splitGoalsAndCombo,sanitizeBestPicks,sanitizeFilterTips,sanitizeH2HPicks} from './publicBoard.js'
 
 const PORT=Number(process.env.PORT||3000),PUBLIC=fileURLToPath(new URL('../public/',import.meta.url))
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml','.mp4':'video/mp4'}
@@ -54,13 +54,13 @@ async function resultPayload(date){
   const pending=p=>({outcome:'pending',matchState:Date.parse(p.kickoff)>Date.now()?'upcoming':'pending'})
   const indexed=[...map.values()]
   const withResult=p=>({...p,result:resolveResult(p,fixtureForPick(p,indexed)||map.get(String(p.fixtureId)),storedResultForPick(stored,p))||pending(p)})
-  const picks=compactResultRows((board.bestPicks||[]).map(withResult))
+  const picks=compactResultRows(sanitizeBestPicks(board.bestPicks||[]).map(withResult))
   const varTips=compactResultRows((board.varTips||[]).map(withResult))
-  const filterTips=compactResultRows((board.filterTips||[]).map(withResult))
+  const filterTips=compactResultRows(sanitizeFilterTips(board.filterTips||[],board?.meta?.filterTipsEngine||board?.filterTipsMeta?.engine).map(withResult))
   const split=splitGoalsAndCombo(board)
   const goalsBankers=compactResultRows(split.goalsBankers.map(withResult))
   const comboPicks=compactResultRows(split.comboPicks.map(withResult))
-  const h2hPicks=compactResultRows((board.h2hPicks||[]).map(withResult))
+  const h2hPicks=compactResultRows(sanitizeH2HPicks(board.h2hPicks||[]).map(withResult))
   const dailyBankers=compactResultRows((board.dailyBankers||[]).map(withResult))
   const bankers=compactResultRows([...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[]),...(board.dailyBankers||[])].map(withResult))
   return{date,picks,varTips,filterTips,goalsBankers,comboPicks,h2hPicks,dailyBankers,bankers,fixtures:[...map.values()]}
