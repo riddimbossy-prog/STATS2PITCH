@@ -4,7 +4,7 @@ import {parseSportyBet} from './odds.js'
 export const COMBO_MIN_ODD=Math.max(1.20,Number(process.env.COMBO_MIN_ODD||1.20))
 export const COMBO_MIN_SCORE=Math.max(80,Math.min(95,Number(process.env.COMBO_MIN_SCORE||80)))
 export const COMBO_MAX_PER_FIXTURE=2
-export const COMBO_ENGINE_VERSION='combo-v3.2-hard-gates-only'
+export const COMBO_ENGINE_VERSION='combo-v3.3-best-two'
 export const COMBO_ODDS_THRESHOLDS=Object.freeze({
   ggTeamOver05ExclusiveMax:1.30,
   drawMax:3.00,
@@ -380,19 +380,9 @@ function archetype(def){
   return `${lead} + ${tail}`
 }
 function selectedCandidates(candidates){
-  const sorted=[...(candidates||[])].sort((a,b)=>b.comboScore-a.comboScore||b.homeConsensus-a.homeConsensus||a.odds-b.odds)
-  if(!sorted.length)return[]
-  const first=sorted[0],out=[first]
-  const distinct=sorted.slice(1).filter(x=>x.resultRoute!==first.resultRoute)
-  if(!distinct.length)return out
-  const second=distinct[0]
-  const third=distinct[1]
-  const overallSecond=sorted[1],overallThird=sorted[2]
-  const congested=overallSecond&&overallThird&&Math.abs(first.comboScore-overallSecond.comboScore)<=2&&Math.abs(overallSecond.comboScore-overallThird.comboScore)<=2
-  const secondAmbiguous=third&&Math.abs(second.comboScore-third.comboScore)<3
-  if(congested||secondAmbiguous)return out
-  out.push(second)
-  return out.slice(0,COMBO_MAX_PER_FIXTURE)
+  return [...(candidates||[])]
+    .sort((a,b)=>b.comboScore-a.comboScore||b.homeConsensus-a.homeConsensus||a.odds-b.odds)
+    .slice(0,COMBO_MAX_PER_FIXTURE)
 }
 
 export function analyzeComboFixture(f,skipBag=null){
@@ -450,9 +440,9 @@ export function analyzeComboFixture(f,skipBag=null){
     candidates.push(attachWhy(pick,f,{reasons}))
   }
 
-  return selectedCandidates(candidates).map((p,i)=>({
+  return selectedCandidates(candidates).map((p,i,all)=>({
     ...p,rank:i+1,
-    reasons:[`#${i+1} Combo for this match · hard-odds-gate score ${p.comboScore}/100.`,...(p.reasons||[])]
+    reasons:[`#${i+1} of ${all.length} Combo option${all.length===1?'':'s'} for this match · hard-odds-gate score ${p.comboScore}/100.`,...(p.reasons||[])]
   }))
 }
 

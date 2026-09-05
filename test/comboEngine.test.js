@@ -63,7 +63,7 @@ test('recognizes all twelve Combo market families and enforces 1.20 minimum',()=
   const parsed=listedComboMarkets(rows)
   assert.equal(COMBO_MIN_ODD,1.20)
   assert.equal(COMBO_MIN_SCORE,80)
-  assert.equal(COMBO_ENGINE_VERSION,'combo-v3.2-hard-gates-only')
+  assert.equal(COMBO_ENGINE_VERSION,'combo-v3.3-best-two')
   assert.equal(parsed.length,11)
   assert.ok(parsed.every(x=>x.odds>=1.20))
   assert.ok(parsed.some(x=>x.market==='combo-home-over-25'))
@@ -76,7 +76,56 @@ test('publishes Combo picks that pass hard odds gates and never more than two',(
   assert.ok(picks.length>=1)
   assert.equal(picks[0].rank,1)
   assert.ok(picks.every(x=>x.odds>=1.20&&x.reasons.length>0&&x.why))
-  assert.ok(picks.every(x=>x.engineVersion==='combo-v3.2-hard-gates-only'))
+  assert.ok(picks.every(x=>x.engineVersion==='combo-v3.3-best-two'))
+})
+
+test('chooses the best two gated Combo markets for a match, including the same result side',()=>{
+  const picks=analyzeComboFixture(strongHomeFixture())
+  assert.equal(picks.length,2)
+  assert.equal(picks[0].rank,1)
+  assert.equal(picks[1].rank,2)
+  assert.notEqual(picks[0].market,picks[1].market)
+  assert.ok(picks[0].comboScore>=picks[1].comboScore)
+  assert.match(picks[0].reasons[0],/1 of 2 Combo options/)
+  assert.match(picks[1].reasons[0],/2 of 2 Combo options/)
+})
+
+test('a market that fails a hard odds gate is never used to fill the second slot',()=>{
+  const f=strongHomeFixture({markets:[
+    market('Home Team or Over 2.5',1.44),
+    market('Home Team or GG',1.45),
+    market('Draw or Over 2.5',1.29)
+  ]})
+  f.marketOdds=decisionOdds({awayO05:1.30})
+  const picks=analyzeComboFixture(f)
+  assert.equal(picks.length,2)
+  assert.ok(picks.every(x=>x.route!=='HOME_GG'))
+  assert.deepEqual(picks.map(x=>x.route).sort(),['DRAW_OVER_25','HOME_OVER_25'])
+})
+
+test('publishes a single Combo when only one listed market survives the hard gates',()=>{
+  const f=strongHomeFixture({markets:[
+    market('Home Team or Over 2.5',1.44),
+    market('Home Team or GG',1.45)
+  ]})
+  f.marketOdds=decisionOdds({awayO05:1.30})
+  const picks=analyzeComboFixture(f)
+  assert.equal(picks.length,1)
+  assert.equal(picks[0].route,'HOME_OVER_25')
+})
+
+test('never publishes more than two Combo markets even when every listed family qualifies',()=>{
+  const f=strongHomeFixture({markets:[
+    market('Home Team or Over 2.5',1.44),market('Home Team or Under 2.5',1.76),
+    market('Draw or Over 2.5',1.29),market('Draw or Under 2.5',1.92),
+    market('Away or Over 2.5',1.25),market('Away or Under 2.5',1.33),
+    market('Home Team or GG',1.45),market('Draw or GG',1.52),market('Away Team or GG',1.22),
+    market('Home Team or Any Clean Sheet',1.75),market('Draw or Any Clean Sheet',1.56),
+    market('Away Team or Any Clean Sheet',1.33)
+  ]})
+  const picks=analyzeComboFixture(f)
+  assert.equal(picks.length,2)
+  assert.equal(new Set(picks.map(x=>x.market)).size,2)
 })
 
 test('draw-or-over can qualify when winner is unclear but the failure state is rare',()=>{

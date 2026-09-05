@@ -88,3 +88,13 @@ test('combo merge keeps two combo markets on the same fixture',()=>{
   const {comboPicks}=isolateComboBags(existing,incoming,now)
   assert.equal(comboPicks.length,2)
 })
+
+test('public combo view keeps rank and group so two options render per match',()=>{
+  const combo={
+    fixtureId:9,market:'combo-home-gg',route:'HOME_GG',family:'Combo',
+    rank:1,group:'result-gg',engineVersion:'combo-v3.3-best-two',selection:'Home Team or GG'
+  }
+  const view=publicBoard({comboPicks:[combo],meta:{comboEngine:'combo-v3.3-best-two'}},'combo')
+  assert.equal(view.comboPicks[0].rank,1)
+  assert.equal(view.comboPicks[0].group,'result-gg')
+})

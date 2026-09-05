@@ -7,6 +7,85 @@
   border: 1px solid rgba(200, 245, 66, 0.3);
 }
 
+.combo-hero {
+  border-color: rgba(200, 245, 66, 0.22);
+  background: linear-gradient(160deg, rgba(200, 245, 66, 0.12), var(--surface));
+}
+.combo-hero .goals-hero-num {
+  background: #c8f542;
+  color: #10140a;
+  box-shadow: 0 0 20px rgba(200, 245, 66, 0.28);
+}
+
+.combo-options {
+  display: grid;
+  gap: 8px;
+  margin: 0 14px 10px;
+}
+.combo-option {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  color: inherit;
+  cursor: pointer;
+}
+.combo-option:hover,
+.combo-option:focus-visible {
+  border-color: rgba(200, 245, 66, 0.5);
+  outline: none;
+}
+.combo-option-rank {
+  flex: 0 0 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font: 800 12px var(--mono);
+  background: rgba(200, 245, 66, 0.16);
+  color: #c8f542;
+}
+.combo-option-copy {
+  min-width: 0;
+  flex: 1;
+}
+.combo-option-kicker {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.combo-option-copy strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.combo-option-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.combo-option .odd.odd-stack {
+  font-size: 16px;
+  padding: 5px 9px;
+  display: inline-flex;
+}
+.combo-option-score {
+  font: 700 12px var(--mono);
+  color: var(--accent);
+  min-width: 24px;
+  text-align: right;
+}
+
 .combo-modal-title {
   font-size: 11px;
   letter-spacing: 0.1em;
@@ -19,4 +98,14 @@
   font: 700 12px/1.2 'Space Mono', monospace;
   opacity: 0.68;
   margin: 8px 0;
+}
+
+@media (max-width: 1100px) {
+  .combo-option {
+    padding: 10px 8px;
+    gap: 8px;
+  }
+  .combo-option-copy strong {
+    font-size: 14px;
+  }
 }

@@ -328,7 +328,7 @@ function slimMeta(meta:any={}){
     refresh:meta.refresh||null
   }
 }
-const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why'])
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why'])
 function slimForm(rows:any){
   return (Array.isArray(rows)?rows:[]).slice(0,5).map((x:any)=>({
     result:x?.result||'',opponent:x?.opponent||'',home:x?.home||'',away:x?.away||'',
@@ -359,9 +359,14 @@ function slimFixtures(rows:any){
 }
 function slimResults(results:any,picks:any[]){
   const src=results&&typeof results==='object'?results:{}
-  const ids=new Set((picks||[]).map((p:any)=>String(p?.fixtureId||'')).filter(Boolean))
+  const keys=new Set<string>()
+  for(const p of picks||[]){
+    const id=String(p?.fixtureId||'')
+    if(id)keys.add(id)
+    if(p?.fixtureId!=null&&p?.market)keys.add(`${p.fixtureId}|${p.market}|${String(p.selection||'').trim()}`)
+  }
   const out:any={}
-  for(const id of ids){
+  for(const id of keys){
     const r=src[id]
     if(!r)continue
     out[id]={outcome:r.outcome||'pending',matchState:r.matchState||'pending',homeScore:r.homeScore??r.home?.score??null,awayScore:r.awayScore??r.away?.score??null,minute:r.minute||r.clock||null,status:r.status||'',live:r.live===true,finished:r.finished===true,postponed:r.postponed===true,cancelled:r.cancelled===true}
@@ -418,7 +423,7 @@ function publicBoard(board:any={},view='all'){
   empty.availableMarkets=Array.isArray(board?.availableMarkets)&&board.availableMarkets.length?board.availableMarkets:markets(empty.bestPicks)
   return finalizePublic(empty)
 }
-function compactResultRows(rows:any[]){return (rows||[]).map((p:any)=>({fixtureId:p?.fixtureId??null,result:p?.result||null}))}
+function compactResultRows(rows:any[]){return (rows||[]).map((p:any)=>({fixtureId:p?.fixtureId??null,market:p?.market||null,selection:p?.selection||null,result:p?.result||null}))}
 async function snapshot(date:string){
   const rows=await rest(`/rest/v1/prediction_snapshots?select=payload,generated_at&snapshot_date=eq.${encodeURIComponent(date)}&limit=1`)
   const row=Array.isArray(rows)?rows[0]:null,payload=row?.payload||null
@@ -611,6 +616,8 @@ function settle(p:any,f:any){
   return{outcome,matchState:'settled',...f}
 }
 function decidedOutcome(o:any){return ['won','lost','void','postponed'].includes(String(o||''))}
+function pickResultKey(p:any){return `${p?.fixtureId}|${p?.market}|${String(p?.selection||'').trim()}`}
+function storedForPick(stored:any,p:any){return stored?.[pickResultKey(p)]||stored?.[String(p?.fixtureId??'')]||null}
 function attachResult(p:any,current:any,stored:any){
   const live=current?settle(p,current):null
   if(live&&decidedOutcome(live.outcome))return live
@@ -669,7 +676,7 @@ Deno.serve(async req=>{
       const published=[...(board.bestPicks||[]),...(board.varTips||[]),...(board.filterTips||[]),...(board.goalsBankers||[]),...(board.comboPicks||[]),...(board.dailyBankers||[]),...(board.bankers||[]),...(board.safestBankers||[]),...(board.valueBankers||[])]
       let fixtures:any[]=[];try{fixtures=await liveScores(date,published)}catch{}
       const map=mergeLive(new Map(),fixtures,published),stored=board?.results||{}
-      const withResult=(rows:any[])=>compactResultRows((rows||[]).map((p:any)=>({...p,result:attachResult(p,map.get(String(p.fixtureId)),stored[String(p.fixtureId)])})))
+      const withResult=(rows:any[])=>compactResultRows((rows||[]).map((p:any)=>({...p,result:attachResult(p,map.get(String(p.fixtureId)),storedForPick(stored,p))})))
       const picks=withResult(board?.bestPicks)
       const varTips=withResult(board?.varTips)
       const filterTips=withResult(board?.filterTips)

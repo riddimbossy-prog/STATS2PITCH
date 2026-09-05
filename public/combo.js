@@ -5,7 +5,7 @@ import {api,readBoardCache,writeBoardCache,scrollDateStrip,isSrlPick,bootDone,lo
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const ESC={amp:"&"+"amp;",lt:"&"+"lt;",gt:"&"+"gt;",quot:"&"+"quot;",apos:"&"+"#39;"}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":ESC.amp,"<":ESC.lt,">":ESC.gt,'"':ESC.quot,"'":ESC.apos}[c]))
-const VIEW='combo-v3.2'
+const VIEW='combo-v3.3'
 const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'all',country:'all',league:'all',family:'all',timer:null}
 
 function flag(c){return typeof window.countryFlag==='function'?window.countryFlag(c):'🌍'}
@@ -22,7 +22,7 @@ function familyLabel(v){return v==='result-goals'?'Result + O/U 2.5':v==='result
 function pickLabel(r){return String(r.displaySelection||r.selection||'Selection')}
 function decided(o){return ['won','lost','void','postponed'].includes(String(o||''))}
 function outcomeLabel(o){return ({won:'WON',lost:'LOST',void:'VOID',postponed:'POSTPONED'})[o]||'SETTLED'}
-function liveResultRow(r){
+function liveMatchRow(r){
   const id=String(r.fixtureId)
   for(const bag of ['comboPicks','goalsBankers','picks','filterTips','varTips','dailyBankers','bankers']){
     const hit=(state.results?.[bag]||[]).find(x=>String(x.fixtureId)===id)
@@ -30,8 +30,20 @@ function liveResultRow(r){
   }
   return null
 }
+function livePickRow(r){
+  const id=String(r.fixtureId)
+  const market=String(r.market||'')
+  const sel=String(r.selection||'').trim()
+  for(const bag of ['comboPicks','goalsBankers','picks','filterTips','varTips','dailyBankers','bankers']){
+    const rows=state.results?.[bag]||[]
+    const hit=rows.find(x=>String(x.fixtureId)===id&&String(x.market||'')===market&&String(x.selection||'').trim()===sel)
+      ||rows.find(x=>String(x.fixtureId)===id&&market&&String(x.market||'')===market)
+    if(hit?.result)return hit.result
+  }
+  return null
+}
 function resultFor(r){
-  const live=liveResultRow(r)
+  const live=livePickRow(r)||liveMatchRow(r)
   const stored=state.board?.results?.[pickKey(r)]||state.board?.results?.[String(r.fixtureId)]||null
   if(live&&decided(live.outcome))return live
   if(live&&live.matchState==='live')return live
@@ -106,19 +118,38 @@ function renderChips(base){
   host.innerHTML=`<button class="country-chip ${state.country==='all'?'active':''}" data-country="all">🌍</button>`+countries.map(c=>`<button class="country-chip ${state.country===c?'active':''}" data-country="${esc(c)}" title="${esc(c)}">${flag(c)}</button>`).join('')
   host.querySelectorAll('[data-country]').forEach(b=>b.onclick=()=>{state.country=b.dataset.country;state.league='all';render()})
 }
-function renderTodayStats(base){
+function renderTodayStats(groups){
   const host=$('#todayStats');if(!host)return
-  const counts={upcoming:0,live:0,settled:0,total:base.length}
-  for(const r of base){const s=stateFor(r);if(counts[s]!==undefined)counts[s]++}
-  host.innerHTML=`<button data-stat="all"><small>Combo picks</small><b>${counts.total}</b></button><button data-stat="upcoming"><small>Upcoming</small><b>${counts.upcoming}</b></button><button data-stat="live"><small>Live</small><b>${counts.live}</b></button><button data-stat="settled"><small>Settled</small><b>${counts.settled}</b></button>`
+  const counts={upcoming:0,live:0,settled:0,total:groups.length}
+  for(const picks of groups){const s=stateFor(picks[0]);if(counts[s]!==undefined)counts[s]++}
+  host.innerHTML=`<button data-stat="all"><small>Matches</small><b>${counts.total}</b></button><button data-stat="upcoming"><small>Upcoming</small><b>${counts.upcoming}</b></button><button data-stat="live"><small>Live</small><b>${counts.live}</b></button><button data-stat="settled"><small>Settled</small><b>${counts.settled}</b></button>`
   $$('[data-stat]').forEach(b=>b.onclick=()=>{state.status=b.dataset.stat;if($('#statusFilter'))$('#statusFilter').value=state.status;render()})
 }
-function card(r,i){
-  const score=scoreFor(r),conf=comboScore(r),odds=oddStr(r),ev=expectedValue(r.odds,conf)
-  const evStr=ev==null?'':`${ev>=0?'+':''}${ev.toFixed(2)}`
-  const rank=r.rank?`#${r.rank}`:''
-  const confHtml=conf>0?`<div class="confidence"><span>Combo score</span><div class="confidence-bar"><i style="width:${Math.max(0,Math.min(100,conf))}%"></i></div><b>${conf}</b></div>`:''
-  return `<article class="card ${stateFor(r)} ${decided(resultFor(r)?.outcome)?esc(resultFor(r).outcome):''}" data-i="${i}" role="button" tabindex="0" aria-label="Why ${esc(r.home)} vs ${esc(r.away)} was chosen"><div class="m-card-top"><span class="m-top-left"><span class="m-board-tag combo">COMBO ${esc(rank)}</span></span><span class="m-top-mid"></span><span class="m-top-right">${topStatus(r)}${conf>0?`<span class="m-conf">${esc(conf)}%</span>`:''}</span></div><div class="league"><span class="league-flag" role="img" aria-label="${esc(r.country||'International')} flag">${flag(r.country)}</span><span>${esc(r.league||'League')}</span></div>${matchup(r,score)}<div class="pick"><div class="pick-copy"><span class="pick-kicker">PICK</span><strong>${esc(pickLabel(r))}</strong></div><span class="odd">${odds}</span></div>${typeof learningChipHtml==='function'?learningChipHtml(r,esc):''}${confHtml}<div class="m-footer">${ev!=null?`<div class="m-ev"><span>Expected Value</span><b class="${ev>=0?'pos':'neg'}">${evStr}</b></div>`:`<div class="m-ev"><span>${esc(familyLabel(r.group))}</span></div>`}<span class="odd odd-stack"><span class="odd-kicker">ODDS</span>${odds}</span></div><div class="time"><b>Kickoff</b> · ${esc(dateTime(r.kickoff))}</div><button class="details" data-i="${i}" type="button">Why this pick?</button><div class="m-why-row">Why this pick ›</div></article>`
+function groupByFixture(list){
+  const map=new Map()
+  for(const r of list){
+    const id=String(r.fixtureId||'')
+    if(!id)continue
+    if(!map.has(id))map.set(id,[])
+    map.get(id).push(r)
+  }
+  return [...map.values()].map(picks=>picks.slice().sort((a,b)=>(a.rank||99)-(b.rank||99)||comboScore(b)-comboScore(a)||Number(a.odds)-Number(b.odds)))
+}
+function groupClass(picks){
+  const outs=picks.map(r=>resultFor(r)?.outcome).filter(decided)
+  if(outs.length&&outs.every(o=>o==='won'))return'won'
+  if(outs.length&&outs.every(o=>o==='lost'))return'lost'
+  return''
+}
+function optionRow(r,gi,pi){
+  const conf=comboScore(r),odds=oddStr(r),x=resultFor(r)
+  const settled=decided(x?.outcome)?`<span class="pick-result ${esc(x.outcome)}">${outcomeLabel(x.outcome)}</span>`:''
+  return `<button class="combo-option" type="button" data-i="${gi}" data-p="${pi}" aria-label="Why ${esc(pickLabel(r))} was chosen"><span class="combo-option-rank">${esc(r.rank||pi+1)}</span><span class="combo-option-copy"><span class="combo-option-kicker">Option ${esc(r.rank||pi+1)} · ${esc(familyLabel(r.group))}</span><strong>${esc(pickLabel(r))}</strong></span><span class="combo-option-meta">${settled}<span class="odd odd-stack">${odds}</span>${conf>0?`<span class="combo-option-score">${esc(conf)}</span>`:''}</span></button>`
+}
+function card(picks,i){
+  const r=picks[0],score=scoreFor(r)
+  const n=picks.length
+  return `<article class="card combo-match ${stateFor(r)} ${groupClass(picks)}" data-i="${i}"><div class="m-card-top"><span class="m-top-left"><span class="m-board-tag combo">COMBO · ${n} OPTION${n===1?'':'S'}</span></span><span class="m-top-mid"></span><span class="m-top-right">${topStatus(r)}</span></div><div class="league"><span class="league-flag" role="img" aria-label="${esc(r.country||'International')} flag">${flag(r.country)}</span><span>${esc(r.league||'League')}</span></div>${matchup(r,score)}<div class="combo-options">${picks.map((p,pi)=>optionRow(p,i,pi)).join('')}</div><div class="time"><b>Kickoff</b> · ${esc(dateTime(r.kickoff))}</div><div class="m-why-row">Tap an option for why ›</div></article>`
 }
 function openWhy(r){
   const modal=$('#modal');if(!modal)return
@@ -130,32 +161,34 @@ function openWhy(r){
 function render(){
   renderDates()
   const base=rows().sort((a,b)=>kickoffMs(a)-kickoffMs(b)||(a.rank||99)-(b.rank||99))
+  const groups=groupByFixture(base)
   state.country=fill($('#countryFilter'),uniq(base.map(r=>r.country)),state.country,'All countries')
   const countryRows=state.country==='all'?base:base.filter(r=>r.country===state.country)
   state.league=fill($('#leagueFilter'),uniq(countryRows.map(r=>r.league)),state.league,'All leagues')
   if($('#statusFilter'))$('#statusFilter').value=state.status
   if($('#familyFilter'))$('#familyFilter').value=state.family
   renderChips(base)
-  renderTodayStats(base)
-  const filtered=base.filter(r=>{
+  renderTodayStats(groups)
+  const hero=$('#comboHeroCount');if(hero)hero.textContent=String(groups.length)
+  const filtered=groupByFixture(base.filter(r=>{
     const s=stateFor(r)
     if(state.status!=='all'&&s!==state.status)return false
     if(state.country!=='all'&&r.country!==state.country)return false
     if(state.league!=='all'&&r.league!==state.league)return false
     if(state.family!=='all'&&r.group!==state.family)return false
     return true
-  })
-  const matches=new Set(filtered.map(r=>String(r.fixtureId))).size
-  $('#status').textContent=`${filtered.length} combo pick${filtered.length===1?'':'s'} · ${matches} match${matches===1?'':'es'}`
+  }))
+  const optionCount=filtered.reduce((n,picks)=>n+picks.length,0)
+  $('#status').textContent=`${filtered.length} match${filtered.length===1?'':'es'} · ${optionCount} combo option${optionCount===1?'':'s'}`
   const host=$('#cards')
   host.innerHTML=filtered.length?filtered.map(card).join(''):'<div class="empty">No Combo picks match these filters yet.</div>'
   bindCrestFallbacks(host)
-  $$('article[data-i]').forEach(el=>{
-    const go=()=>openWhy(filtered[Number(el.dataset.i)])
-    el.onclick=e=>{if(e.target.closest('.details'))return;go()}
-    el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}
+  $$('.combo-option').forEach(el=>el.onclick=e=>{
+    e.stopPropagation()
+    const picks=filtered[Number(el.dataset.i)]||[]
+    const pick=picks[Number(el.dataset.p)]
+    if(pick)openWhy(pick)
   })
-  $$('button.details').forEach(el=>el.onclick=e=>{e.stopPropagation();openWhy(filtered[Number(el.dataset.i)])})
 }
 function skeleton(){const host=$('#cards');if(host)host.innerHTML=Array.from({length:6},()=>'<div class="card skeleton"><div></div><div></div><div></div><div></div></div>').join('')}
 function startPolling(){

@@ -42,9 +42,9 @@ test('public board drops internals and keeps only the requested view',()=>{
   assert.equal(goals.filterTips.length,0)
 })
 
-test('result rows compact to fixture id and outcome only',()=>{
-  const rows=compactResultRows([{fixtureId:11,home:'A',away:'B',why:{x:1},result:{outcome:'won'}}])
-  assert.deepEqual(rows,[{fixtureId:11,result:{outcome:'won'}}])
+test('result rows compact to fixture, market and outcome',()=>{
+  const rows=compactResultRows([{fixtureId:11,home:'A',away:'B',market:'combo-home-gg',selection:'Home Team or GG',why:{x:1},result:{outcome:'won'}}])
+  assert.deepEqual(rows,[{fixtureId:11,market:'combo-home-gg',selection:'Home Team or GG',result:{outcome:'won'}}])
 })
 
 test('settle job includes Goals Bankers',async()=>{

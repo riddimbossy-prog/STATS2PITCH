@@ -1,5 +1,5 @@
 const VIEWS=new Set(['all','var','filter','goals','combo','bankers'])
-const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why'])
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','homeSplit','awaySplit','bankerChecks','bankerApproved','currentVenueSamples','learning','learningProfile','marketWhy','oddsBook','why'])
 
 function slimMeta(meta={}){
   return{
@@ -95,25 +95,33 @@ function slimFixtures(rows){
   }))
 }
 
+function slimResult(r){
+  return{
+    outcome:r.outcome||'pending',
+    matchState:r.matchState||'pending',
+    homeScore:r.homeScore??r.home?.score??null,
+    awayScore:r.awayScore??r.away?.score??null,
+    minute:r.minute||r.clock||null,
+    status:r.status||'',
+    live:r.live===true,
+    finished:r.finished===true,
+    postponed:r.postponed===true,
+    cancelled:r.cancelled===true
+  }
+}
 function slimResults(results,picks){
   const src=results&&typeof results==='object'?results:{}
-  const ids=new Set((picks||[]).map(p=>String(p?.fixtureId||'')).filter(Boolean))
+  const keys=new Set()
+  for(const p of picks||[]){
+    const id=String(p?.fixtureId||'')
+    if(id)keys.add(id)
+    if(p?.fixtureId!=null&&p?.market)keys.add(`${p.fixtureId}|${p.market}|${String(p.selection||'').trim()}`)
+  }
   const out={}
-  for(const id of ids){
+  for(const id of keys){
     const r=src[id]
     if(!r)continue
-    out[id]={
-      outcome:r.outcome||'pending',
-      matchState:r.matchState||'pending',
-      homeScore:r.homeScore??r.home?.score??null,
-      awayScore:r.awayScore??r.away?.score??null,
-      minute:r.minute||r.clock||null,
-      status:r.status||'',
-      live:r.live===true,
-      finished:r.finished===true,
-      postponed:r.postponed===true,
-      cancelled:r.cancelled===true
-    }
+    out[id]=slimResult(r)
   }
   return out
 }
@@ -225,5 +233,10 @@ export function publicBoard(board={},view='all'){
 }
 
 export function compactResultRows(rows){
-  return (Array.isArray(rows)?rows:[]).map(p=>({fixtureId:p?.fixtureId??null,result:p?.result||null}))
+  return (Array.isArray(rows)?rows:[]).map(p=>({
+    fixtureId:p?.fixtureId??null,
+    market:p?.market||null,
+    selection:p?.selection||null,
+    result:p?.result||null
+  }))
 }

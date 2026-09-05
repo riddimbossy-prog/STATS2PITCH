@@ -235,3 +235,29 @@ test('after kickoff the published market stays even if the engine would change i
   assert.equal(kept.bankers[0].odds,1.54)
   await clearBoard(date)
 })
+
+test('a Combo V3.3 refresh replaces V3.2 rows so each match can publish two gated options',async()=>{
+  const date='2099-02-07'
+  await clearBoard(date)
+  const oldPick={
+    fixtureId:'51',market:'combo-home-over-25',selection:'Home Team or Over 2.5',
+    engineVersion:'combo-v3.2-hard-gates-only',kickoff:`${date}T18:00:00Z`
+  }
+  await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[oldPick],bankers:[],priority:[],results:{},availableMarkets:[],
+    comboMeta:{engine:'combo-v3.2-hard-gates-only'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',comboEngine:'combo-v3.2-hard-gates-only',sourceFixtures:20,scheduledFixtures:20}
+  },{preservePublished:false})
+  const freshA={fixtureId:'51',market:'combo-home-over-25',selection:'Home Team or Over 2.5',engineVersion:'combo-v3.3-best-two',kickoff:`${date}T18:00:00Z`}
+  const freshB={fixtureId:'51',market:'combo-home-gg',selection:'Home Team or GG',engineVersion:'combo-v3.3-best-two',kickoff:`${date}T18:00:00Z`}
+  const saved=await saveBoard(date,{
+    bestPicks:[],varTips:[],filterTips:[],goalsBankers:[],comboPicks:[freshA,freshB],bankers:[],priority:[],results:{},availableMarkets:[],
+    comboMeta:{engine:'combo-v3.3-best-two'},
+    meta:{date,engineVersion:'stats2pitch-v5-var-tips',comboEngine:'combo-v3.3-best-two',sourceFixtures:20,scheduledFixtures:20,generatedAt:`${date}T06:00:00Z`}
+  })
+  assert.equal(saved.comboPicks.length,2)
+  assert.ok(saved.comboPicks.every(row=>row.engineVersion==='combo-v3.3-best-two'))
+  assert.equal(saved.meta.comboEngine,'combo-v3.3-best-two')
+  assert.equal(saved.meta.comboCount,2)
+  await clearBoard(date)
+})
