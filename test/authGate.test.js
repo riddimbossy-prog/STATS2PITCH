@@ -57,14 +57,14 @@ test('Results page loads the same sign-in gate as All Picks',async()=>{
   assert.match(home,/gate\.js\?v=5\.18\.0/)
 })
 
-test('service worker self-destructs so iPhone sign-in is not cached stale',()=>{
-  assert.match(sw,/stats2pitch-shell-v5\.15\.0/)
-  assert.match(sw,/registration\.unregister/)
-  assert.match(sw,/clients\.map\(c=>c\.navigate/)
-  assert.doesNotMatch(sw,/addEventListener\('fetch'/)
+test('service worker stays installable without caching sign-in HTML',()=>{
+  assert.match(sw,/stats2pitch-shell-v5\.20\.0/)
+  assert.match(sw,/addEventListener\("fetch"/)
+  assert.match(sw,/skipCache/)
+  assert.match(sw,/path\.startsWith\("\/apk\/"\)/)
   assert.doesNotMatch(sw,/functions\/v1/)
-  assert.match(pwa,/s2p-sw-kill-/)
-  assert.match(pwa,/unregister\(\)/)
-  assert.doesNotMatch(pwa,/serviceWorker\.register/)
-  assert.match(pwa,/v=5\.15\.0/)
+  assert.match(pwa,/serviceWorker\.register/)
+  assert.match(pwa,/s2p-install-sheet/)
+  assert.match(pwa,/Download Android App/)
+  assert.doesNotMatch(pwa,/s2p-sw-kill-/)
 })

@@ -75,8 +75,9 @@ test('public clients request a slim board view and reuse a cached board',async()
     assert.match(src,/warmNeighbors/)
   }
   assert.match(files[4],/sessionStorage/)
-  assert.match(files[5],/registration\.unregister/)
-  assert.doesNotMatch(files[5],/addEventListener\('fetch'/)
+  assert.match(files[5],/addEventListener\("fetch"/)
+  assert.match(files[5],/skipCache/)
+  assert.doesNotMatch(files[5],/functions\/v1/)
 })
 
 test('public board slims pick internals, unused results and fixture extras',()=>{

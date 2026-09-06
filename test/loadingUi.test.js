@@ -14,7 +14,7 @@ test('v4 uses skeleton loading and installable PWA shell',async()=>{
   assert.match(app,/setInterval\(async\(\)=>/)
   assert.match(pwa,/beforeinstallprompt/)
   assert.match(pwa,/serviceWorker/)
-  assert.match(sw,/registration\.unregister/)
+  assert.match(sw,/skipWaiting/)
   await access(new URL('../public/offline.html',import.meta.url))
 })
 

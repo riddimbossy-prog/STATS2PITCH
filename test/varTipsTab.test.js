@@ -37,8 +37,8 @@ test('VAR Tips is a dedicated public tab with no method copy',async()=>{
     assert.match(page,/href="\/daily-bankers\.html"/)
     assert.doesNotMatch(page,/href="\/bankers\.html"/)
   }
-  assert.match(sw,/registration\.unregister/)
-  assert.doesNotMatch(sw,/addEventListener\('fetch'/)
+  assert.match(sw,/addEventListener\("fetch"/)
+  assert.match(sw,/skipCache/)
   assert.match(manifest,/"url":"\/var-tips\.html"/)
   assert.match(manifest,/"url":"\/filter-tips\.html"/)
   assert.match(manifest,/"url":"\/goals-bankers\.html"/)
