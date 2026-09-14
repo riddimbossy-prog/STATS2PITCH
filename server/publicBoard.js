@@ -1,5 +1,5 @@
 const VIEWS=new Set(['all','var','filter','goals','combo','h2h','bankers'])
-const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','learning','why','occurrence','h2hHits','h2hMatches','userWhy'])
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','learning','why','occurrence','h2hHits','h2hMatches','formRate','formHits','formMatches','userWhy'])
 
 function slimMeta(meta={}){
   return{

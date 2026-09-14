@@ -9,6 +9,7 @@ Generator for Stats2Pitch boards and sporty.codes Elite.
 - **VAR Tips** — dedicated board (`away-fav-streak-v1`) for home and away favourites. This is the feed for sporty.codes Elite.
 - **Goals Bankers** — V5 team-goal ladder (`goals-bankers-v5.4`). One pick per match from team 2+, Over 2.5 or GG. At least one team must sit in the overall Top 5. Skip is a valid result. Does not feed Elite.
 - **Combo** — SportyBet Combo OR markets (`combo-v3.3-best-two`). Best two qualifying markets per match after hard odds gates. A match with only one survivor publishes that one option. Does not feed Elite.
+- **H2H** — split same-venue meetings (`h2h-v1.4-form-60`). A market publishes at 80%+ H2H only when last-5 venue form still backs it at 60%+. If form does not confirm, the match is skipped. Does not feed Elite.
 
 Public pages show fixture, teams, logos, league, kickoff, market, pick and odds. Engine method is not published on the site.
 

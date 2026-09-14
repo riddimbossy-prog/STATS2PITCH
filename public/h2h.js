@@ -94,7 +94,7 @@ function optionRow(r,gi,pi){
 }
 function card(picks,i){
   const r=picks[0],score=scoreFor(r),n=picks.length
-  return `<article class="card combo-match ${stateFor(r)} ${groupClass(picks)}" data-i="${i}"><div class="m-card-top"><span class="m-top-left"><span class="m-board-tag combo">H2H · ${n} OPTION${n===1?'':'S'}</span></span><span class="m-top-mid"></span><span class="m-top-right">${topStatus(r)}</span></div><div class="league"><span class="league-flag" role="img" aria-label="${esc(r.country||'International')} flag">${flag(r.country)}</span><span>${esc(r.league||'League')}</span></div>${matchup(r,score)}<div class="combo-options">${picks.map((p,pi)=>optionRow(p,i,pi)).join('')}</div><div class="time"><b>Kickoff</b> · ${esc(kick(r))} · ${r.h2hHits}/${r.h2hMatches} split H2Hs</div><div class="m-why-row">Tap an option for why ›</div></article>`
+  return `<article class="card combo-match ${stateFor(r)} ${groupClass(picks)}" data-i="${i}"><div class="m-card-top"><span class="m-top-left"><span class="m-board-tag combo">H2H · ${n} OPTION${n===1?'':'S'}</span></span><span class="m-top-mid"></span><span class="m-top-right">${topStatus(r)}</span></div><div class="league"><span class="league-flag" role="img" aria-label="${esc(r.country||'International')} flag">${flag(r.country)}</span><span>${esc(r.league||'League')}</span></div>${matchup(r,score)}<div class="combo-options">${picks.map((p,pi)=>optionRow(p,i,pi)).join('')}</div><div class="time"><b>Kickoff</b> · ${esc(kick(r))} · ${r.h2hHits}/${r.h2hMatches} split H2Hs · form ${esc(r.formRate??'—')}%</div><div class="m-why-row">Tap an option for why ›</div></article>`
 }
 function renderChips(base){
   const host=$('#countryChips');if(!host)return
@@ -126,8 +126,8 @@ function render(){
   }))
   const optionCount=filtered.reduce((n,picks)=>n+picks.length,0)
   const hero=$('#comboHeroCount');if(hero)hero.textContent=String(filtered.length)
-  $('#status').textContent=`${filtered.length} match${filtered.length===1?'':'es'} · ${optionCount} 80%+ pattern${optionCount===1?'':'s'}`
-  $('#cards').innerHTML=filtered.length?filtered.map(card).join(''):'<div class="empty">No split H2H market reached 80% with enough meetings.</div>'
+  $('#status').textContent=`${filtered.length} match${filtered.length===1?'':'es'} · ${optionCount} 80%+ pattern${optionCount===1?'':'s'} with 60% form`
+  $('#cards').innerHTML=filtered.length?filtered.map(card).join(''):'<div class="empty">No split H2H market reached 80% with current form still at 60%.</div>'
   bindCrestFallbacks($('#cards'))
   $$('.combo-option').forEach(el=>el.onclick=e=>{
     e.stopPropagation()
@@ -140,7 +140,7 @@ function open(r){
   if(!r)return
   const modal=$('#modal');if(!modal)return
   modal.classList.remove('hidden')
-  modal.innerHTML=`<div class="dialog"><div class="combo-modal-title">Split H2H Pattern</div><h3>${esc(r.home)} vs ${esc(r.away)}</h3><div class="pick"><strong>${esc(pickLabel(r))}</strong><span class="odd">${oddStr(r)}</span></div><p>${esc(r.userWhy)}</p><div class="combo-modal-score">Occurrence ${r.occurrence}% · ${r.h2hHits}/${r.h2hMatches} same-venue meetings · minimum 80% · min price 1.20</div><button class="close">Close</button></div>`
+  modal.innerHTML=`<div class="dialog"><div class="combo-modal-title">Split H2H Pattern</div><h3>${esc(r.home)} vs ${esc(r.away)}</h3><div class="pick"><strong>${esc(pickLabel(r))}</strong><span class="odd">${oddStr(r)}</span></div><p>${esc(r.userWhy)}</p><div class="combo-modal-score">Occurrence ${r.occurrence}% · form ${esc(r.formRate??'—')}% · ${r.h2hHits}/${r.h2hMatches} same-venue meetings · minimum 80% H2H and 60% current form · min price 1.20</div><button class="close">Close</button></div>`
   modal.querySelector('.close').onclick=()=>modal.classList.add('hidden')
 }
 function startPolling(){
