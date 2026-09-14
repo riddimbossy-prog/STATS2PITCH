@@ -320,6 +320,18 @@ function isBlockedHomeOrPick(row:any){
   const sel=String(row?.selection||row?.displaySelection||row?.pick||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
   return sel==='12'||sel==='1x'||sel==='home away'||sel.includes('home or away')||sel.includes('home or draw')
 }
+function publicH2HWhy(row:any){
+  const sel=String(row?.displaySelection||row?.selection||'This pick').trim()||'This pick'
+  const home=String(row?.home||'Home')
+  const away=String(row?.away||'Away')
+  return `${sel} is the published head-to-head pick for ${home} vs ${away}.`
+}
+function publicH2HPick(row:any){
+  const next={...row,userWhy:publicH2HWhy(row)}
+  for(const k of ['occurrence','h2hHits','h2hMatches','formRate','formHits','formMatches','engineVersion','engine','confidence','engineRating','source','sportyEventId','sportyGameId']) delete next[k]
+  delete next.why
+  return next
+}
 function sanitizeFilterTips(rows:any,expectedEngine:any=FILTER_ENGINE){
   const eng=String(expectedEngine||FILTER_ENGINE).trim()||FILTER_ENGINE
   return (Array.isArray(rows)?rows:[]).filter((row:any)=>{
@@ -362,7 +374,7 @@ function sanitizeH2HPicks(rows:any){
   const out:any[]=[]
   for(const picks of groups.values()){
     picks.sort((a,b)=>(a.rank||99)-(b.rank||99)||(b.occurrence||0)-(a.occurrence||0)||Number(a.odds)-Number(b.odds))
-    picks.slice(0,2).forEach((p,i)=>out.push({...p,rank:i+1}))
+    picks.slice(0,2).forEach((p,i)=>out.push(publicH2HPick({...p,rank:i+1})))
   }
   return out
 }
@@ -399,7 +411,6 @@ function slimMeta(meta:any={}){
     goalsBankersCount:meta.goalsBankersCount,
     comboEngine:meta.comboEngine,
     comboCount:meta.comboCount,
-    h2hEngine:meta.h2hEngine,
     h2hCount:meta.h2hCount,
     dailyBankersEngine:meta.dailyBankersEngine,
     safestBankersCount:meta.safestBankersCount,
@@ -408,7 +419,7 @@ function slimMeta(meta:any={}){
     refresh:meta.refresh||null
   }
 }
-const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','learning','why','occurrence','h2hHits','h2hMatches','userWhy'])
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','learning','why','userWhy'])
 function slimForm(rows:any){
   return (Array.isArray(rows)?rows:[]).slice(0,5).map((x:any)=>({
     result:x?.result||'',opponent:x?.opponent||'',home:x?.home||'',away:x?.away||'',
@@ -530,9 +541,10 @@ function publicBoard(board:any={},view='all'){
   if(v==='combo'){empty.comboPicks=split.comboPicks;empty.comboMeta=board?.comboMeta||null;empty.availableMarkets=markets(empty.comboPicks);return finalizePublic(empty)}
   if(v==='h2h'){
     empty.h2hPicks=sanitizeH2HPicks(board?.h2hPicks)
-    empty.h2hMeta=board?.h2hMeta||null
+    empty.h2hMeta={count:empty.h2hPicks.length}
     empty.availableMarkets=markets(empty.h2hPicks)
     empty.meta.h2hCount=empty.h2hPicks.length
+    delete empty.meta.h2hEngine
     return finalizePublic(empty)
   }
   if(v==='bankers'){

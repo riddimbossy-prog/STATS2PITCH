@@ -88,6 +88,19 @@ test('Goals Bankers is a dedicated public tab with slip rules and no method copy
   assert.doesNotMatch(js,/Goals Streak|first-match|streak window|streak_yes|1\.10|1\.40/i)
 })
 
+test('H2H is a dedicated public tab with no method copy',async()=>{
+  const [html,js]=await Promise.all([
+    read('public/h2h.html'),
+    read('public/h2h.js')
+  ])
+  assert.match(html,/data-view="h2h"/)
+  assert.match(html,/h2h\.js/)
+  assert.match(html,/Smart Football Picks/)
+  assert.match(js,/board\?\.h2hPicks/)
+  assert.doesNotMatch(html,/80%|60%|form 60|Pattern Engine|same-venue|current venue form|min price/i)
+  assert.doesNotMatch(js,/80%|60%|formRate|h2hHits|occurrence|split H2Hs|current-form|min price 1\.20/i)
+})
+
 test('All Picks no longer brand the VAR engine on the public pages',async()=>{
   const [index,app]=await Promise.all([
     read('public/index.html'),

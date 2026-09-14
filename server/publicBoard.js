@@ -1,5 +1,5 @@
 const VIEWS=new Set(['all','var','filter','goals','combo','h2h','bankers'])
-const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','learning','why','occurrence','h2hHits','h2hMatches','formRate','formHits','formMatches','userWhy'])
+const PICK_KEEP=new Set(['fixtureId','home','away','homeLogo','awayLogo','homeId','awayId','league','country','kickoff','market','marketName','selection','displaySelection','pick','odds','publishedAt','reasons','shortReason','homeConsensus','awayConsensus','consensus','engineRating','comboScore','rank','group','earlySeason','favourite','kind','route','family','engine','engineVersion','classification','learning','why','userWhy'])
 
 function slimMeta(meta={}){
   return{
@@ -20,7 +20,6 @@ function slimMeta(meta={}){
     goalsBankersCount:meta.goalsBankersCount,
     comboEngine:meta.comboEngine,
     comboCount:meta.comboCount,
-    h2hEngine:meta.h2hEngine,
     h2hCount:meta.h2hCount,
     dailyBankersEngine:meta.dailyBankersEngine,
     safestBankersCount:meta.safestBankersCount,
@@ -203,6 +202,18 @@ function isBlockedHomeOrPick(row){
   const sel=String(row?.selection||row?.displaySelection||row?.pick||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim()
   return sel==='12'||sel==='1x'||sel==='home away'||sel.includes('home or away')||sel.includes('home or draw')
 }
+export function publicH2HWhy(row){
+  const sel=String(row?.displaySelection||row?.selection||'This pick').trim()||'This pick'
+  const home=String(row?.home||'Home')
+  const away=String(row?.away||'Away')
+  return `${sel} is the published head-to-head pick for ${home} vs ${away}.`
+}
+function publicH2HPick(row){
+  const next={...row,userWhy:publicH2HWhy(row)}
+  for(const k of ['occurrence','h2hHits','h2hMatches','formRate','formHits','formMatches','engineVersion','engine','confidence','engineRating','source','sportyEventId','sportyGameId']) delete next[k]
+  delete next.why
+  return next
+}
 export function sanitizeFilterTips(rows,expectedEngine=FILTER_ENGINE){
   const eng=String(expectedEngine||FILTER_ENGINE).trim()||FILTER_ENGINE
   return (Array.isArray(rows)?rows:[]).filter(row=>{
@@ -247,7 +258,7 @@ export function sanitizeH2HPicks(rows){
   const out=[]
   for(const picks of groups.values()){
     picks.sort((a,b)=>(a.rank||99)-(b.rank||99)||(b.occurrence||0)-(a.occurrence||0)||Number(a.odds)-Number(b.odds))
-    picks.slice(0,2).forEach((p,i)=>out.push({...p,rank:i+1}))
+    picks.slice(0,2).forEach((p,i)=>out.push(publicH2HPick({...p,rank:i+1})))
   }
   return out
 }
@@ -342,9 +353,10 @@ export function publicBoard(board={},view='all'){
   }
   if(v==='h2h'){
     empty.h2hPicks=sanitizeH2HPicks(board?.h2hPicks)
-    empty.h2hMeta=board?.h2hMeta||null
+    empty.h2hMeta={count:empty.h2hPicks.length}
     empty.availableMarkets=markets(empty.h2hPicks)
     empty.meta.h2hCount=empty.h2hPicks.length
+    delete empty.meta.h2hEngine
     return finalize(empty)
   }
   if(v==='bankers'){

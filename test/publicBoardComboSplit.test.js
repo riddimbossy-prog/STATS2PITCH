@@ -100,7 +100,7 @@ test('public combo view keeps rank and group so two options render per match',()
 })
 
 test('view=h2h returns only split H2H picks',()=>{
-  const pick={fixtureId:9,market:'match-winner',selection:'Home',odds:1.50,occurrence:100,h2hHits:5,h2hMatches:5,formRate:80,formHits:4,formMatches:5,userWhy:'same venue'}
+  const pick={fixtureId:9,home:'Arsenal',away:'Chelsea',market:'match-winner',selection:'Home',odds:1.50,occurrence:100,h2hHits:5,h2hMatches:5,formRate:80,formHits:4,formMatches:5,engineVersion:'h2h-v1.4-form-60',why:{marketChosen:'80% split H2Hs'},userWhy:'same venue'}
   const board={
     meta:{h2hEngine:'h2h-v1-split-80',h2hCount:1},
     h2hPicks:[pick],
@@ -109,12 +109,21 @@ test('view=h2h returns only split H2H picks',()=>{
   }
   const view=publicBoard(board,'h2h')
   assert.equal(view.h2hPicks.length,1)
-  assert.equal(view.h2hPicks[0].occurrence,100)
-  assert.equal(view.h2hPicks[0].formRate,80)
-  assert.equal(view.h2hPicks[0].userWhy,'same venue')
+  assert.equal(view.h2hPicks[0].selection,'Home')
+  assert.equal(view.h2hPicks[0].formRate,undefined)
+  assert.equal(view.h2hPicks[0].occurrence,undefined)
+  assert.equal(view.h2hPicks[0].h2hHits,undefined)
+  assert.equal(view.h2hPicks[0].formHits,undefined)
+  assert.equal(view.h2hPicks[0].engineVersion,undefined)
+  assert.equal(view.h2hPicks[0].why,undefined)
+  assert.match(view.h2hPicks[0].userWhy,/published head-to-head pick/)
+  assert.match(view.h2hPicks[0].userWhy,/Arsenal vs Chelsea/)
+  assert.doesNotMatch(view.h2hPicks[0].userWhy,/80%|60%|form gate|same venue/i)
   assert.equal(view.comboPicks.length,0)
   assert.equal(view.bestPicks.length,0)
-  assert.equal(view.meta.h2hEngine,'h2h-v1-split-80')
+  assert.equal(view.meta.h2hEngine,undefined)
+  assert.equal(view.meta.h2hCount,1)
+  assert.deepEqual(view.h2hMeta,{count:1})
 })
 
 test('public board drops stale Filter V2, blank odds and sub-1.20 prices',()=>{
@@ -250,7 +259,8 @@ test('public board never publishes SportyBet in page copy or Why text',()=>{
   assertNoBookmaker(filter.filterTips)
   assertNoBookmaker(combo.comboPicks)
   assert.match(all.bestPicks[0].reasons[0],/Listed price 1\.33/)
-  assert.match(h2h.h2hPicks[0].userWhy,/currently listed at a qualifying price/)
+  assert.match(h2h.h2hPicks[0].userWhy,/published head-to-head pick/)
+  assert.doesNotMatch(h2h.h2hPicks[0].userWhy,/80%|historical meetings|form gate/i)
   assert.match(filter.filterTips[0].reasons[0],/cleared the odds filter at 1\.40/)
   assert.match(combo.comboPicks[0].reasons[0],/listed Yes 1\.44/)
 })

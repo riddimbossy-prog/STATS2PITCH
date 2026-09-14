@@ -160,12 +160,11 @@ function render(){
   renderCountryChips(baseRows)
   renderStats(baseRows)
   const rows=filtered(baseRows)
-  const engine=state.board?.dailyBankersMeta?.engine||state.board?.meta?.dailyBankersEngine||'daily-bankers-v2'
   if(!state.board){
     $('#status').textContent='Loading…'
     return
   }
-  $('#status').textContent=`${rows.length} banker${rows.length===1?'':'s'} · ${engine}`
+  $('#status').textContent=`${rows.length} banker${rows.length===1?'':'s'}`
   $('#cards').innerHTML=rows.length?rows.map(card).join(''):'<div class="empty">No Daily Bankers match these filters yet.</div>'
   bindCrestFallbacks($('#cards'))
   $$('article[data-i]').forEach(el=>{const go=()=>open(rows[Number(el.dataset.i)]);el.onclick=e=>{if(e.target.closest('.details'))return;go()};el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}})
