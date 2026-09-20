@@ -14,7 +14,7 @@ function fixture({homeScores, awayScores, price = 1.75, markets, id = 1} = {}) {
   const home = homeScores || [[1, 1], [1, 0], [2, 1], [1, 2], [1, 1]]
   const away = awayScores || [[2, 1], [3, 1], [1, 1], [2, 0], [2, 1]]
   return {
-    fixtureId: id, league: 'Test League', country: 'England', kickoff: '2026-09-22T12:00:00Z',
+    fixtureId: id, league: 'Test League', country: 'England', kickoff: id === 1 ? '2026-09-22T12:00:00Z' : '2026-09-22T13:00:00Z',
     home: {id: 1, name: 'Stal', fixtures: rows(1, 'home', home)},
     away: {id: 2, name: 'Legia', fixtures: rows(2, 'away', away)},
     statsReady: true,
