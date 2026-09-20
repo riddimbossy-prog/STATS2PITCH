@@ -185,7 +185,7 @@ export function isComboBoardPick(r){
   return m.startsWith('combo-')||engine.startsWith('combo-')
 }
 
-const FILTER_ENGINE='perfect-split-v1'
+const FILTER_ENGINE='adaptive-match-v1'
 const FILTER_MIN_ODD=1.20
 const H2H_MIN_ODD=1.20
 const BANKER_MIN_ODD=1.20
