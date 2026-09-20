@@ -3,7 +3,7 @@ import {learningAllows, stampLearning} from './learning.js'
 import {attachWhy, last5Form, last5Overall, fixtureHasStats, teamStats} from './pickWhy.js'
 import {isSrlMatch, isEarlySeason} from './redFlags.js'
 import {extractFilterOdds, isCupCompetition} from './filterEngineV2.js'
-import {MARKETS, settleMarket} from './perfectSplit.js'
+import {MARKETS, settleMarket, profileOf as splitProfile} from './perfectSplit.js'
 
 export {extractFilterOdds, isCupCompetition}
 export const ENGINE_ID = 'adaptive-match-v1'
@@ -166,7 +166,7 @@ function whyLines(f, home, away, shape, winner, runner) {
     'The main matchup supports ' + h + '. I also tested a quiet game, an open game, the stronger side blanking, an underdog surge, and one side carrying the goals.',
     'The most difficult of those scenarios for ' + m.display + ' is ' + winner.worst.name + '. Its estimated chance there is ' + Math.round(winner.worst.chance * 100) + '%, so the pick still has a clear failure path.',
     m.display + ' was selected at ' + winner.odds.toFixed(2) + ' because its matchup and scenario support was strongest relative to its price' +
-      (runner ? '; ' + runner.market.display + ' was the closest alternative but depended more on a narrower outcome.' : '.')
+      (runner ? '; ' + runner.market.display + ' was the closest alternative but had a lower scenario-adjusted edge at its price.' : '.')
   ]
   return lines
 }
@@ -178,6 +178,8 @@ function packPick(f, home, away, shape, winner, runner, book) {
   const lastMatchesHome = last5Overall(f?.home?.lastMatches || f?.home?.fixtures, f?.home?.id)
   const lastMatchesAway = last5Overall(f?.away?.lastMatches || f?.away?.fixtures, f?.away?.id)
   const reasons = whyLines(f, home, away, shape, winner, runner)
+  const homeHits = market.homeStat(splitProfile(venueGames(f?.home?.fixtures, f?.home?.id, 'home')))
+  const awayHits = market.awayStat(splitProfile(venueGames(f?.away?.fixtures, f?.away?.id, 'away')))
   const pick = {
     fixtureId: f.fixtureId, league: f.league, country: f.country, kickoff: f.kickoff,
     home: f?.home?.name, away: f?.away?.name, homeId: f?.home?.id ?? null, awayId: f?.away?.id ?? null,
@@ -186,7 +188,7 @@ function packPick(f, home, away, shape, winner, runner, book) {
     displaySelection: market.display, pick: market.display, odds: round(winner.odds),
     engine: ENGINE_ID, engineVersion: ENGINE_VERSION, route: market.route, marketId: market.id,
     favourite: shape.favourite, family: market.family,
-    homeConsensus: home.over15, awayConsensus: away.over15,
+    homeConsensus: pct(homeHits, home.sample), awayConsensus: pct(awayHits, away.sample),
     consensus: Math.round(winner.probability * 100),
     filterScore: Math.round(winner.robust * 100), rawFilterScore: round(winner.score * 100),
     displayScore: Math.round(winner.robust * 100), capability: Math.round(winner.normal * 100),
