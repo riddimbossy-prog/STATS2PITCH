@@ -44,14 +44,29 @@ function formMatches(rows,esc){
 function avgCell(v){return v==null||v===''?'—':String(v)}
 function pctCell(v){return v==null||v===''?'—':`${v}%`}
 
+function formIsVenue(rows,expected){
+  const list=Array.isArray(rows)?rows:[]
+  return list.length>0&&list.every(x=>x?.venue===expected)
+}
+
+function formHeading(name,rows,side){
+  if(formIsVenue(rows,side==='home'?'H':'A'))return `${name|| (side==='home'?'Home':'Away')} · last 5 ${side}`
+  return `${name|| (side==='home'?'Home':'Away')} · last matches`
+}
+
 function comparisonHtml(why,r,esc){
   const home=why?.homeStats||why?.homeAvg||{}
   const away=why?.awayStats||why?.awayAvg||{}
   if(home.played==null&&away.played==null&&home.ppg==null&&away.ppg==null&&home.gf==null&&away.gf==null)return''
+  const homeForm=why?.lastMatchesHome||why?.last5Home||[]
+  const awayForm=why?.lastMatchesAway||why?.last5Away||[]
+  const venue=formIsVenue(homeForm,'H')&&formIsVenue(awayForm,'A')
+  const homeHead=venue?`${r.home||'Home'} home`:(r.home||'Home')
+  const awayHead=venue?`${r.away||'Away'} away`:(r.away||'Away')
   return`<div class="why-compare">
-    <h4>Team stats · last matches</h4>
+    <h4>${venue?'Team stats · last 5 at venue':'Team stats · last matches'}</h4>
     <table>
-      <thead><tr><th></th><th>${esc(r.home||'Home')}</th><th>${esc(r.away||'Away')}</th></tr></thead>
+      <thead><tr><th></th><th>${esc(homeHead)}</th><th>${esc(awayHead)}</th></tr></thead>
       <tbody>
         <tr><th>Matches</th><td>${esc(avgCell(home.played))}</td><td>${esc(avgCell(away.played))}</td></tr>
         <tr><th>Win %</th><td>${esc(pctCell(home.winPct))}</td><td>${esc(pctCell(away.winPct))}</td></tr>
@@ -243,8 +258,8 @@ export function whySectionHtml(r,esc=fallbackEsc,opts={}){
     ${consensusHtml(r,esc)}
     ${choice?marketChoiceHtml(choice,esc):(lines.length?`<ul class="why-lines">${lines.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'<p class="why-empty">The published tip is preserved. Form detail will appear after the next board refresh.</p>')}
     ${homeForm.length||awayForm.length?`<div class="why-form">
-      <section><h4>${esc(r.home||'Home')} · last matches</h4>${formPills(homeForm,esc)}${formMatches(homeForm,esc)}</section>
-      <section><h4>${esc(r.away||'Away')} · last matches</h4>${formPills(awayForm,esc)}${formMatches(awayForm,esc)}</section>
+      <section><h4>${esc(formHeading(r.home,homeForm,'home'))}</h4>${formPills(homeForm,esc)}${formMatches(homeForm,esc)}</section>
+      <section><h4>${esc(formHeading(r.away,awayForm,'away'))}</h4>${formPills(awayForm,esc)}${formMatches(awayForm,esc)}</section>
     </div>`:''}
     ${comparisonHtml(why,r,esc)}
     ${h2hHtml(why.h2h,esc)}

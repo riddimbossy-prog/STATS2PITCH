@@ -173,7 +173,34 @@ test('All Picks, VAR Tips, Filter Tips and Goals Bankers open a why popup on mat
   assert.match(popup,/Why not the other markets/)
   assert.match(popup,/goalsMarketWhy/)
   assert.match(popup,/last matches/)
+  assert.match(popup,/last 5 \$\{side\}/)
+  assert.match(popup,/last 5 at venue/)
   assert.match(popup,/Team stats/)
   assert.doesNotMatch(popup,/Goals Streak|first-match/)
   assert.doesNotMatch(varJs,/Goals Streak|first-match|streak window/)
+})
+
+test('filter venue form is labelled as last 5 home and away',()=>{
+  const html=whySectionHtml({
+    home:'Lochin',
+    away:'Respublika Football Academy',
+    displaySelection:'BTTS No',
+    homeConsensus:60,
+    awayConsensus:40,
+    reasons:['Lochin have averaged 1.2 scored and 0.4 conceded at home; Respublika Football Academy have averaged 1.8 scored and 1.0 conceded away.'],
+    why:{
+      homeStats:{played:5,winPct:60,ppg:2.2,gf:1.2,ga:0.4,btts:40,over15:60,over25:20},
+      awayStats:{played:5,winPct:40,ppg:1.8,gf:1.8,ga:1,btts:60,over15:80,over25:80},
+      lastMatchesHome:[{result:'W',venue:'H',hs:2,as:1,opponent:'Aral',date:'2026-08-10'}],
+      lastMatchesAway:[{result:'W',venue:'A',hs:0,as:3,opponent:'Pakhtakor',date:'2026-08-12'}]
+    }
+  })
+  assert.match(html,/Lochin · last 5 home/)
+  assert.match(html,/Respublika Football Academy · last 5 away/)
+  assert.match(html,/Team stats · last 5 at venue/)
+  assert.match(html,/Lochin home/)
+  assert.match(html,/Respublika Football Academy away/)
+  assert.match(html,/>1\.2</)
+  assert.match(html,/>2\.2</)
+  assert.doesNotMatch(html,/Lochin · last matches/)
 })

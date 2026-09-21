@@ -1,6 +1,6 @@
 import {ENGINE_VERSION, FINISHED, FORM_SAMPLE} from './config.js'
 import {learningAllows, stampLearning} from './learning.js'
-import {attachWhy, last5Form, last5Overall, fixtureHasStats} from './pickWhy.js'
+import {attachWhy, last5Form, fixtureHasStats} from './pickWhy.js'
 import {isSrlMatch, isEarlySeason} from './redFlags.js'
 import {extractFilterOdds, isCupCompetition} from './filterEngineV2.js'
 import {MARKETS, settleMarket, profileOf as splitProfile} from './perfectSplit.js'
@@ -198,12 +198,26 @@ function whyLines(f, home, away, shape, winner, runner) {
   return lines
 }
 
+function venuePublicStats(profile) {
+  if (!profile?.sample) {
+    return {played: 0, winPct: null, ppg: null, gf: null, ga: null, btts: null, over15: null, over25: null}
+  }
+  return {
+    played: profile.sample,
+    winPct: profile.winPct,
+    ppg: profile.ppg,
+    gf: profile.gf,
+    ga: profile.ga,
+    btts: profile.btts,
+    over15: profile.over15,
+    over25: profile.over25
+  }
+}
+
 function packPick(f, home, away, shape, winner, runner, book) {
   const market = winner.market
   const last5Home = last5Form(f?.home?.fixtures, f?.home?.id, 'home')
   const last5Away = last5Form(f?.away?.fixtures, f?.away?.id, 'away')
-  const lastMatchesHome = last5Overall(f?.home?.lastMatches || f?.home?.fixtures, f?.home?.id)
-  const lastMatchesAway = last5Overall(f?.away?.lastMatches || f?.away?.fixtures, f?.away?.id)
   const reasons = whyLines(f, home, away, shape, winner, runner)
   const homeHits = market.homeStat(splitProfile(venueGames(f?.home?.fixtures, f?.home?.id, 'home')))
   const awayHits = market.awayStat(splitProfile(venueGames(f?.away?.fixtures, f?.away?.id, 'away')))
@@ -228,7 +242,17 @@ function packPick(f, home, away, shape, winner, runner, book) {
     homeSplit: f.homeSplit || null, awaySplit: f.awaySplit || null,
     earlySeason: f.earlySeason === true, sportyEventId: f.sportyEventId || null
   }
-  return attachWhy(pick, f, {reasons, last5Home, last5Away, lastMatchesHome, lastMatchesAway, homeAvg: home, awayAvg: away})
+  return attachWhy(pick, f, {
+    reasons,
+    last5Home,
+    last5Away,
+    lastMatchesHome: last5Home,
+    lastMatchesAway: last5Away,
+    homeAvg: home,
+    awayAvg: away,
+    homeStats: venuePublicStats(home),
+    awayStats: venuePublicStats(away)
+  })
 }
 
 export function diagnoseFilterFixture(fixture, learningState = null) {

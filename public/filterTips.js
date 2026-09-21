@@ -1,5 +1,5 @@
 import {crestSrc,fixtureCrests,bindCrestFallbacks} from './crests.js'
-import {whySectionHtml,bindWhyModal,learningChipHtml} from './whyPopup.js?v=5.16.0'
+import {whySectionHtml,bindWhyModal,learningChipHtml} from './whyPopup.js?v=5.17.0'
 import {api,readBoardCache,writeBoardCache,warmNeighbors,scrollDateStrip,hasRemainingTips,nextDateWithTips,isSrlPick,bootDone,loadLiveResults} from './net.js'
 
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
