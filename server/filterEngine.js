@@ -1,6 +1,6 @@
 import {ENGINE_VERSION, FINISHED, FORM_SAMPLE} from './config.js'
 import {learningAllows, stampLearning} from './learning.js'
-import {attachWhy, last5Form, last5Overall, fixtureHasStats, teamStats} from './pickWhy.js'
+import {attachWhy, last5Form, last5Overall, fixtureHasStats} from './pickWhy.js'
 import {isSrlMatch, isEarlySeason} from './redFlags.js'
 import {extractFilterOdds, isCupCompetition} from './filterEngineV2.js'
 import {MARKETS, settleMarket, profileOf as splitProfile} from './perfectSplit.js'
@@ -10,6 +10,9 @@ export const ENGINE_ID = 'adaptive-match-v1'
 export const FILTER_VERSION = ENGINE_ID
 export const FILTER_RULE_VERSION = FILTER_VERSION
 export const FILTER_MIN_ODD = Math.max(1.20, Number(process.env.ENGINE_MIN_ODD || 1.20))
+export const FILTER_MAX_ODD = Math.max(FILTER_MIN_ODD, Number(process.env.ENGINE_FILTER_MAX_ODD || 2.20))
+const MIN_PROBABILITY = 0.52
+const MIN_EDGE = 0.04
 
 const finite = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v))
 const num = v => finite(v) ? Number(v) : null
@@ -44,6 +47,13 @@ function venueGames(fixtures, id, venue) {
 
 export function profileOf(games) {
   const n = games.length
+  if (!n) {
+    return {
+      sample: 0, ready: false, gf: 0, ga: 0, ppg: 0, winPct: null,
+      over15: null, over25: null, btts: null, scored: null, scored2: null,
+      blank: null, conceded: null, games
+    }
+  }
   const count = fn => games.filter(fn).length
   const gf = games.reduce((s, g) => s + g.gf, 0)
   const ga = games.reduce((s, g) => s + g.ga, 0)
@@ -93,7 +103,9 @@ function oddsFor(f, market, book) {
 
 function poisson(lambda) {
   const values = [Math.exp(-lambda)]
-  for (let i = 1; i < 9; i++) values.push(values[i - 1] * lambda / i)
+  for (let i = 1; i < 10; i++) values.push(values[i - 1] * lambda / i)
+  const used = values.reduce((s, v) => s + v, 0)
+  values[values.length - 1] += Math.max(0, 1 - used)
   return values
 }
 
@@ -146,6 +158,21 @@ function evaluateMarket(m, odds, shape) {
   return {market: m, odds, probability, normal, worst, implied, margin, robust, score, chances}
 }
 
+function followsFavourite(row, shape) {
+  const id = row.market.id
+  if (id === 'home-win' || id === 'dc-1x') return shape.favourite === 'home'
+  if (id === 'away-win' || id === 'dc-x2') return shape.favourite === 'away'
+  return true
+}
+
+function isSupported(row, shape) {
+  if (row.odds > FILTER_MAX_ODD || row.odds < FILTER_MIN_ODD) return false
+  if (row.margin < MIN_EDGE || row.normal < row.implied || row.score < 0.01) return false
+  if (row.probability < MIN_PROBABILITY) return false
+  if (!followsFavourite(row, shape)) return false
+  return true
+}
+
 function whyLines(f, home, away, shape, winner, runner) {
   const hn = f?.home?.name || 'Home', an = f?.away?.name || 'Away'
   const m = winner.market
@@ -163,10 +190,10 @@ function whyLines(f, home, away, shape, winner, runner) {
     hn + ' have averaged ' + home.gf.toFixed(1) + ' scored and ' + home.ga.toFixed(1) + ' conceded at home; ' + an + ' have averaged ' + away.gf.toFixed(1) + ' scored and ' + away.ga.toFixed(1) + ' conceded away.',
     'That attack-versus-defence pairing points to roughly ' + shape.h.toFixed(1) + ' ' + hn + ' goals and ' + shape.a.toFixed(1) + ' ' + an + ' goals. The form gap is ' + home.ppg.toFixed(1) + ' versus ' + away.ppg.toFixed(1) + ' points per game.',
     'Recent goal patterns add context: both teams scored in ' + home.btts + '% of ' + hn + ' home games and ' + away.btts + '% of ' + an + ' away games; three or more goals occurred in ' + home.over25 + '% and ' + away.over25 + '%.',
-    'The main matchup supports ' + h + '. I also tested a quiet game, an open game, the stronger side blanking, an underdog surge, and one side carrying the goals.',
-    'The most difficult of those scenarios for ' + m.display + ' is ' + winner.worst.name + '. Its estimated chance there is ' + Math.round(winner.worst.chance * 100) + '%, so the pick still has a clear failure path.',
-    m.display + ' was selected at ' + winner.odds.toFixed(2) + ' because its matchup and scenario support was strongest relative to its price' +
-      (runner ? '; ' + runner.market.display + ' was the closest alternative but had a lower scenario-adjusted edge at its price.' : '.')
+    'The main matchup gives ' + h + ' about ' + Math.round(winner.normal * 100) + '% support. I also tested a quiet game, an open game, the stronger side blanking, an underdog surge, and one side carrying the goals.',
+    'The most difficult of those scenarios for ' + m.display + ' is ' + winner.worst.name + '. Its estimated chance there is ' + Math.round(winner.worst.chance * 100) + '%, so that failure path is already priced into the call.',
+    m.display + ' was selected at ' + winner.odds.toFixed(2) + ' because it had the strongest matchup support inside the price window' +
+      (runner ? '; ' + runner.market.display + ' was the closest alternative.' : '.')
   ]
   return lines
 }
@@ -180,6 +207,9 @@ function packPick(f, home, away, shape, winner, runner, book) {
   const reasons = whyLines(f, home, away, shape, winner, runner)
   const homeHits = market.homeStat(splitProfile(venueGames(f?.home?.fixtures, f?.home?.id, 'home')))
   const awayHits = market.awayStat(splitProfile(venueGames(f?.away?.fixtures, f?.away?.id, 'away')))
+  const resultSide = market.id === 'home-win' || market.id === 'dc-1x' ? 'home'
+    : market.id === 'away-win' || market.id === 'dc-x2' ? 'away'
+    : shape.favourite
   const pick = {
     fixtureId: f.fixtureId, league: f.league, country: f.country, kickoff: f.kickoff,
     home: f?.home?.name, away: f?.away?.name, homeId: f?.home?.id ?? null, awayId: f?.away?.id ?? null,
@@ -187,12 +217,12 @@ function packPick(f, home, away, shape, winner, runner, book) {
     market: market.marketKey, marketName: market.display, selection: market.selection,
     displaySelection: market.display, pick: market.display, odds: round(winner.odds),
     engine: ENGINE_ID, engineVersion: ENGINE_VERSION, route: market.route, marketId: market.id,
-    favourite: shape.favourite, family: market.family,
+    favourite: resultSide, family: market.family,
     homeConsensus: pct(homeHits, home.sample), awayConsensus: pct(awayHits, away.sample),
     consensus: Math.round(winner.probability * 100),
     filterScore: Math.round(winner.robust * 100), rawFilterScore: round(winner.score * 100),
     displayScore: Math.round(winner.robust * 100), capability: Math.round(winner.normal * 100),
-    runnerUpRoute: runner?.market.route || null, scoreSeparation: runner ? round((winner.score - runner.score) * 100) : null,
+    runnerUpRoute: runner?.market.route || null, scoreSeparation: runner ? round((winner.probability - runner.probability) * 100) : null,
     metrics: {home, away}, matchup: shape, oddsBook: book,
     filterFlags: ['MATCHUP_SCENARIOS'], filterReasons: reasons,
     homeSplit: f.homeSplit || null, awaySplit: f.awaySplit || null,
@@ -211,16 +241,15 @@ export function diagnoseFilterFixture(fixture, learningState = null) {
   if (!home.ready || !away.ready) return {pick: null, skip: 'insufficient-venue-sample', home, away}
   const shape = matchWorlds(home, away)
   const book = extractFilterOdds(fixture)
-  const candidates = MARKETS.map(m => {
+  const priced = MARKETS.map(m => {
     const odds = oddsFor(fixture, m, book)
-    return odds && odds >= FILTER_MIN_ODD ? evaluateMarket(m, odds, shape) : null
-  }).filter(Boolean).sort((a, b) => b.score - a.score || b.margin - a.margin || a.market.priority - b.market.priority)
-  if (!candidates.length) return {pick: null, skip: 'no-priced-market', home, away}
+    return odds && odds >= FILTER_MIN_ODD && odds <= FILTER_MAX_ODD ? evaluateMarket(m, odds, shape) : null
+  }).filter(Boolean)
+  if (!priced.length) return {pick: null, skip: 'no-priced-market', home, away}
+  const candidates = priced.filter(row => isSupported(row, shape))
+    .sort((a, b) => b.probability - a.probability || b.score - a.score || a.market.priority - b.market.priority)
+  if (!candidates.length) return {pick: null, skip: 'no-robust-edge', home, away, shape, candidates: priced}
   const winner = candidates[0], runner = candidates[1] || null
-  if (winner.margin < 0.04 || winner.normal < winner.implied || winner.score < 0.01 ||
-      (runner && winner.score - runner.score < 0.015)) {
-    return {pick: null, skip: 'no-robust-edge', home, away, shape, candidates}
-  }
   const packed = packPick(fixture, home, away, shape, winner, runner, book)
   const learned = learningAllows(packed, learningState, {board: 'filter'})
   if (!learned.allowed) return {pick: null, skip: learned.action === 'drop' ? 'learning-drop' : 'learning-tighten', home, away, learning: learned}

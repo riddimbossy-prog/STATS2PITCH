@@ -52,3 +52,23 @@ test('the existing board contract publishes the adaptive engine identifier', () 
   assert.equal(board.bestPicks.length, 2)
   assert.equal(board.bestPicks[0].fixtureId, 1)
 })
+
+test('longshot underdog wins are not published as Filter Tips', () => {
+  const result = diagnoseFilterFixture(fixture({
+    markets: [
+      {marketKey: 'match-winner', outcomes: [{name: 'Home', odd: 2.05}, {name: 'Away', odd: 8.70}]},
+      {marketKey: 'total-goals', outcomes: [{name: 'Over 1.5', odd: 1.75}]}
+    ]
+  }))
+  assert.equal(result.skip, null)
+  assert.notEqual(result.pick.marketId, 'away-win')
+  assert.ok(Number(result.pick.odds) <= 2.20)
+})
+
+test('a lone 11.00 away win is skipped instead of becoming the Filter pick', () => {
+  const result = diagnoseFilterFixture(fixture({
+    markets: [{marketKey: 'match-winner', outcomes: [{name: 'Away', odd: 11}]}]
+  }))
+  assert.equal(result.pick, null)
+  assert.ok(result.skip === 'no-priced-market' || result.skip === 'no-robust-edge')
+})

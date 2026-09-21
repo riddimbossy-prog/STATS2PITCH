@@ -126,14 +126,15 @@ test('view=h2h returns only split H2H picks',()=>{
   assert.deepEqual(view.h2hMeta,{count:1})
 })
 
-test('public board drops stale Filter V2, blank odds and sub-1.20 prices',()=>{
+test('public board drops stale Filter V2, blank odds, sub-1.20 prices and longshot Filter odds',()=>{
   const board={
     meta:{filterTipsEngine:'perfect-split-v1',filterTipsCount:3},
     filterTips:[
       {fixtureId:1,engine:'sporty-filter-v2',selection:'Over 1.5',odds:1.40,market:'total-goals'},
       {fixtureId:2,engine:'perfect-split-v1',selection:'Over 1.5',odds:null,market:'total-goals'},
       {fixtureId:3,engine:'perfect-split-v1',selection:'Over 0.5',odds:1.14,market:'home-team-goals'},
-      {fixtureId:4,engine:'perfect-split-v1',selection:'Over 1.5',odds:1.21,market:'total-goals'}
+      {fixtureId:4,engine:'perfect-split-v1',selection:'Over 1.5',odds:1.21,market:'total-goals'},
+      {fixtureId:5,engine:'perfect-split-v1',selection:'Away',odds:11,market:'match-winner'}
     ]
   }
   const view=publicBoard(board,'filter')

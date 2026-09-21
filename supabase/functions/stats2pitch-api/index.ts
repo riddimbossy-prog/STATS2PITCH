@@ -303,8 +303,9 @@ function sanitizeGoalsAndCombo(board:any={}){
     }
   }
 }
-const FILTER_ENGINE='perfect-split-v1'
+const FILTER_ENGINE='adaptive-match-v1'
 const FILTER_MIN_ODD=1.20
+const FILTER_MAX_ODD=2.20
 const H2H_MIN_ODD=1.20
 const BANKER_MIN_ODD=1.20
 const GOAL_KEYS=new Set(['total-goals','home-team-goals','away-team-goals'])
@@ -339,7 +340,7 @@ function sanitizeFilterTips(rows:any,expectedEngine:any=FILTER_ENGINE){
     if(got&&got!==eng)return false
     if(isBlockedHomeOrPick(row))return false
     const odds=Number(row?.odds)
-    return Number.isFinite(odds)&&odds>=FILTER_MIN_ODD
+    return Number.isFinite(odds)&&odds>=FILTER_MIN_ODD&&odds<=FILTER_MAX_ODD
   })
 }
 function sanitizeBestPicks(rows:any){
