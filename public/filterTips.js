@@ -6,7 +6,7 @@ const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
 const REQUIRED_ENGINES=new Set(['sporty-filter-v1','sporty-filter-v2','perfect-split-v1','adaptive-match-v1'])
 const BOARD_VIEW='filter'
-const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',timer:null}
+const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'all',country:'all',league:'all',market:'all',timer:null}
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
 function team(name,img,side){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${esc(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span></div>`}
 function matchMid(r,score){const live=stateFor(r)==='live',o=resultFor(r)?.outcome;if(o==='postponed')return`<span class="versus">VS</span><b class="match-mid-score postponed">P/P</b>`;if(score)return`<span class="versus">${live?'LIVE':'VS'}</span><b class="match-mid-score">${esc(score.home)}–${esc(score.away)}</b>`;return`<span class="versus">VS</span><b class="match-mid-clock">${esc(kickClock(r.kickoff))}</b>`}
@@ -103,7 +103,7 @@ $('#statusFilter')?.addEventListener('change',e=>{state.status=e.target.value;re
 $('#countryFilter')?.addEventListener('change',e=>{state.country=e.target.value;state.league='all';render()})
 $('#leagueFilter')?.addEventListener('change',e=>{state.league=e.target.value;render()})
 $('#market')?.addEventListener('change',e=>{state.market=e.target.value;render()})
-$('#clearFilters')?.addEventListener('click',()=>{state.status='upcoming';state.country=state.league=state.market='all';render()})
+$('#clearFilters')?.addEventListener('click',()=>{state.status='all';state.country=state.league=state.market='all';render()})
 $('#refresh')?.addEventListener('click',load)
 $('#notifyBell')?.addEventListener('click',load)
 $('#profileBtn')?.addEventListener('click',()=>document.body.classList.toggle('filters-open'))

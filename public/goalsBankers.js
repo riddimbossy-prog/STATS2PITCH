@@ -10,7 +10,7 @@ const SLIP_KEY='s2p-goals-slip'
 const PUBLISHED_ROUTES=new Set(['FAV_2PLUS','OVER_2.5','GG'])
 const COMBO_ROUTES=new Set(['DRAW_OR_OVER_25','DRAW_OR_UNDER_25','DRAW_OR_GG'])
 const MARKET_CHIPS=[{id:'all',label:'All'},{id:'FAV_2PLUS',label:'2+'},{id:'OVER_2.5',label:'Over 2.5'},{id:'GG',label:'GG'}]
-const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'upcoming',country:'all',league:'all',market:'all',route:'all',slip:loadSlip(),timer:null,note:''}
+const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,results:null,status:'all',country:'all',league:'all',market:'all',route:'all',slip:loadSlip(),timer:null,note:''}
 
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
 function team(name,img,side){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${esc(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span></div>`}
@@ -170,7 +170,7 @@ $('#statusFilter')?.addEventListener('change',e=>{state.status=e.target.value;re
 $('#countryFilter')?.addEventListener('change',e=>{state.country=e.target.value;state.league='all';render()})
 $('#leagueFilter')?.addEventListener('change',e=>{state.league=e.target.value;render()})
 $('#market')?.addEventListener('change',e=>{state.market=e.target.value;render()})
-$('#clearFilters')?.addEventListener('click',()=>{state.status='upcoming';state.country=state.league=state.market=state.route='all';render()})
+$('#clearFilters')?.addEventListener('click',()=>{state.status='all';state.country=state.league=state.market=state.route='all';render()})
 $('#accaClear')?.addEventListener('click',()=>{state.slip=[];state.note='';saveSlip();render()})
 $('#refresh')?.addEventListener('click',load)
 $('#notifyBell')?.addEventListener('click',load)

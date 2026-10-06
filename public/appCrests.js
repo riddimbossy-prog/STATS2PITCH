@@ -6,7 +6,7 @@ import {adviceFor} from './performanceAdvice.js'
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]))
 const view=document.body.dataset.view||'all'
 const BOARD_VIEW=view==='results'?'all':'all'
-const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,resultData:null,performance:null,market:'all',country:'all',league:'all',seasonStage:'all',status:view==='results'?'settled':'upcoming',performanceGroup:'market',timer:null}
+const state={date:new URLSearchParams(location.search).get('date')||new Date().toISOString().slice(0,10),board:null,resultData:null,performance:null,market:'all',country:'all',league:'all',seasonStage:'all',status:view==='results'?'settled':'all',performanceGroup:'market',timer:null}
 function flag(country){return typeof window.countryFlag==='function'?window.countryFlag(country):'🌍'}
 function team(name,img,side){return`<div class="team team-${side}"><span class="crest-wrap"><img class="team-crest" src="${esc(img)}" alt="${esc(name)} crest" loading="lazy"></span><span class="team-name">${esc(name)}</span></div>`}
 function matchMid(r,score){const live=stateFor(r)==='live',o=resultFor(r)?.outcome;if(o==='postponed')return`<span class="versus">VS</span><b class="match-mid-score postponed">P/P</b>`;if(score)return`<span class="versus">${live?'LIVE':'VS'}</span><b class="match-mid-score">${esc(score.home)}–${esc(score.away)}</b>`;return`<span class="versus">VS</span><b class="match-mid-clock">${esc(kickClock(r.kickoff))}</b>`}
@@ -138,7 +138,7 @@ function renderPerformance(){
 }
 
 async function loadResultsView(){skeleton();const [perf]=await Promise.all([api('/performance?days=30')]);state.performance=perf;renderPerformance();await loadBoardData()}
-function bind(){for(const[id,key]of[['statusFilter','status'],['seasonFilter','seasonStage'],['countryFilter','country'],['leagueFilter','league'],['market','market']]){const el=$('#'+id);if(el)el.onchange=e=>{state[key]=e.target.value;if(key==='country')state.league='all';renderBoard()}};$('#clearFilters')?.addEventListener('click',()=>{state.status=view==='results'?'settled':'upcoming';state.country=state.league=state.market=state.seasonStage='all';renderBoard()});$('#performanceGroup')?.addEventListener('change',e=>{state.performanceGroup=e.target.value;renderPerformance()});$('#refresh')?.addEventListener('click',load);$('#notifyBell')?.addEventListener('click',load);$('#profileBtn')?.addEventListener('click',()=>document.body.classList.toggle('filters-open'))}
+function bind(){for(const[id,key]of[['statusFilter','status'],['seasonFilter','seasonStage'],['countryFilter','country'],['leagueFilter','league'],['market','market']]){const el=$('#'+id);if(el)el.onchange=e=>{state[key]=e.target.value;if(key==='country')state.league='all';renderBoard()}};$('#clearFilters')?.addEventListener('click',()=>{state.status=view==='results'?'settled':'all';state.country=state.league=state.market=state.seasonStage='all';renderBoard()});$('#performanceGroup')?.addEventListener('change',e=>{state.performanceGroup=e.target.value;renderPerformance()});$('#refresh')?.addEventListener('click',load);$('#notifyBell')?.addEventListener('click',load);$('#profileBtn')?.addEventListener('click',()=>document.body.classList.toggle('filters-open'))}
 async function load(){
   try{
     if(view==='results'){skeleton();await loadResultsView();bootDone();return}
