@@ -37,7 +37,7 @@ Deno.serve(async req=>{
     const row=await snapshot(date)
     if(!row)return json({meta:{date,generatedAt:null,engine:'banker-totals-v1.2'},fixtures:[],results:{},dailyBankers:[],safestBankers:[],valueBankers:[],bankers:[],dailyBankersMeta:null})
     const board=row.payload||{}
-    const floor=(rows:any[])=>(Array.isArray(rows)?rows:[]).filter((row:any)=>{const odds=Number(row?.odds);return Number.isFinite(odds)&&odds>=1.20})
+    const floor=(rows:any[])=>(Array.isArray(rows)?rows:[]).filter((row:any)=>{const odds=Number(row?.odds);if(!Number.isFinite(odds)||odds<=1)return false;if(row?.engine==='sporty-split-v1')return true;return odds>=1.20})
     const dedicated=floor(Array.isArray(board.bankers)?board.bankers:[])
     const safest=floor(Array.isArray(board.safestBankers)?board.safestBankers:dedicated.filter((x:any)=>x?.kind!=='value'&&x?.rule!=='OPP_TT_OVER25'&&x?.rule!=='DRAW_OR_OVER25'))
     const value=floor(Array.isArray(board.valueBankers)?board.valueBankers:dedicated.filter((x:any)=>x?.kind==='value'||x?.rule==='OPP_TT_OVER25'||x?.rule==='DRAW_OR_OVER25'))

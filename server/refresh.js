@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs'
 import {sportyFixturesByDate} from './sportyBet.js'
 import {hydrateSportyComboMarkets} from './comboMarketHydrator.js'
 import {buildComboBoard} from './comboEngine.js'
@@ -197,6 +198,17 @@ export async function refreshNow(date,onProgress=()=>{}){
   board.meta.h2hEngine=h2hBoard.meta.engine;board.meta.h2hCount=h2hBoard.picks.length
   Object.assign(board,sanitizeGoalsAndCombo(board))
   board.bankers=bankerRules.picks;board.bankerRulesMeta=bankerRules.meta
+  try{
+    const splitAll=JSON.parse(readFileSync(new URL('../data/split-bankers.json', import.meta.url),'utf8'))
+    const splitRows=Array.isArray(splitAll?.[date]?.valueBankers)?splitAll[date].valueBankers:[]
+    if(splitRows.length){
+      const drop=row=>row?.engine==='sporty-split-v1'
+      board.valueBankers=[...(board.valueBankers||[]).filter(row=>!drop(row)),...splitRows]
+      board.dailyBankers=[...(board.dailyBankers||[]).filter(row=>!drop(row)),...splitRows]
+      board.meta.splitBankersEngine='sporty-split-v1'
+      board.meta.splitBankersCount=splitRows.length
+    }
+  }catch(error){console.warn('split bankers skipped', error?.message||error)}
   board.meta.bankerRulesEngine=bankerRules.meta.engine
   board.meta.bankerRulesCount=bankerRules.picks.length
   board.meta.diagnostics.qualifiedTips=board.priority.length;board.meta.diagnostics.bestPicks=board.bestPicks.length;board.meta.diagnostics.varTips=(board.varTips||[]).length
