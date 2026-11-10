@@ -51,13 +51,9 @@ export function SofaBridgeHost() {
       20_000,
     );
     bridgeRef.current = bridge;
-    registerSportyBridge(async (path) => {
-      const result = await bridge.enqueue(path);
-      try {
-        return JSON.parse(result.body) as unknown;
-      } catch {
-        throw new Error('SportyBet bridge returned a non-JSON body');
-      }
+    registerSportyBridge(async (path, headerSet) => {
+      const result = await bridge.enqueue(path, headerSet);
+      return { status: result.status, body: result.body };
     });
     return () => {
       registerSportyBridge(null);

@@ -2,14 +2,18 @@ import type { Lineup, LineupPlayer, Match, MatchDetail, MatchStatus, RawIncident
 import { stepScore, type HoldState } from './var-hold';
 import {
   chooseSchedule,
+  eventPath,
+  headerNames,
+  headersFor,
   inspectSporty,
   kickoffMs,
-  livePath,
-  SPORTY_HEADERS,
+  listTotal,
+  morePages,
   sportyCopy,
   sportyLine,
   upcomingPath,
-  type ScheduleScope,
+  type AttemptRecord,
+  type HeaderSet,
 } from './sporty-read';
 
 /**
@@ -24,8 +28,6 @@ const LIVE_TTL = 8_000;
 const SCHEDULE_TTL = 120_000;
 const EVENT_TTL = 30_000;
 const TEAM_TTL = 6 * 60 * 60_000;
-
-const HEADERS = SPORTY_HEADERS;
 
 export interface CacheRow {
   payload: string;
@@ -65,7 +67,7 @@ export interface DataSource {
 }
 
 export interface FetchJson {
-  (url: string): Promise<unknown>;
+  (url: string, init?: { headerSet: HeaderSet }): Promise<unknown>;
 }
 
 export function memoryCache(): CacheStore {
@@ -85,10 +87,12 @@ export function sportybetBaseUrl(): string {
   return (configured && configured.replace(/\/$/, '')) || DEFAULT_BASE;
 }
 
-let bridgeFetch: ((path: string) => Promise<unknown>) | null = null;
+let bridgeFetch: ((path: string, headerSet: HeaderSet) => Promise<{ status: number; body: string }>) | null = null;
 
-/** Native installs this so a 403 can be retried inside a sportybet.com page. Web leaves it unset. */
-export function registerSportyBridge(fetchPath: ((path: string) => Promise<unknown>) | null) {
+/** Native installs this so reads can run inside the sportybet.com page. Web leaves it unset. */
+export function registerSportyBridge(
+  fetchPath: ((path: string, headerSet: HeaderSet) => Promise<{ status: number; body: string }>) | null,
+) {
   bridgeFetch = fetchPath;
 }
 
@@ -102,51 +106,41 @@ export function sportyPath(url: string): string | null {
   }
 }
 
-export async function defaultFetchJson(url: string): Promise<unknown> {
+export async function defaultFetchJson(url: string, init?: { headerSet: HeaderSet }): Promise<unknown> {
+  const headerSet = init?.headerSet ?? 'plain';
   const path = sportyPath(url);
   if (bridgeFetch && path) {
     try {
-      const body = await bridgeFetch(path);
-      const inspected = inspectSporty(body);
-      if (inspected.bizCode == null || inspected.bizCode === 10000) {
-        return { __sportyHttp: true, status: 200, via: 'page', body };
+      const page = await bridgeFetch(path, headerSet);
+      const parsed = parseBody(page.body);
+      if (page.status === 200 && inspectSporty(parsed).bizCode === 10000) {
+        return { __sportyHttp: true, status: page.status, via: 'page', body: parsed, snippet: page.body.slice(0, 200) };
       }
     } catch {
-      // The hidden page missed. The phone's own request is the next try.
+      // The hidden page missed this header set. The phone request is next.
     }
   }
-  return directFetchJson(url);
+  return directFetch(url, headerSet);
 }
 
-async function directFetchJson(url: string): Promise<unknown> {
-  let last = 'SportyBet request failed';
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12_000);
-    try {
-      const response = await fetch(url, { headers: HEADERS, signal: controller.signal });
-      if (response.status === 429 || response.status >= 500) {
-        last = `SportyBet ${response.status}`;
-        await sleep(400 * (attempt + 1));
-        continue;
-      }
-      if (!response.ok) {
-        throw new Error(
-          response.status === 403
-            ? 'SportyBet refused the request (403). This network is outside Ghana.'
-            : `SportyBet ${response.status}`,
-        );
-      }
-      return { __sportyHttp: true, status: response.status, via: 'direct', body: await response.json() };
-    } catch (error) {
-      if (error instanceof Error && error.message.startsWith('SportyBet')) throw error;
-      last = error instanceof Error ? error.message : last;
-      if (attempt === 2) throw new Error(last);
-    } finally {
-      clearTimeout(timer);
-    }
+async function directFetch(url: string, headerSet: HeaderSet): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const response = await fetch(url, { headers: headersFor(headerSet), signal: controller.signal });
+    const text = await response.text();
+    return { __sportyHttp: true, status: response.status, via: 'direct', body: parseBody(text), snippet: text.slice(0, 200) };
+  } finally {
+    clearTimeout(timer);
   }
-  throw new Error(last);
+}
+
+function parseBody(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
 }
 
 class RequestGate {
@@ -169,7 +163,7 @@ export function createSportyBetSource(options?: {
   baseUrl?: string;
   gapMs?: number;
 }): DataSource {
-  const fetchJson = options?.fetchJson ?? defaultFetchJson;
+  const fetchJson = options?.fetchJson;
   const cache = options?.cache ?? memoryCache();
   const now = options?.now ?? Date.now;
   const baseUrl = (options?.baseUrl ?? sportybetBaseUrl()).replace(/\/$/, '');
@@ -177,9 +171,9 @@ export function createSportyBetSource(options?: {
   const holds = new Map<string, HoldState>();
   const liveIds = new Set<string>();
 
-  async function pull(path: string): Promise<unknown> {
-    await gate.wait();
-    return fetchJson(`${baseUrl}${path}`);
+  async function pull(path: string, headerSet: HeaderSet): Promise<unknown> {
+    if (fetchJson) return fetchJson(`${baseUrl}${path}`, { headerSet });
+    return directFetch(`${baseUrl}${path}`, headerSet);
   }
 
   async function cached<T>(key: string, ttlMs: number, fresh: boolean | undefined, load: () => Promise<T>): Promise<SourceResult<T>> {
@@ -196,10 +190,11 @@ export function createSportyBetSource(options?: {
       return { ok: true, data, fromCache: false, stale: false, fetchedAt: stamped };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'SportyBet request failed';
+      const copy = error instanceof ReadError ? error.copy : message;
       if (hit) {
-        return { ok: false, data: JSON.parse(hit.payload) as T, error: message, fromCache: true, stale: true, fetchedAt };
+        return { ok: false, data: JSON.parse(hit.payload) as T, error: message, copy, fromCache: true, stale: true, fetchedAt };
       }
-      return { ok: false, data: null, error: message, fromCache: false, stale: false, fetchedAt: null };
+      return { ok: false, data: null, error: message, copy, fromCache: false, stale: false, fetchedAt: null };
     }
   }
 
@@ -218,21 +213,108 @@ export function createSportyBetSource(options?: {
     return { ...match, feedScore: step.state.confirmed, varPending: step.varPending };
   }
 
-  async function read(path: string): Promise<{ status: number; via: string; body: unknown }> {
+  async function attempt(path: string, via: 'page' | 'direct', headerSet: HeaderSet): Promise<AttemptRecord & { body: unknown }> {
+    await gate.wait();
+    const names = headerNames(headerSet);
     try {
-      const raw = await pull(path);
-      return unwrapHttp(raw);
+      if (via === 'page') {
+        if (!bridgeFetch) throw new Error('SportyBet page is not open');
+        const page = await bridgeFetch(path, headerSet);
+        const body = parseBody(page.body);
+        const info = inspectSporty(body);
+        return {
+          path,
+          via,
+          headerSet,
+          headerNames: names,
+          httpStatus: page.status,
+          bizCode: info.bizCode,
+          message: info.message,
+          snippet: page.body.slice(0, 200),
+          body,
+        };
+      }
+      const raw = await pull(path, headerSet);
+      const http = unwrapHttp(raw);
+      const info = inspectSporty(http.body);
+      const snippet = http.snippet || (typeof http.body === 'string' ? http.body : JSON.stringify(http.body ?? '')).slice(0, 200);
+      return {
+        path,
+        via,
+        headerSet,
+        headerNames: names,
+        httpStatus: http.status,
+        bizCode: info.bizCode,
+        message: info.message,
+        snippet,
+        body: http.body,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'SportyBet request failed';
-      const status = /403/.test(message) ? 403 : Number(message.match(/SportyBet (\d+)/)?.[1] ?? 0);
-      if (status) {
-        throw new Error(sportyLine({ httpStatus: status, path, bizCode: null, message: null, tournaments: 0, events: 0, kept: 0, scope: 'today' }));
-      }
-      throw error instanceof Error ? error : new Error(message);
+      const status = /403/.test(message) ? 403 : Number(message.match(/(\d{3})/)?.[1] ?? 0);
+      return { path, via, headerSet, headerNames: names, httpStatus: status, bizCode: null, message, snippet: message.slice(0, 200), body: null };
     }
   }
 
-  async function loadPages(todayGames: boolean): Promise<{
+  async function ladder(path: string): Promise<{
+    ok: boolean;
+    body: unknown;
+    attempts: AttemptRecord[];
+    status: number;
+    bizCode: number | null;
+    message: string | null;
+    via: string;
+  }> {
+    const attempts: Array<AttemptRecord & { body: unknown }> = [];
+    const steps: Array<['page' | 'direct', HeaderSet]> = [];
+    if (bridgeFetch && !fetchJson) steps.push(['page', 'plain'], ['page', 'web']);
+    steps.push(['direct', 'plain'], ['direct', 'web']);
+    for (const [via, headerSet] of steps) {
+      const row = await attempt(path, via, headerSet);
+      attempts.push(row);
+      if (row.httpStatus === 200 && row.bizCode === 10000) {
+        return { ok: true, body: row.body, attempts, status: row.httpStatus, bizCode: row.bizCode, message: row.message, via: `${row.via}/${row.headerSet}` };
+      }
+    }
+    const last = attempts[attempts.length - 1];
+    return {
+      ok: false,
+      body: last?.body ?? null,
+      attempts,
+      status: last?.httpStatus ?? 0,
+      bizCode: last?.bizCode ?? null,
+      message: last?.message,
+      via: last ? `${last.via}/${last.headerSet}` : 'direct/plain',
+    };
+  }
+
+  function failure(path: string, result: Awaited<ReturnType<typeof ladder>>, tournaments = 0, events = 0): Error {
+    const line = sportyLine({
+      httpStatus: result.status,
+      path,
+      bizCode: result.bizCode,
+      message: result.message,
+      tournaments,
+      events,
+      kept: 0,
+      scope: 'today',
+    });
+    const copy = sportyCopy({
+      httpStatus: result.status,
+      path,
+      bizCode: result.bizCode,
+      message: result.message,
+      tournaments,
+      events,
+      kept: 0,
+      scope: 'today',
+      via: result.via,
+      attempts: result.attempts,
+    });
+    return new ReadError(line, copy);
+  }
+
+  async function loadPages(): Promise<{
     matches: Match[];
     path: string;
     status: number;
@@ -241,74 +323,88 @@ export function createSportyBetSource(options?: {
     message: string | null;
     tournaments: number;
     events: number;
+    attempts: AttemptRecord[];
   }> {
     const matches: Match[] = [];
-    let path = upcomingPath(1, todayGames);
+    const attempts: AttemptRecord[] = [];
+    let path = upcomingPath(1);
     let status = 200;
-    let via = 'direct';
-    let bizCode: number | null = null;
+    let via = 'direct/plain';
+    let bizCode: number | null = 10000;
     let message: string | null = null;
     let tournaments = 0;
     let events = 0;
-    for (let page = 1; page <= 4; page += 1) {
-      path = upcomingPath(page, todayGames);
-      const http = await read(path);
-      const info = inspectSporty(http.body);
-      status = http.status;
-      via = http.via;
-      bizCode = info.bizCode;
-      message = info.message;
-      if (http.status >= 400) throw new Error(sportyLine({ httpStatus: http.status, path, bizCode, message, tournaments, events, kept: 0, scope: 'today' }));
-      if (info.bizCode != null && info.bizCode !== 10000) {
-        throw new Error(sportyLine({ httpStatus: http.status || 200, path, bizCode: info.bizCode, message: info.message, tournaments: info.tournaments, events: info.events.length, kept: 0, scope: 'today' }));
-      }
+    for (let page = 1; page <= 8; page += 1) {
+      path = upcomingPath(page);
+      const result = await ladder(path);
+      attempts.push(...result.attempts);
+      status = result.status;
+      via = result.via;
+      bizCode = result.bizCode;
+      message = result.message;
+      if (!result.ok) throw failure(path, { ...result, attempts }, tournaments, events);
+      const info = inspectSporty(result.body);
       tournaments += info.tournaments;
       events += info.events.length;
       matches.push(...info.events.map((event) => mapSportyEvent(event)).filter((event): event is Match => event != null));
-      if (info.events.length < 100) break;
+      if (!morePages(page, info.events.length, listTotal(result.body))) break;
     }
-    return { matches, path, status, via, bizCode, message, tournaments, events };
+    return { matches, path, status, via, bizCode, message, tournaments, events, attempts };
   }
 
   async function loadSchedule(date: string): Promise<PackedList> {
-    let bag = await loadPages(true);
-    let chosen = chooseSchedule(bag.matches, date, now());
-    if (bag.events === 0 || chosen.matches.length === 0) {
-      const wider = await loadPages(false);
-      const widerChosen = chooseSchedule(wider.matches, date, now());
-      if (widerChosen.matches.length >= chosen.matches.length) {
-        bag = wider;
-        chosen = widerChosen;
-      }
-    }
-    const facts = { httpStatus: bag.status, path: bag.path, bizCode: bag.bizCode, message: bag.message, tournaments: bag.tournaments, events: bag.events, kept: chosen.matches.length, scope: chosen.scope };
-    return { matches: chosen.matches, notice: sportyLine(facts), copy: sportyCopy({ ...facts, via: bag.via }) };
+    const bag = await loadPages();
+    const chosen = chooseSchedule(bag.matches, date, now());
+    const facts = {
+      httpStatus: bag.status,
+      path: bag.path,
+      bizCode: bag.bizCode,
+      message: bag.message,
+      tournaments: bag.tournaments,
+      events: bag.events,
+      kept: chosen.matches.length,
+      scope: chosen.scope,
+      via: bag.via,
+      attempts: bag.attempts,
+    };
+    return { matches: chosen.matches, notice: sportyLine(facts), copy: sportyCopy(facts) };
   }
 
   async function loadLive(): Promise<PackedList> {
-    const paths = [livePath('liveOrPrematchEvents'), livePath('configurableLiveOrPrematchEvents')];
-    let last = 'SportyBet live request failed';
-    for (const path of paths) {
-      try {
-        const http = await read(path);
-        const info = inspectSporty(http.body);
-        if (http.status >= 400) throw new Error(sportyLine({ httpStatus: http.status, path, bizCode: info.bizCode, message: info.message, tournaments: info.tournaments, events: info.events.length, kept: 0, scope: 'today' }));
-        if (info.bizCode != null && info.bizCode !== 10000) {
-          throw new Error(sportyLine({ httpStatus: http.status || 200, path, bizCode: info.bizCode, message: info.message, tournaments: info.tournaments, events: info.events.length, kept: 0, scope: 'today' }));
-        }
-        const matches = info.events
-          .map((event) => mapSportyEvent(event))
-          .filter((event): event is Match => event != null)
-          .map((match) => applyHold(match, varAwarded(http.body, match.id)))
-          .filter((match) => match.status === 'live');
-        const scope: ScheduleScope = 'today';
-        const facts = { httpStatus: http.status, path, bizCode: info.bizCode, message: info.message, tournaments: info.tournaments, events: info.events.length, kept: matches.length, scope };
-        return { matches, notice: sportyLine(facts), copy: sportyCopy({ ...facts, via: http.via }) };
-      } catch (error) {
-        last = error instanceof Error ? error.message : last;
+    const bag = await loadPages();
+    const candidates = bag.matches
+      .filter((match) => match.status === 'live' || (match.kickoff > 0 && match.kickoff <= now() && match.status !== 'finished' && match.status !== 'cancelled' && match.status !== 'postponed'))
+      .slice(0, 8);
+    const attempts = [...bag.attempts];
+    const matches: Match[] = [];
+    for (const candidate of candidates) {
+      let detailed: Match | null = null;
+      let awarded = false;
+      for (const product of ['1', '3'] as const) {
+        const path = eventPath(candidate.id, product);
+        const result = await ladder(path);
+        attempts.push(...result.attempts);
+        if (!result.ok) continue;
+        detailed = mapSportyEvents(result.body)[0] ?? null;
+        awarded = varAwarded(result.body, candidate.id);
+        if (detailed) break;
       }
+      const row = detailed ?? candidate;
+      if (row.status === 'live' || candidate.status === 'live') matches.push(applyHold({ ...row, status: row.status === 'scheduled' ? 'live' : row.status }, awarded));
     }
-    throw new Error(last);
+    const facts = {
+      httpStatus: bag.status,
+      path: bag.path,
+      bizCode: bag.bizCode,
+      message: bag.message,
+      tournaments: bag.tournaments,
+      events: bag.events,
+      kept: matches.length,
+      scope: 'today' as const,
+      via: bag.via,
+      attempts,
+    };
+    return { matches, notice: sportyLine(facts), copy: sportyCopy(facts) };
   }
 
   return {
@@ -325,11 +421,20 @@ export function createSportyBetSource(options?: {
       return unpacked;
     },
     async match(id, fresh) {
-      const product = liveIds.has(id) ? '1' : '3';
+      const products: Array<'1' | '3'> = liveIds.has(id) ? ['1', '3'] : ['3'];
       const eventResult = await cached(`event:${id}`, EVENT_TTL, fresh, async () => {
-        const payload = await pull(`/factsCenter/event?eventId=${encodeURIComponent(id)}&productId=${product}`);
-        const match = mapSportyEvents(payload)[0] ?? null;
-        if (!match) throw new Error('SportyBet event had no match');
+        let payload: unknown = null;
+        let last: Awaited<ReturnType<typeof ladder>> | null = null;
+        for (const product of products) {
+          const result = await ladder(eventPath(id, product));
+          last = result;
+          if (result.ok) {
+            payload = result.body;
+            break;
+          }
+        }
+        const match = payload ? mapSportyEvents(payload)[0] ?? null : null;
+        if (!match || !payload) throw last ? failure(eventPath(id, products[0]), last) : new Error('SportyBet event had no match');
         const held = applyHold(match, timelineAwards(sportyEvents(payload)[0] ?? {}));
         const raw = sportyEvents(payload)[0] ?? {};
         const detail: MatchDetail = {
@@ -343,9 +448,11 @@ export function createSportyBetSource(options?: {
       return eventResult;
     },
     teamResults(teamId, fresh) {
-      return cached(`team:${teamId}`, TEAM_TTL, fresh, async () =>
-        mapTeamResults(await pull(`/factsCenter/teamEventList?teamId=${encodeURIComponent(teamId)}&pageSize=12&pageNum=1`), teamId),
-      );
+      return cached(`team:${teamId}`, TEAM_TTL, fresh, async () => {
+        const result = await ladder(`/factsCenter/teamEventList?teamId=${encodeURIComponent(teamId)}&pageSize=12&pageNum=1`);
+        if (!result.ok) throw failure(`/factsCenter/teamEventList`, result);
+        return mapTeamResults(result.body, teamId);
+      });
     },
     recentLineups(teamId, fresh) {
       // factsCenter event and team lists do not publish starting XIs, so squad strength stays unknown.
@@ -356,25 +463,35 @@ export function createSportyBetSource(options?: {
   };
 }
 
+class ReadError extends Error {
+  copy: string;
+  constructor(message: string, copy: string) {
+    super(message);
+    this.copy = copy;
+  }
+}
+
 function unpack(result: SourceResult<PackedList>): SourceResult<Match[]> {
   return {
     ...result,
     data: result.data?.matches ?? null,
     notice: result.error ?? result.data?.notice,
-    copy: result.data?.copy ?? result.error,
+    copy: result.copy ?? result.data?.copy ?? result.error,
   };
 }
 
-function unwrapHttp(raw: unknown): { status: number; via: string; body: unknown } {
+function unwrapHttp(raw: unknown): { status: number; via: string; body: unknown; snippet: string } {
   const row = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
   if (row && row.__sportyHttp === true) {
+    const snippet = typeof row.snippet === 'string' ? row.snippet : '';
     return {
       status: typeof row.status === 'number' ? row.status : 200,
       via: row.via === 'page' ? 'page' : 'direct',
       body: row.body,
+      snippet,
     };
   }
-  return { status: 200, via: 'mock', body: raw };
+  return { status: 200, via: 'mock', body: raw, snippet: '' };
 }
 
 function holdIncidents(state: HoldState | undefined): RawIncident[] {

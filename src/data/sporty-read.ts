@@ -1,44 +1,51 @@
 import type { Match } from '../domain';
 import { localDate } from '../format';
 
-/** Markets the SportyBet web client asks for on the Ghana factsCenter list. */
-export const SPORTY_MARKET_IDS = '1,18,10,29,11,26,36,14,60100';
+/** The longest market list Predict2u has confirmed on pcUpcomingEvents. */
+export const SPORTY_MARKET_IDS = '1,18,10,29';
 
-export const SPORTY_HEADERS: Record<string, string> = {
+export const SPORTY_UA =
+  'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
+
+/** Proven curl: Accept and a browser User-Agent only. */
+export const PLAIN_HEADERS: Record<string, string> = {
   Accept: 'application/json',
-  'Content-Type': 'application/json',
+  'User-Agent': SPORTY_UA,
+};
+
+/** Same request with the Ghana web client headers. No Content-Type and no Origin on a GET. */
+export const WEB_HEADERS: Record<string, string> = {
+  Accept: 'application/json',
+  'User-Agent': SPORTY_UA,
   clientid: 'web',
   platform: 'web',
   operid: '2',
-  'User-Agent':
-    'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
-  Referer: 'https://www.sportybet.com/gh/',
-  Origin: 'https://www.sportybet.com',
 };
 
-export function upcomingPath(page: number, todayGames: boolean): string {
-  const params = new URLSearchParams({
-    sportId: 'sr:sport:1',
-    marketId: SPORTY_MARKET_IDS,
-    pageSize: '100',
-    pageNum: String(page),
-    option: '1',
-    timeline: '0',
-  });
-  if (todayGames) params.set('todayGames', 'true');
-  return `/factsCenter/pcUpcomingEvents?${params.toString()}`;
+export type HeaderSet = 'plain' | 'web';
+
+export function headersFor(set: HeaderSet): Record<string, string> {
+  return set === 'web' ? WEB_HEADERS : PLAIN_HEADERS;
 }
 
-export function livePath(kind: 'liveOrPrematchEvents' | 'configurableLiveOrPrematchEvents' = 'liveOrPrematchEvents'): string {
-  const params = new URLSearchParams({
-    sportId: 'sr:sport:1',
-    marketId: SPORTY_MARKET_IDS,
-    pageSize: '100',
-    pageNum: '1',
-    productId: '1',
-    timeline: '0',
-  });
-  return `/factsCenter/${kind}?${params.toString()}`;
+export function headerNames(set: HeaderSet): string {
+  return Object.keys(headersFor(set)).join(', ');
+}
+
+/** Predict2u's working list URL. No timeline, no todayGames, no productId. */
+export function upcomingPath(page: number): string {
+  return `/factsCenter/pcUpcomingEvents?sportId=${encodeURIComponent('sr:sport:1')}&marketId=${encodeURIComponent(SPORTY_MARKET_IDS)}&pageSize=100&pageNum=${page}&option=1`;
+}
+
+export function eventPath(eventId: string, productId: '1' | '3'): string {
+  return `/factsCenter/event?eventId=${encodeURIComponent(eventId)}&productId=${productId}`;
+}
+
+/** Stop paging once this page covers totalNum, or the page itself is short. */
+export function morePages(page: number, pageEvents: number, total: number | null): boolean {
+  if (pageEvents < 100) return false;
+  if (total != null && page * 100 >= total) return false;
+  return page < 8;
 }
 
 export function endpointName(path: string): string {
@@ -121,6 +128,31 @@ export function sportyLine(input: {
   return base;
 }
 
+export interface AttemptRecord {
+  path: string;
+  via: string;
+  headerSet: string;
+  headerNames: string;
+  httpStatus: number;
+  bizCode: number | null;
+  message: string | null;
+  snippet: string;
+}
+
+export function formatLadder(attempts: AttemptRecord[]): string {
+  return attempts
+    .map((attempt) => {
+      const lines = [
+        `${attempt.via}/${attempt.headerSet} HTTP ${attempt.httpStatus || 'none'} bizCode ${attempt.bizCode ?? 'none'}${attempt.message ? ` (${attempt.message})` : ''}`,
+        `path: ${attempt.path}`,
+        `headers: ${attempt.headerNames}`,
+      ];
+      if (attempt.httpStatus !== 200 && attempt.snippet) lines.push(`body: ${attempt.snippet.slice(0, 200)}`);
+      return lines.join('\n');
+    })
+    .join('\n\n');
+}
+
 export function sportyCopy(input: {
   httpStatus: number;
   path: string;
@@ -131,8 +163,9 @@ export function sportyCopy(input: {
   kept: number;
   scope: ScheduleScope;
   via: string;
+  attempts?: AttemptRecord[];
 }): string {
-  return [
+  const summary = [
     sportyLine(input),
     `path: ${input.path}`,
     `http: ${input.httpStatus || 'none'}`,
@@ -144,6 +177,13 @@ export function sportyCopy(input: {
     `kept: ${input.kept}`,
     `scope: ${input.scope}`,
   ].join('\n');
+  const ladder = input.attempts?.length ? formatLadder(input.attempts) : '';
+  return ladder ? `${summary}\n\n${ladder}` : summary;
+}
+
+export function listTotal(payload: unknown): number | null {
+  const data = asRecord(asRecord(payload)?.data);
+  return asNumber(data?.totalNum);
 }
 
 function gather(source: Record<string, unknown>): { tournaments: number; events: Record<string, unknown>[] } {

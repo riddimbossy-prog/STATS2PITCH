@@ -8,6 +8,7 @@ export interface BridgeSnapshot {
 export interface BridgeRequest {
   id: string;
   path: string;
+  headerSet?: 'plain' | 'web';
 }
 
 export interface BridgeResult {
@@ -23,6 +24,7 @@ export interface BridgeTransport {
 type Waiter = {
   id: string;
   path: string;
+  headerSet: 'plain' | 'web';
   resolve: (result: BridgeResult) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -72,7 +74,7 @@ export class SofaBridge {
     return getBridgeSnapshot();
   }
 
-  enqueue(path: string): Promise<BridgeResult> {
+  enqueue(path: string, headerSet: 'plain' | 'web' = 'plain'): Promise<BridgeResult> {
     const id = `s${++this.seq}`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -81,9 +83,10 @@ export class SofaBridge {
           reject(new Error('SportyBet bridge timed out'));
         });
       }, this.timeoutMs);
-      this.waiters.set(id, { id, path, resolve, reject, timer, challengeRetries: 0 });
-      if (this.ready) this.transport.send({ id, path });
-      else this.queue.push({ id, path });
+      const request: BridgeRequest = { id, path, headerSet };
+      this.waiters.set(id, { id, path, headerSet, resolve, reject, timer, challengeRetries: 0 });
+      if (this.ready) this.transport.send(request);
+      else this.queue.push(request);
     });
   }
 
@@ -123,7 +126,7 @@ export class SofaBridge {
       waiter.challengeRetries += 1;
       this.ready = false;
       this.publish('challenge', 'Blocked');
-      this.queue.push({ id: waiter.id, path: waiter.path });
+      this.queue.push({ id: waiter.id, path: waiter.path, headerSet: waiter.headerSet });
       this.transport.reload();
       return;
     }
@@ -136,9 +139,8 @@ export class SofaBridge {
     }
     if (message.status < 200 || message.status >= 300) {
       this.finish(message.id, () => {
-        const detail = `SportyBet ${message.status}`;
-        this.publish(this.ready ? 'live' : 'offline', detail);
-        waiter.reject(new Error(detail));
+        this.publish(this.ready ? 'live' : 'offline', `SportyBet ${message.status}`);
+        waiter.resolve({ status: message.status, body: message.body });
       });
       return;
     }
@@ -165,11 +167,15 @@ export class SofaBridge {
 export function buildPageFetchScript(request: BridgeRequest): string {
   const id = JSON.stringify(request.id);
   const path = JSON.stringify(request.path);
-  return `(function(){var id=${id};var path=${path};fetch(path,{credentials:'include',headers:{Accept:'application/json','Content-Type':'application/json',clientid:'web',platform:'web',operid:'2'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:res.status,body:body}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
+  const headers =
+    request.headerSet === 'web'
+      ? "{Accept:'application/json',clientid:'web',platform:'web',operid:'2'}"
+      : "{Accept:'application/json'}";
+  return `(function(){var id=${id};var path=${path};fetch(path,{credentials:'include',headers:${headers}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:res.status,body:body}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
 }
 
 export function buildProbeScript(): string {
-  return `(function(){fetch('/api/gh/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1%2C18&pageSize=1&pageNum=1&option=1&timeline=0',{credentials:'include',headers:{Accept:'application/json','Content-Type':'application/json',clientid:'web',platform:'web',operid:'2'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:res.status,body:body.slice(0,500)}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
+  return `(function(){fetch('/api/gh/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1%2C18%2C10%2C29&pageSize=1&pageNum=1&option=1',{credentials:'include',headers:{Accept:'application/json'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:res.status,body:body.slice(0,500)}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
 }
 
 export const SPORTY_PAGE = 'https://www.sportybet.com/gh/';

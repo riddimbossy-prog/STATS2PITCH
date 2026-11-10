@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Match } from '../domain';
 import { localDate } from '../format';
-import { chooseSchedule, inspectSporty, kickoffMs, sportyLine, upcomingPath } from './sporty-read';
+import { chooseSchedule, formatLadder, inspectSporty, kickoffMs, morePages, sportyLine, upcomingPath } from './sporty-read';
 
 const day = '2026-11-10';
 
@@ -22,15 +22,39 @@ function match(id: string, kickoff: number): Match {
   };
 }
 
-test('upcoming query carries the web client params', () => {
-  const path = upcomingPath(2, true);
-  assert.match(path, /^\/factsCenter\/pcUpcomingEvents\?/);
-  assert.match(path, /sportId=sr%3Asport%3A1/);
-  assert.match(path, /marketId=1%2C18%2C10%2C29%2C11%2C26%2C36%2C14%2C60100/);
-  assert.match(path, /pageSize=100/);
-  assert.match(path, /pageNum=2/);
-  assert.match(path, /todayGames=true/);
-  assert.match(path, /timeline=0/);
+test('upcoming query is the proven Predict2u URL', () => {
+  const path = upcomingPath(2);
+  assert.equal(
+    path,
+    '/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1%2C18%2C10%2C29&pageSize=100&pageNum=2&option=1',
+  );
+  assert.doesNotMatch(path, /timeline|todayGames|productId/);
+});
+
+test('paging stops when the page is short or totalNum is covered', () => {
+  assert.equal(morePages(1, 40, 200), false);
+  assert.equal(morePages(1, 100, 100), false);
+  assert.equal(morePages(1, 100, 250), true);
+  assert.equal(morePages(3, 100, 250), false);
+});
+
+test('the diagnostics ladder keeps non-200 bodies', () => {
+  const text = formatLadder([
+    {
+      path: '/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1%2C18%2C10%2C29&pageSize=100&pageNum=1&option=1',
+      via: 'direct',
+      headerSet: 'plain',
+      headerNames: 'Accept, User-Agent',
+      httpStatus: 422,
+      bizCode: null,
+      message: null,
+      snippet: 'rejected params',
+    },
+  ]);
+  assert.match(text, /direct\/plain HTTP 422/);
+  assert.match(text, /headers: Accept, User-Agent/);
+  assert.match(text, /body: rejected params/);
+  assert.doesNotMatch(text, /timeline|todayGames/);
 });
 
 test('a seconds timestamp is treated as milliseconds', () => {

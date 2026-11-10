@@ -50,30 +50,6 @@ const UPCOMING = {
   },
 };
 
-const LIVE = {
-  bizCode: 10000,
-  data: {
-    tournaments: [
-      {
-        events: [
-          {
-            eventId: 'sr:match:200',
-            homeTeamId: 'h1',
-            awayTeamId: 'a1',
-            homeTeamName: 'Inter',
-            awayTeamName: 'Milan',
-            estimateStartTime: KICK,
-            matchStatus: 'H1',
-            playedSeconds: '23:10',
-            setScore: '1-0',
-            sport: { category: { name: 'Italy', tournament: { name: 'Serie A' } } },
-          },
-        ],
-      },
-    ],
-  },
-};
-
 test('parses a SportyBet set score', () => {
   assert.deepEqual(parseSetScore('2-1'), { home: 2, away: 1 });
   assert.deepEqual(parseSetScore('1:0'), { home: 1, away: 0 });
@@ -95,30 +71,45 @@ test('maps an upcoming event, its league and its markets', () => {
 
 test('scheduled and live reads use the factsCenter paths and fall back to a stale cache', async () => {
   const calls: string[] = [];
-  let failLive = false;
+  let fail = false;
+  const liveEvent = {
+    eventId: 'sr:match:200',
+    homeTeamId: 'h1',
+    awayTeamId: 'a1',
+    homeTeamName: 'Inter',
+    awayTeamName: 'Milan',
+    estimateStartTime: KICK,
+    matchStatus: 'H1',
+    playedSeconds: '23:10',
+    setScore: '1-0',
+    sport: { category: { name: 'Italy', tournament: { name: 'Serie A' } } },
+  };
   const source = createSportyBetSource({
     gapMs: 0,
     baseUrl: 'https://www.sportybet.com/api/gh',
     cache: memoryCache(),
     fetchJson: async (url) => {
       calls.push(url);
-      if (url.includes('pcUpcomingEvents')) return UPCOMING;
-      if (url.includes('liveOrPrematchEvents')) {
-        if (failLive) throw new Error('SportyBet refused the request (403). This network is outside Ghana.');
-        return LIVE;
+      if (fail) throw new Error('SportyBet 403');
+      if (url.includes('pcUpcomingEvents')) {
+        return url.includes('pageNum=1') && calls.filter((item) => item.includes('pcUpcomingEvents')).length === 1
+          ? UPCOMING
+          : { bizCode: 10000, data: { tournaments: [{ events: [liveEvent] }], totalNum: 1 } };
       }
+      if (url.includes('/event?')) return { bizCode: 10000, data: liveEvent };
       throw new Error(`unexpected ${url}`);
     },
   });
   const day = await source.scheduled(localDate(new Date(KICK)), true);
   assert.equal(day.ok, true);
   assert.equal(day.data?.[0]?.id, 'sr:match:100');
-  assert.match(calls[0] ?? '', /factsCenter\/pcUpcomingEvents/);
+  assert.match(calls[0] ?? '', /factsCenter\/pcUpcomingEvents\?sportId=sr%3Asport%3A1&marketId=1%2C18%2C10%2C29&pageSize=100&pageNum=1&option=1$/);
+  assert.doesNotMatch(calls[0] ?? '', /timeline|todayGames|productId/);
   const live = await source.live(true);
   assert.equal(live.data?.[0]?.minute, "23'");
   assert.equal(live.data?.[0]?.feedScore?.home, 1);
-  assert.equal(live.data?.[0]?.varPending, false);
-  failLive = true;
+  assert.match(calls.find((url) => url.includes('/event?')) ?? '', /productId=1/);
+  fail = true;
   const stale = await source.live(true);
   assert.equal(stale.ok, false);
   assert.equal(stale.stale, true);
@@ -132,24 +123,20 @@ test('a new live goal is held, then confirmed when the score sticks', async () =
     gapMs: 0,
     now: () => now,
     fetchJson: async (url) => {
-      if (!url.includes('liveOrPrematchEvents')) throw new Error(url);
-      return {
-        data: {
-          events: [
-            {
-              eventId: 'sr:match:9',
-              homeTeamName: 'A',
-              awayTeamName: 'B',
-              homeTeamId: 'a',
-              awayTeamId: 'b',
-              estimateStartTime: KICK,
-              matchStatus: 'H2',
-              playedSeconds: '70:00',
-              setScore: score,
-            },
-          ],
-        },
+      const event = {
+        eventId: 'sr:match:9',
+        homeTeamName: 'A',
+        awayTeamName: 'B',
+        homeTeamId: 'a',
+        awayTeamId: 'b',
+        estimateStartTime: KICK,
+        matchStatus: 'H2',
+        playedSeconds: '70:00',
+        setScore: score,
       };
+      if (url.includes('pcUpcomingEvents')) return { bizCode: 10000, data: { tournaments: [{ events: [event] }], totalNum: 1 } };
+      if (url.includes('/event?')) return { bizCode: 10000, data: event };
+      throw new Error(url);
     },
   });
   const first = await source.live(true);
@@ -170,23 +157,21 @@ test('a VAR-awarded timeline row confirms the new score immediately', async () =
   const source = createSportyBetSource({
     gapMs: 0,
     now: () => 5_000,
-    fetchJson: async () => ({
-      data: {
-        events: [
-          {
-            eventId: 'sr:match:7',
-            homeTeamName: 'A',
-            awayTeamName: 'B',
-            homeTeamId: 'a',
-            awayTeamId: 'b',
-            matchStatus: 'H1',
-            playedSeconds: '12:00',
-            setScore: score,
-            comments: [{ type: 'var', text: 'VAR confirmed goal', confirmed: true }],
-          },
-        ],
-      },
-    }),
+    fetchJson: async (url) => {
+      const event = {
+        eventId: 'sr:match:7',
+        homeTeamName: 'A',
+        awayTeamName: 'B',
+        homeTeamId: 'a',
+        awayTeamId: 'b',
+        matchStatus: 'H1',
+        playedSeconds: '12:00',
+        setScore: score,
+        comments: [{ type: 'var', text: 'VAR confirmed goal', confirmed: true }],
+      };
+      if (url.includes('pcUpcomingEvents')) return { bizCode: 10000, data: { tournaments: [{ events: [event] }], totalNum: 1 } };
+      return { bizCode: 10000, data: event };
+    },
   });
   await source.live(true);
   score = '1-0';
@@ -201,6 +186,7 @@ test('event detail maps score, markets and lineups when SportyBet sends them', a
     fetchJson: async (url) => {
       assert.match(url, /factsCenter\/event\?eventId=sr%3Amatch%3A100&productId=3/);
       return {
+        bizCode: 10000,
         data: {
           eventId: 'sr:match:100',
           homeTeamName: 'Arsenal',
@@ -226,7 +212,7 @@ test('event detail maps score, markets and lineups when SportyBet sends them', a
   assert.deepEqual(lineups.data, []);
 });
 
-test('an empty todayGames list falls back to the all-upcoming feed', async () => {
+test('tomorrow is kept from the upcoming list without a todayGames query', async () => {
   const calls: string[] = [];
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -235,12 +221,10 @@ test('an empty todayGames list falls back to the all-upcoming feed', async () =>
     gapMs: 0,
     fetchJson: async (url) => {
       calls.push(url);
-      if (url.includes('todayGames=true')) {
-        return { bizCode: 10000, data: { tournaments: Array.from({ length: 12 }, () => ({ events: [] })) } };
-      }
       return {
         bizCode: 10000,
         data: {
+          totalNum: 1,
           tournaments: [
             {
               name: 'Premier League',
@@ -265,8 +249,28 @@ test('an empty todayGames list falls back to the all-upcoming feed', async () =>
   assert.equal(day.ok, true);
   assert.equal(day.data?.[0]?.id, 'sr:match:5');
   assert.match(day.notice ?? '', /showing the next days/);
-  assert.match(calls[0] ?? '', /todayGames=true/);
-  assert.equal(calls.some((url) => url.includes('pcUpcomingEvents') && !url.includes('todayGames=true')), true);
+  assert.equal(calls.length, 1);
+  assert.doesNotMatch(calls[0] ?? '', /timeline|todayGames/);
+});
+
+test('a 422 on the plain request is kept in the ladder and the web headers can still win', async () => {
+  const source = createSportyBetSource({
+    gapMs: 0,
+    fetchJson: async (_url, init) => {
+      if (init?.headerSet !== 'web') {
+        return { __sportyHttp: true, status: 422, via: 'direct', body: 'rejected', snippet: 'rejected params' };
+      }
+      return UPCOMING;
+    },
+  });
+  const day = await source.scheduled(localDate(new Date(KICK)), true);
+  assert.equal(day.ok, true);
+  assert.equal(day.data?.[0]?.id, 'sr:match:100');
+  assert.match(day.notice ?? '', /SportyBet OK/);
+  assert.match(day.copy ?? '', /direct\/plain HTTP 422/);
+  assert.match(day.copy ?? '', /headers: Accept, User-Agent/);
+  assert.match(day.copy ?? '', /body: rejected params/);
+  assert.match(day.copy ?? '', /direct\/web HTTP 200/);
 });
 
 test('a refused bizCode is the visible error', async () => {
