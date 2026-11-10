@@ -12,7 +12,7 @@ export default function MatchesScreen() {
   const [filter, setFilter] = useState<'live' | 'today'>('today');
   const rows = board.matches.filter((match) => (filter === 'live' ? match.status === 'live' : true));
   const banner = board.sample
-    ? 'Sample board. These fixtures are not from Sofascore. Live data is still the only real source.'
+    ? 'Sample board. These fixtures are not from SportyBet. Live data is still the only real source.'
     : board.error;
 
   return (
@@ -26,19 +26,19 @@ export default function MatchesScreen() {
           { value: 'live', label: 'Live' },
         ]}
       />
-      {board.phase === 'loading' ? <Loading label="Asking Sofascore for today's matches" /> : null}
+      {board.phase === 'loading' ? <Loading label="Asking SportyBet for today's matches" /> : null}
       {board.phase === 'error' && !board.sample ? (
         <View style={{ gap: 10 }}>
           <Empty
-            title="Sofascore did not respond"
-            body="Lists, slips and grades already on this phone are still here. The feed is unofficial and sometimes refuses a network."
+            title="SportyBet did not respond"
+            body="Lists, slips and grades already on this phone are still here. SportyBet blocks many networks outside Ghana."
           />
-          <Button label="Try Sofascore again" onPress={board.refresh} />
+          <Button label="Try SportyBet again" onPress={board.refresh} />
           <Button label="Preview the sample board" tone="ghost" onPress={board.openSample} />
         </View>
       ) : null}
       {board.phase === 'ready' && rows.length === 0 ? (
-        <Empty title={filter === 'live' ? 'No live matches' : 'No matches today'} body="Pull to refresh. Kickoffs show up as Sofascore publishes them." />
+        <Empty title={filter === 'live' ? 'No live matches' : 'No matches today'} body="Pull to refresh. Kickoffs show up as SportyBet publishes them." />
       ) : null}
       {rows.map((match, index) => (
         <MatchCard key={match.id} index={index} match={match} detail={board.details[match.id]} onPress={() => router.push(`/match/${match.id}`)} />

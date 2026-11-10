@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stats2Pitch",
     "slug": "stats2pitch",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/brand/s2p-pitch-mark.png",
     "scheme": "stats2pitch",
@@ -12,7 +12,7 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 3,
       "package": "com.stats2pitch.app",
       "permissions": ["android.permission.POST_NOTIFICATIONS", "android.permission.VIBRATE"],
       "predictiveBackGestureEnabled": false,
@@ -51,7 +51,7 @@
       "typedRoutes": false
     },
     "extra": {
-      "sofascoreBaseUrl": "https://api.sofascore.com/api/v1"
+      "sportybetBaseUrl": "https://www.sportybet.com/api/gh"
     }
   }
 }

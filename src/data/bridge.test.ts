@@ -48,7 +48,7 @@ test('a 403 challenge reloads the page once and retries', async () => {
   });
   assert.equal(reloads(), 1);
   assert.equal(bridge.snapshot().status, 'challenge');
-  assert.equal(bridge.snapshot().lastError, 'Blocked 403 challenge');
+  assert.equal(bridge.snapshot().lastError, 'Blocked');
   bridge.markReady();
   assert.equal(sent.length, 2);
   assert.equal(sent[1]?.id, sent[0]?.id);
@@ -71,7 +71,7 @@ test('a second 403 challenge rejects instead of reloading forever', async () => 
   assert.equal(bridge.snapshot().status, 'challenge');
 });
 
-test('challenge detection matches the Sofascore reason field', () => {
+test('challenge detection matches a blocked reason field', () => {
   assert.equal(isChallengeBody('{"error":{"code":403,"reason":"challenge"}}'), true);
   assert.equal(isChallengeBody('{"events":[]}'), false);
 });

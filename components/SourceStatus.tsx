@@ -11,30 +11,30 @@ export function SourceStatus() {
   useEffect(() => subscribeBridge(setBridge), []);
 
   if (board.sample) {
-    return <T dim>Sample board. Not live Sofascore.</T>;
+    return <T dim>Sample board. Not live SportyBet.</T>;
   }
   if (Platform.OS === 'web') {
     return (
       <T dim>
-        Web preview uses direct fetch. A browser cannot pass Sofascore's challenge, so a failed read offers the sample board.
+        Web preview calls SportyBet directly. A network outside Ghana is often blocked, so a failed read offers the sample board.
         {board.error ? ` Last error: ${board.error}` : ''}
       </T>
     );
   }
 
-  const label =
-    bridge.status === 'live'
-      ? 'Live from Sofascore'
-      : bridge.status === 'challenge'
-        ? 'Blocked 403 challenge'
-        : bridge.status === 'starting'
-          ? 'Opening Sofascore…'
-          : 'Offline';
+  const blocked = /403|blocked|challenge/i.test(`${board.error ?? ''} ${bridge.lastError ?? ''}`) || bridge.status === 'challenge';
+  const label = board.phase === 'ready' && !board.error
+    ? 'Live from SportyBet'
+    : blocked
+      ? 'Blocked'
+      : board.phase === 'loading' || bridge.status === 'starting'
+        ? 'Opening SportyBet…'
+        : 'Offline';
   const detail = bridge.lastError || board.error;
   return (
-    <T dim style={bridge.status === 'challenge' || bridge.status === 'offline' ? { color: colors.warn } : undefined}>
+    <T dim style={label === 'Blocked' || label === 'Offline' ? { color: colors.warn } : undefined}>
       {label}
-      {detail ? ` · ${detail}` : ''}
+      {detail && label !== 'Live from SportyBet' ? ` · ${detail}` : ''}
     </T>
   );
 }

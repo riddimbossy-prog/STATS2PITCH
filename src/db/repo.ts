@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import type { ListEntry, Slip, TrackedPick } from '../domain';
-import type { CacheRow, CacheStore } from '../data/sofascore';
+import type { CacheRow, CacheStore } from '../data/sportybet';
 
 export interface Repo {
   kind: 'sqlite' | 'document';

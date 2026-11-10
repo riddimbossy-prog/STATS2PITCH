@@ -1,8 +1,8 @@
 import { useEffect, useRef, type ComponentType, type Ref } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import WebViewImport from 'react-native-webview';
-import { SofaBridge, SOFA_MOBILE_UA, SOFA_PAGE, buildPageFetchScript, buildProbeScript, isChallengeBody } from './bridge';
-import { registerSofaBridge } from './sofascore';
+import { SofaBridge, SPORTY_MOBILE_UA, SPORTY_PAGE, buildPageFetchScript, buildProbeScript } from './bridge';
+import { registerSportyBridge } from './sportybet';
 
 type BridgeView = {
   injectJavaScript: (script: string) => void;
@@ -29,8 +29,8 @@ type BridgeViewProps = {
 const SofaView = WebViewImport as unknown as ComponentType<BridgeViewProps>;
 
 /**
- * Hidden page that has loaded sofascore.com. Native reads go through that
- * page so the challenge cookies apply. The web build does not mount this.
+ * Hidden sportybet.com page. A 403 from direct fetch is retried in that page.
+ * The web build does not mount this.
  */
 export function SofaBridgeHost() {
   const viewRef = useRef<BridgeView>(null);
@@ -51,16 +51,16 @@ export function SofaBridgeHost() {
       20_000,
     );
     bridgeRef.current = bridge;
-    registerSofaBridge(async (path) => {
+    registerSportyBridge(async (path) => {
       const result = await bridge.enqueue(path);
       try {
         return JSON.parse(result.body) as unknown;
       } catch {
-        throw new Error('Sofascore bridge returned a non-JSON body');
+        throw new Error('SportyBet bridge returned a non-JSON body');
       }
     });
     return () => {
-      registerSofaBridge(null);
+      registerSportyBridge(null);
       bridgeRef.current = null;
     };
   }, []);
@@ -78,7 +78,6 @@ export function SofaBridgeHost() {
     if (!bridge) return;
     if (message.type === 'probe') {
       const status = message.status ?? 0;
-      const body = message.body ?? '';
       if (message.error) {
         bridge.markOffline(message.error);
         return;
@@ -88,10 +87,12 @@ export function SofaBridgeHost() {
         bridge.markReady();
         return;
       }
-      if (status === 403 && isChallengeBody(body) && !reloaded.current) {
-        reloaded.current = true;
+      if (status === 403) {
         bridge.noteChallenge();
-        viewRef.current?.reload();
+        if (!reloaded.current) {
+          reloaded.current = true;
+          viewRef.current?.reload();
+        }
       }
       return;
     }
@@ -109,8 +110,8 @@ export function SofaBridgeHost() {
     <View pointerEvents="none" style={styles.host}>
       <SofaView
         ref={viewRef}
-        source={{ uri: SOFA_PAGE }}
-        userAgent={SOFA_MOBILE_UA}
+        source={{ uri: SPORTY_PAGE }}
+        userAgent={SPORTY_MOBILE_UA}
         javaScriptEnabled
         domStorageEnabled
         thirdPartyCookiesEnabled
@@ -123,7 +124,7 @@ export function SofaBridgeHost() {
         }}
         onMessage={onMessage}
         onError={() => {
-          bridgeRef.current?.markOffline('Sofascore page failed to load');
+          bridgeRef.current?.markOffline('SportyBet page failed to load');
         }}
       />
     </View>

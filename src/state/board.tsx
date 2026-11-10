@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getBookie } from '../bookies/stub';
+import { bookFromPicks, convertSportyCode, phoneClient } from '../bookies/book';
 import { cacheFromRepo, getRepo, type Repo } from '../db/repo';
 import type { ListEntry, ListKind, ListScope, Match, MatchDetail, Slip, TrackedPick } from '../domain';
-import { createSofascoreSource, type DataSource } from '../data/sofascore';
+import { createSportyBetSource, type DataSource } from '../data/sportybet';
 import { buildPicks, isGreenlit, isSuppressed, reconcile, suggestSimilar, type Pick, type Suggestion } from '../engine';
 import type { Notice } from '../engine/notify';
 import type { Snapshot } from '../engine/notify';
@@ -48,6 +48,7 @@ interface BoardContextValue {
   setBookieId: (id: string) => void;
   setStake: (value: string) => void;
   bookDraft: () => Promise<string | null>;
+  convertCode: (code: string) => Promise<string | null>;
   addList: (input: { kind: ListKind; scope: ListScope; name: string; refId?: string }) => void;
   removeList: (id: string) => void;
   dismissToast: (id: string) => void;
@@ -91,7 +92,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
   const [slips, setSlips] = useState<Slip[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [draftIds, setDraftIds] = useState<string[]>([]);
-  const [bookieId, setBookieId] = useState(getBookie('sportybet').id);
+  const [bookieId, setBookieId] = useState('sportybet');
   const [stake, setStake] = useState('10');
 
   useEffect(() => {
@@ -100,7 +101,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
       const repo = await getRepo();
       if (cancelled) return;
       repoRef.current = repo;
-      sourceRef.current = createSofascoreSource({ cache: cacheFromRepo(repo) });
+      sourceRef.current = createSportyBetSource({ cache: cacheFromRepo(repo) });
       const [storedLists, storedTracked, storedSlips] = await Promise.all([repo.lists(), repo.tracked(), repo.slips()]);
       if (cancelled) return;
       setLists(storedLists);
@@ -167,7 +168,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
           kickoff: match.kickoff,
           homeResults: histories[match.home.id] ?? [],
           awayResults: histories[match.away.id] ?? [],
-          odds: details[match.id]?.odds ?? {},
+          odds: { ...(match.odds ?? {}), ...(details[match.id]?.odds ?? {}) },
         }),
       ),
     [matches, histories, details],
@@ -220,7 +221,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     if (sampleRef.current) return;
     const rows = mergeMatches(scheduled.data ?? [], live.data ?? []);
     if (!scheduled.data && !live.data) {
-      const message = scheduled.error || live.error || 'Sofascore did not respond.';
+      const message = scheduled.error || live.error || 'SportyBet did not respond.';
       setError(message);
       setPhase('error');
       if (process.env.EXPO_PUBLIC_OPEN_SAMPLE === '1') applySample();
@@ -240,7 +241,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     const [scheduled, live] = await Promise.all([source.scheduled(date, true), source.live(true)]);
     if (sampleRef.current) return;
     if (!scheduled.data && !live.data) {
-      setError(scheduled.error || live.error || 'Sofascore did not respond.');
+      setError(scheduled.error || live.error || 'SportyBet did not respond.');
       return;
     }
     const rows = mergeMatches(scheduled.data ?? [], live.data ?? []);
@@ -367,43 +368,109 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     setDraftIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
   }
 
+  function legsFor(chosen: Pick[]): Slip['legs'] {
+    return chosen.map((pick) => ({
+      id: uid('leg'),
+      pickId: pick.id,
+      matchId: pick.matchId,
+      market: pick.market,
+      side: pick.side,
+      label: pick.label,
+      odds: pick.odds,
+      status: 'pending' as const,
+    }));
+  }
+
+  function saveBooked(
+    results: Awaited<ReturnType<typeof bookFromPicks>>,
+    chosen: Pick[],
+    stakeValue: number | null,
+  ) {
+    const made = results
+      .filter((result) => result.ok && result.code)
+      .map((result) => {
+        const slip: Slip = {
+          id: uid('slip'),
+          bookieId: result.id,
+          bookieName: result.name,
+          code: result.code,
+          stub: false,
+          stubMessage: `${result.legs}/${result.offered} legs · odds ${result.totalOdds ?? '—'}`,
+          stake: stakeValue,
+          status: 'open',
+          createdAt: Date.now(),
+          settledAt: null,
+          shareUrl: result.shareUrl,
+          bookedLegs: result.legs,
+          offeredLegs: result.offered,
+          legs: chosen.length
+            ? legsFor(chosen)
+            : [
+                {
+                  id: uid('leg'),
+                  pickId: 'pasted',
+                  matchId: 'pasted',
+                  market: 'over_2_5',
+                  side: 'match',
+                  label: result.name,
+                  odds: result.totalOdds,
+                  status: 'pending',
+                },
+              ],
+        };
+        return slip;
+      });
+    if (!made.length) return;
+    setSlips((current) => [...made, ...current]);
+    for (const slip of made) void repoRef.current?.saveSlip(slip);
+  }
+
   async function bookDraft(): Promise<string | null> {
     const chosen = visiblePicks.filter((pick) => draftIds.includes(pick.id));
     if (!chosen.length) return 'Add at least one pick to the slip.';
     const stakeValue = stake.trim() ? Number(stake) : null;
     if (stake.trim() && !Number.isFinite(stakeValue)) return 'Stake needs to be a number.';
-    const bookie = getBookie(bookieId);
-    const booking = await bookie.book(
-      chosen.map((pick) => ({ id: pick.id, label: pick.label, odds: pick.odds })),
-      stakeValue,
-    );
-    const slip: Slip = {
-      id: uid('slip'),
-      bookieId: bookie.id,
-      bookieName: bookie.name,
-      code: booking.code,
-      stub: true,
-      stubMessage: booking.message,
-      stake: stakeValue,
-      status: 'open',
-      createdAt: Date.now(),
-      settledAt: null,
-      legs: chosen.map((pick) => ({
-        id: uid('leg'),
-        pickId: pick.id,
+    const picks = chosen.map((pick) => {
+      const match = matches.find((item) => item.id === pick.matchId);
+      return {
+        id: pick.id,
         matchId: pick.matchId,
+        eventId: match?.id.startsWith('sr:') ? match.id : undefined,
         market: pick.market,
         side: pick.side,
         label: pick.label,
+        home: match?.home.name ?? pick.teamName,
+        away: match?.away.name ?? pick.opponentName,
+        kickoff: pick.kickoff,
         odds: pick.odds,
-        status: 'pending',
-      })),
-    };
-    setSlips((current) => [slip, ...current]);
-    setDraftIds([]);
-    void repoRef.current?.saveSlip(slip);
-    for (const pick of chosen) track(pick);
-    return null;
+      };
+    });
+    try {
+      const results = await bookFromPicks(phoneClient(), picks);
+      const sporty = results.find((result) => result.id === 'sportybet');
+      if (!sporty?.ok) return sporty?.reason || 'SportyBet did not book this slip.';
+      saveBooked(results, chosen, stakeValue);
+      setDraftIds([]);
+      for (const pick of chosen) track(pick);
+      const failed = results.filter((result) => !result.ok).map((result) => `${result.name}: ${result.reason ?? 'failed'}`);
+      return failed.length ? failed.join('\n') : null;
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Booking failed';
+    }
+  }
+
+  async function convertCode(code: string): Promise<string | null> {
+    const trimmed = code.trim();
+    if (!trimmed) return 'Paste a SportyBet code.';
+    try {
+      const results = await convertSportyCode(phoneClient(), trimmed);
+      const stakeValue = Number(stake);
+      saveBooked(results, [], Number.isFinite(stakeValue) ? stakeValue : null);
+      const failed = results.filter((result) => !result.ok).map((result) => `${result.name}: ${result.reason ?? 'failed'}`);
+      return failed.length ? failed.join('\n') : null;
+    } catch (error) {
+      return error instanceof Error ? error.message : 'That code could not be read';
+    }
   }
 
   function addList(input: { kind: ListKind; scope: ListScope; name: string; refId?: string }) {
@@ -473,6 +540,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     setBookieId,
     setStake,
     bookDraft,
+    convertCode,
     addList,
     removeList,
     dismissToast: (id) => setToasts((current) => current.filter((toast) => toast.id !== id)),

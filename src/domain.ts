@@ -52,6 +52,8 @@ export interface Match {
   minute: string | null;
   feedScore: { home: number; away: number } | null;
   varPending: boolean;
+  /** Decimal prices taken from the SportyBet markets on this event, when the list included them. */
+  odds?: Partial<Record<string, number>>;
 }
 
 export interface RawIncident {
@@ -142,5 +144,8 @@ export interface Slip {
   status: 'open' | 'won' | 'lost' | 'void';
   createdAt: number;
   settledAt: number | null;
+  shareUrl?: string | null;
+  bookedLegs?: number;
+  offeredLegs?: number;
   legs: SlipLeg[];
 }

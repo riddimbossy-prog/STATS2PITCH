@@ -1,6 +1,6 @@
 # Stats2Pitch
 
-Android-first football live scores and betting insight. The app reads Sofascore through one adapter, tips every trend or form line at 80% or above, and settles the picks you track.
+Android-first football live scores and betting insight. The app reads SportyBet Ghana through one adapter, tips every trend or form line at 80% or above, and settles the picks you track.
 
 Web can be run from the same Expo project. A Play Store build is configured as an AAB; the preview profile builds an APK.
 
@@ -34,7 +34,7 @@ npm run typecheck
 3. Scan the QR code with Expo Go. Phone and computer need to be on the same network.
 4. Allow notifications when the app asks. Settlement alerts are local notifications on Android. On web they show as in-app toasts.
 
-`npm run web` runs the same UI in a browser. Browsers cannot call Sofascore directly (the feed does not send usable browser access from this app), so use Expo Go on the phone for the live feed.
+`npm run web` runs the same UI in a browser. SportyBet blocks many IPs outside Ghana, so use the app on a phone in Ghana for the live feed. A failed read can open the labelled sample board.
 
 ## Build an APK
 
@@ -53,15 +53,21 @@ eas build -p android --profile preview
 ```
 app/                     screens (expo-router)
 src/engine/              pure trend, confidence, squad, grade, VAR and settlement logic
-src/data/sofascore.ts    the only module that calls Sofascore
-src/bookies/stub.ts      pluggable bookie adapters, all local stubs
+src/data/sportybet.ts    the only module that calls SportyBet
+src/bookies/             SportyBet booking, then Football.com, MSport, Betika, Betpawa
 src/db/repo.ts           SQLite on Android; web uses an on-device document store
 src/state/board.tsx      board, polling, slips, lists
 ```
 
-Sofascore has no official public API. The owner accepted that risk. `createSofascoreSource` is the only place that knows the host, paths and headers. Set `EXPO_PUBLIC_SOFASCORE_BASE_URL` to point the same adapter at another base later. Calls are queued (about 350ms apart), cached, retried on 429 and 5xx, and a failure returns the last cached payload when one exists. A 403 or a dead network does not throw into the UI.
+`createSportyBetSource` is the only place that knows the SportyBet host, paths and headers. Set `EXPO_PUBLIC_SPORTYBET_BASE_URL` to point the same adapter at another base. Calls are queued (about 350ms apart), cached, retried on 429 and 5xx, and a failure returns the last cached payload when one exists. A 403 or a dead network does not throw into the UI. The status line reads Live from SportyBet, Blocked, or Offline.
 
-Live scores refresh about every 10 seconds. Incident checks for a handful of live matches run on that same loop, so a confirmed Sofascore event reaches the app on the next poll rather than by a push socket.
+SportyBet event ids are Betradar ids (`sr:match:N`). Booking uses that id directly. A pasted SportyBet share code is read back and rebooked on the other Ghana books.
+
+Live scores refresh about every 10 seconds. The list comes from `factsCenter/liveOrPrematchEvents`. Today's card comes from `factsCenter/pcUpcomingEvents`. Match detail, markets and the final score come from `factsCenter/event`. Team form comes from `factsCenter/teamEventList`.
+
+### What SportyBet does not send
+
+The public factsCenter payloads used here include score, status, kickoff, teams, competition and markets. They do not include a reliable recent starting XI, so rotation and squad strength stay **unknown** unless an event payload happens to include `homeLineup` / `awayLineup`. Cards and substitutions show only when a timeline (`comments`, `eventTimeline` or `timeline`) is present. Detailed match statistics are not in these payloads.
 
 ### Tips
 
@@ -76,11 +82,11 @@ Live scores refresh about every 10 seconds. Incident checks for a handful of liv
 
 ### Squads
 
-A usual starter is someone who started at least 60% of the last lineups, once three lineups exist. Full strength means at least 90% of that group is starting. Half strength means under 60%. Three or more usual starters missing raises a rotation flag.
+A usual starter is someone who started at least 60% of the last lineups, once three lineups exist. Full strength means at least 90% of that group is starting. Half strength means under 60%. Three or more usual starters missing raises a rotation flag. SportyBet does not currently supply those recent XIs, so the squad card stays on "Squad not compared yet".
 
 ### VAR
 
-A pending check is labelled VAR and is not a goal. The score and the goal notification update only when the check is awarded. A disallowed check does not change the score.
+SportyBet publishes a score, not a separate VAR decision on every goal. The first score seen for a match is accepted. A later increase is labelled VAR and is not awarded for 45 seconds (`GOAL_HOLD_MS` in `src/data/var-hold.ts`). If that same score is still there when the hold ends, it becomes a confirmed goal and the notification can fire. If the score falls back, the check is disallowed and the goal is not awarded. A timeline row that says the goal was VAR confirmed awards it immediately. A pending check is not a goal.
 
 ### Grades
 
@@ -96,11 +102,22 @@ Same market, then closeness of confidence, trend and form. A different market sc
 
 ## Sample board
 
-If Sofascore refuses the connection, Matches offers **Preview the sample board**. Those fixtures are labelled in the app and are not a second data source. Set `EXPO_PUBLIC_OPEN_SAMPLE=1` to open that board automatically after a failed read.
+If SportyBet refuses the connection, Matches offers **Preview the sample board**. Those fixtures are labelled in the app and are not a second data source. Set `EXPO_PUBLIC_OPEN_SAMPLE=1` to open that board automatically after a failed read.
 
-## Stubbed
+## Booking
 
-- Every bookie adapter returns a local code such as `S2P-SPO-……`. Nothing is sent to SportyBet, Bet365, 1xBet or Betway.
+Slips book on SportyBet Ghana first (`POST /api/gh/orders/share`). The app reads that code (`GET /api/gh/orders/share/{code}`) and sends the same Betradar legs to Football.com, MSport, Betika and Betpawa. You can also paste an existing SportyBet code and convert it. Each bookie fails on its own and shows the reason. Share links:
+
+- `https://www.sportybet.com/gh/?shareCode=CODE`
+- `https://www.football.com/gh/?shareCode=CODE`
+- `https://www.msport.com/gh/?shareCode=CODE`
+- `https://www.betika.com/en-gh/share/CODE`
+- `https://www.betpawa.com.gh/share-betslip/CODE`
+
+Requests run from the phone. SportyBet returns 403 from many non-Ghana networks.
+
+## Still local
+
 - There is no account system and no server. Slips, lists, tracked picks and the HTTP cache stay on the device.
-- Odds only appear when Sofascore's odds payload maps onto a known market. Otherwise the price is blank.
+- Odds come from the SportyBet markets on the event (1X2, totals, BTTS, team totals). A market SportyBet did not price stays blank.
 - Play Store signing, store listing and a paid console account are not part of this project.

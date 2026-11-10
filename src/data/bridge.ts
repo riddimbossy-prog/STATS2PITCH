@@ -54,7 +54,7 @@ export function isChallengeBody(body: string): boolean {
 }
 
 /**
- * Queues Sofascore reads until the hidden page says it is ready.
+ * Queues SportyBet reads until the hidden page says it is ready.
  * A 403 challenge reloads the page once, then retries that request.
  */
 export class SofaBridge {
@@ -77,8 +77,8 @@ export class SofaBridge {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.finish(id, () => {
-          this.publish('offline', 'Sofascore bridge timed out');
-          reject(new Error('Sofascore bridge timed out'));
+          this.publish('offline', 'SportyBet bridge timed out');
+          reject(new Error('SportyBet bridge timed out'));
         });
       }, this.timeoutMs);
       this.waiters.set(id, { id, path, resolve, reject, timer, challengeRetries: 0 });
@@ -89,7 +89,7 @@ export class SofaBridge {
 
   noteChallenge() {
     this.ready = false;
-    this.publish('challenge', 'Blocked 403 challenge');
+    this.publish('challenge', 'Blocked');
   }
 
   markOffline(detail: string) {
@@ -114,29 +114,29 @@ export class SofaBridge {
     if (!waiter) return;
     if (message.error) {
       this.finish(message.id, () => {
-        this.publish('offline', message.error ?? 'Sofascore bridge failed');
+        this.publish('offline', message.error ?? 'SportyBet bridge failed');
         waiter.reject(new Error(message.error));
       });
       return;
     }
-    if (message.status === 403 && isChallengeBody(message.body) && waiter.challengeRetries < 1) {
+    if (message.status === 403 && waiter.challengeRetries < 1) {
       waiter.challengeRetries += 1;
       this.ready = false;
-      this.publish('challenge', 'Blocked 403 challenge');
+      this.publish('challenge', 'Blocked');
       this.queue.push({ id: waiter.id, path: waiter.path });
       this.transport.reload();
       return;
     }
-    if (message.status === 403 && isChallengeBody(message.body)) {
+    if (message.status === 403) {
       this.finish(message.id, () => {
-        this.publish('challenge', 'Blocked 403 challenge');
-        waiter.reject(new Error('Sofascore refused the request (403 challenge).'));
+        this.publish('challenge', 'Blocked');
+        waiter.reject(new Error('SportyBet refused the request (403 challenge).'));
       });
       return;
     }
     if (message.status < 200 || message.status >= 300) {
       this.finish(message.id, () => {
-        const detail = `Sofascore ${message.status}`;
+        const detail = `SportyBet ${message.status}`;
         this.publish(this.ready ? 'live' : 'offline', detail);
         waiter.reject(new Error(detail));
       });
@@ -165,13 +165,13 @@ export class SofaBridge {
 export function buildPageFetchScript(request: BridgeRequest): string {
   const id = JSON.stringify(request.id);
   const path = JSON.stringify(request.path);
-  return `(function(){var id=${id};var path=${path};fetch('/api/v1'+path,{credentials:'include',headers:{Accept:'application/json'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:res.status,body:body}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
+  return `(function(){var id=${id};var path=${path};fetch(path,{credentials:'include',headers:{Accept:'application/json'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:res.status,body:body}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
 }
 
 export function buildProbeScript(): string {
-  return `(function(){fetch('/api/v1/sport/football/events/live',{credentials:'include',headers:{Accept:'application/json'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:res.status,body:body.slice(0,500)}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
+  return `(function(){fetch('/api/gh/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1&pageSize=1&pageNum=1&option=1',{credentials:'include',headers:{Accept:'application/json'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:res.status,body:body.slice(0,500)}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
 }
 
-export const SOFA_PAGE = 'https://www.sofascore.com/';
-export const SOFA_MOBILE_UA =
+export const SPORTY_PAGE = 'https://www.sportybet.com/gh/';
+export const SPORTY_MOBILE_UA =
   'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';

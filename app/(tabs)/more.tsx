@@ -13,7 +13,7 @@ export default function MoreScreen() {
       <Card>
         <T style={styles.title}>Source</T>
         <SourceStatus />
-        <T dim>Sofascore is the only data source. On Android the read goes through a hidden Sofascore page.</T>
+        <T dim>SportyBet Ghana is the only data source. A blocked network retries once inside a hidden SportyBet page.</T>
         <T dim>Storage: {board.storage === 'sqlite' ? 'SQLite on this device' : board.storage === 'document' ? 'On-device document' : 'Opening…'}</T>
         {board.fetchedAt ? <T dim>Last read {new Date(board.fetchedAt).toLocaleTimeString()}</T> : null}
         {board.error ? <T style={{ color: colors.warn }}>{board.error}</T> : null}
@@ -25,7 +25,7 @@ export default function MoreScreen() {
       <Card>
         <T>A trend is the last 10 matches. Form is the last 5, and it can tip early as a head start.</T>
         <T dim>Both need 80% from at least five matches. Confidence then moves with the opponent: a team's over 2.5 counts for more when the other side's matches also clear 2.5.</T>
-        <T dim>VAR shows as VAR first. The goal, the score and the notification wait until the check is confirmed.</T>
+        <T dim>A new goal shows as VAR for about 45 seconds. It counts only if the score sticks, or if SportyBet marks the incident VAR confirmed. A score that falls back is not awarded.</T>
       </Card>
     </Screen>
   );
