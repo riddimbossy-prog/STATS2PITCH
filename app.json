@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "Stats2Pitch",
+    "slug": "stats2pitch",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/brand/s2p-pitch-mark.png",
+    "scheme": "stats2pitch",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.stats2pitch.app",
+      "permissions": ["android.permission.POST_NOTIFICATIONS", "android.permission.VIBRATE"],
+      "predictiveBackGestureEnabled": false,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/s2p-pitch-mark.png",
+        "backgroundColor": "#070d0a",
+        "monochromeImage": "./assets/brand/s2p-pitch-mark.png"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/brand/stats2pitch-favicon-v3.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand/s2p-boot.jpg",
+          "resizeMode": "contain",
+          "backgroundColor": "#070d0a"
+        }
+      ],
+      "expo-sqlite",
+      "expo-image",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/brand/stats2pitch-favicon.png",
+          "color": "#070d0a"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "sofascoreBaseUrl": "https://api.sofascore.com/api/v1"
+    }
+  }
+}

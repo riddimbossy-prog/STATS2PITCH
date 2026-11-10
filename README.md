@@ -1,18 +1,116 @@
 # Stats2Pitch
 
-Generator for Stats2Pitch boards and sporty.codes Elite.
+Android-first football live scores and betting insight. The app reads Sofascore through one adapter, tips every trend or form line at 80% or above, and settles the picks you track.
 
-## Boards
+Web can be run from the same Expo project. A Play Store build is configured as an AAB; the preview profile builds an APK.
 
-- **All Picks** — consensus engine (`stats2pitch-consensus-v4-over25`). Last-5 home/away form comes from SportyBet / Sportradar stats.
-- **Filter Tips** — adaptive matchup (`adaptive-match-v1`). Last-5 venue attack vs defence, then scenario checks. Publishes one supported market per match inside a 1.20–2.20 price window. Does not feed Elite.
-- **VAR Tips** — dedicated board (`away-fav-streak-v1`) for home and away favourites. This is the feed for sporty.codes Elite.
-- **Goals Bankers** — V5 team-goal ladder (`goals-bankers-v5.4`). One pick per match from team 2+, Over 2.5 or GG. At least one team must sit in the overall Top 5. Skip is a valid result. Does not feed Elite.
-- **Combo** — SportyBet Combo OR markets (`combo-v3.3-best-two`). Best two qualifying markets per match after hard odds gates. A match with only one survivor publishes that one option. Does not feed Elite.
-- **H2H** — split same-venue meetings (`h2h-v1.4-form-60`). A market publishes at 80%+ H2H only when last-5 venue form still backs it at 60%+. If form does not confirm, the match is skipped. Does not feed Elite.
+## Preserved brand files
 
-Public pages show fixture, teams, logos, league, kickoff, market, pick and odds. Engine method is not published on the site.
+The previous app was removed. These files were kept and now live in `assets/brand/`:
 
-## Refresh
+| File | Used for |
+| --- | --- |
+| `s2p-pitch-mark.png` | App icon, Android adaptive icon, in-app mark |
+| `s2p-pitch-mark.svg` | Preserved vector of the same mark |
+| `s2p-boot.jpg` | Splash screen |
+| `s2p-boot.mp4` | Preserved boot motion |
+| `stats2pitch-logo-v2.png` | Header wordmark |
+| `stats2pitch-logo.png` | Earlier wordmark, kept |
+| `stats2pitch-favicon.png` | Notification icon |
+| `stats2pitch-favicon-v2.png` | Preserved favicon |
+| `stats2pitch-favicon-v3.png` | Web favicon |
+| `stats2pitch-apple.png` | Preserved Apple touch icon |
+| `brand-mark.png` | Preserved wide pitch mark |
+| `football-real.svg` | Preserved ball illustration |
+| `stadium-user-bg.webp` | Preserved stadium background |
+| `stadium-user-bg-v2.webp` | Preserved stadium background |
+| `stadium-user-bg-v3.webp` | Header background |
+| `fox-kicking-ball.mp4` | Preserved brand motion |
 
-Boards refresh automatically every three hours, plus a 04:07 Accra run. Each run fills the public date strip (today through six days ahead, and the past six days) so upcoming dates already have picks.
+## Setup
+
+Node 22 or newer.
+
+```bash
+npm install
+npm test
+npm run typecheck
+```
+
+## Run on an Android phone
+
+1. Install [Expo Go](https://expo.dev/go) from the Play Store.
+2. From this repo run `npm start`.
+3. Scan the QR code with Expo Go. Phone and computer need to be on the same network.
+4. Allow notifications when the app asks. Settlement alerts are local notifications on Android. On web they show as in-app toasts.
+
+`npm run web` runs the same UI in a browser. Browsers cannot call Sofascore directly (the feed does not send usable browser access from this app), so use Expo Go on the phone for the live feed.
+
+## Build an APK
+
+The preview profile in `eas.json` produces an APK. A Play Store listing needs a paid Play Console account; that profile is `production` and emits an AAB.
+
+```bash
+npm install -g eas-cli
+eas login
+eas build -p android --profile preview
+```
+
+`eas init` will ask for an Expo account and can write the project id into `app.json`. The Android package is `com.stats2pitch.app`.
+
+## Architecture
+
+```
+app/                     screens (expo-router)
+src/engine/              pure trend, confidence, squad, grade, VAR and settlement logic
+src/data/sofascore.ts    the only module that calls Sofascore
+src/bookies/stub.ts      pluggable bookie adapters, all local stubs
+src/db/repo.ts           SQLite on Android; web uses an on-device document store
+src/state/board.tsx      board, polling, slips, lists
+```
+
+Sofascore has no official public API. The owner accepted that risk. `createSofascoreSource` is the only place that knows the host, paths and headers. Set `EXPO_PUBLIC_SOFASCORE_BASE_URL` to point the same adapter at another base later. Calls are queued (about 350ms apart), cached, retried on 429 and 5xx, and a failure returns the last cached payload when one exists. A 403 or a dead network does not throw into the UI.
+
+Live scores refresh about every 10 seconds. Incident checks for a handful of live matches run on that same loop, so a confirmed Sofascore event reaches the app on the next poll rather than by a push socket.
+
+### Tips
+
+- Trend window: last 10 matches. Form window: last 5.
+- A line tips at 80% with at least 5 matches. Four from four does not tip.
+- Form at 80% tips as a head start when the 10-match trend is still short.
+- Same-venue matches are used when there are at least five. Otherwise the overall record is used.
+- Confidence = team rate + (opponent rate − 0.5) × 0.5, clamped to 0–1.
+- A supporting opponent lifts the tip. A contradictory record can drop an 80% trend into the Watch group. The tip is still bookmarked.
+- Picks group by confidence band, by market, and by odds band (short / medium / long). Odds sort ascending or descending. Missing prices stay last.
+- Blacklisted teams, leagues, competitions and markets are hidden. Greenlisted ones sort first.
+
+### Squads
+
+A usual starter is someone who started at least 60% of the last lineups, once three lineups exist. Full strength means at least 90% of that group is starting. Half strength means under 60%. Three or more usual starters missing raises a rotation flag.
+
+### VAR
+
+A pending check is labelled VAR and is not a goal. The score and the goal notification update only when the check is awarded. A disallowed check does not change the score.
+
+### Grades
+
+Week, month and year use your tracked picks and slip legs. The week starts Monday 00:00 UTC. A group with at least three settled results and the best hit rate is marked lucky. Letters: A+ 80%+, A 70%+, B 60%+, C 50%+, otherwise D.
+
+### Lists
+
+Three busts in a row, or a 70% bust rate over the recent book, blacklist that team, market, competition or league. Three lands, or an 80% land rate, greenlist it. A row you add by hand is not overwritten.
+
+### Suggestions
+
+Same market, then closeness of confidence, trend and form. A different market scores zero. This is a heuristic, not a learned model.
+
+## Sample board
+
+If Sofascore refuses the connection, Matches offers **Preview the sample board**. Those fixtures are labelled in the app and are not a second data source. Set `EXPO_PUBLIC_OPEN_SAMPLE=1` to open that board automatically after a failed read.
+
+## Stubbed
+
+- Every bookie adapter returns a local code such as `S2P-SPO-……`. Nothing is sent to SportyBet, Bet365, 1xBet or Betway.
+- There is no account system and no server. Slips, lists, tracked picks and the HTTP cache stay on the device.
+- Odds only appear when Sofascore's odds payload maps onto a known market. Otherwise the price is blank.
+- Play Store signing, store listing and a paid console account are not part of this project.
