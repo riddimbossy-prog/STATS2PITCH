@@ -3,7 +3,7 @@ import { bookFromPicks, convertSportyCode, phoneClient } from '../bookies/book';
 import { cacheFromRepo, getRepo, type Repo } from '../db/repo';
 import type { ListEntry, ListKind, ListScope, Match, MatchDetail, Slip, TrackedPick } from '../domain';
 import { createSportyBetSource, type DataSource } from '../data/sportybet';
-import { buildPicks, isGreenlit, isSuppressed, reconcile, suggestSimilar, type Pick, type Suggestion } from '../engine';
+import { buildPicks, isGreenlit, isSuppressed, mapPool, reconcile, suggestSimilar, type Pick, type Suggestion } from '../engine';
 import type { Notice } from '../engine/notify';
 import type { Snapshot } from '../engine/notify';
 import { sampleHistory, samplePack } from '../fixtures/sample';
@@ -246,7 +246,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     setError(null);
     setFetchedAt(Date.now());
     setPhase('ready');
-    await loadHistories(rows, fresh);
+    await loadHistories(rows);
   }
 
   async function refreshScores() {
@@ -271,25 +271,24 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     await Promise.all(interesting.map((match) => loadMatchRef.current(match.id, true)));
   }
 
-  async function loadHistories(rows: Match[], fresh: boolean) {
+  async function loadHistories(rows: Match[]) {
     const source = sourceRef.current;
     if (!source) return;
     const ids = [...new Set(rows.flatMap((match) => [match.home.id, match.away.id]))];
     setProgress({ done: 0, total: ids.length });
     const next = { ...historiesRef.current };
-    for (let index = 0; index < ids.length; index += 1) {
+    let done = 0;
+    await mapPool(ids, 6, async (id) => {
       if (sampleRef.current) return;
-      const id = ids[index]!;
-      if (!fresh && next[id]) {
-        setProgress({ done: index + 1, total: ids.length });
-        continue;
-      }
-      const result = await source.teamResults(id, fresh);
+      // Keep the 6-hour team cache on refresh so pull-to-refresh does not re-read every team.
+      const result = await source.teamResults(id, false);
       if (result.data) next[id] = result.data;
       historiesRef.current = { ...next };
       setHistories({ ...next });
-      setProgress({ done: index + 1, total: ids.length });
-    }
+      done += 1;
+      setProgress({ done, total: ids.length });
+    });
+    if (sampleRef.current) return;
     setProgress(null);
   }
 

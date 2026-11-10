@@ -9,3 +9,4 @@ export * from './notify';
 export * from './lists';
 export * from './view';
 export * from './reconcile';
+export * from './pool';

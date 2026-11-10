@@ -223,8 +223,8 @@ export function createSportyBetSource(options?: {
     return { ...match, feedScore: step.state.confirmed, varPending: step.varPending };
   }
 
-  async function attempt(path: string, via: 'page' | 'direct', headerSet: HeaderSet): Promise<AttemptRecord & { body: unknown }> {
-    await gate.wait();
+  async function attempt(path: string, via: 'page' | 'direct', headerSet: HeaderSet, opts?: { paced?: boolean }): Promise<AttemptRecord & { body: unknown }> {
+    if (opts?.paced !== false) await gate.wait();
     const names = headerNames(headerSet);
     try {
       if (via === 'page') {
@@ -293,6 +293,21 @@ export function createSportyBetSource(options?: {
       bizCode: last?.bizCode ?? null,
       message: last?.message,
       via: last ? `${last.via}/${last.headerSet}` : 'direct/plain',
+    };
+  }
+
+  async function readOnce(path: string): Promise<Awaited<ReturnType<typeof ladder>>> {
+    const via: 'page' | 'direct' = !fetchJson && bridgeFetch && getBridgeSnapshot().status === 'live' ? 'page' : 'direct';
+    const row = await attempt(path, via, 'plain', { paced: false });
+    const ok = row.httpStatus === 200 && row.bizCode === 10000;
+    return {
+      ok,
+      body: row.body,
+      attempts: [row],
+      status: row.httpStatus,
+      bizCode: row.bizCode,
+      message: row.message,
+      via: `${row.via}/${row.headerSet}`,
     };
   }
 
@@ -503,7 +518,7 @@ export function createSportyBetSource(options?: {
     },
     teamResults(teamId, fresh) {
       return cached(`team:${teamId}`, TEAM_TTL, fresh, async () => {
-        const result = await ladder(`/factsCenter/teamEventList?teamId=${encodeURIComponent(teamId)}&pageSize=12&pageNum=1`);
+        const result = await readOnce(`/factsCenter/teamEventList?teamId=${encodeURIComponent(teamId)}&pageSize=12&pageNum=1`);
         if (!result.ok) throw failure(`/factsCenter/teamEventList`, result);
         return mapTeamResults(result.body, teamId);
       });

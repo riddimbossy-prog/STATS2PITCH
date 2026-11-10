@@ -426,3 +426,49 @@ test('team results become home and away rows', () => {
   assert.deepEqual(rows[0], { goalsFor: 2, goalsAgainst: 0, venue: 'home' });
   assert.deepEqual(rows[1], { goalsFor: 1, goalsAgainst: 1, venue: 'away' });
 });
+
+
+test('team history uses one request per team and can run several at once', async () => {
+  let inFlight = 0;
+  let peak = 0;
+  const calls: string[] = [];
+  const source = createSportyBetSource({
+    gapMs: 350,
+    cache: memoryCache(),
+    fetchJson: async (url) => {
+      calls.push(url);
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      inFlight -= 1;
+      assert.match(url, /factsCenter\/teamEventList\?teamId=/);
+      assert.doesNotMatch(url, /timeline/);
+      return {
+        bizCode: 10000,
+        data: {
+          events: [
+            {
+              eventId: 'sr:match:1',
+              homeTeamId: 't1',
+              awayTeamId: 't2',
+              homeTeamName: 'A',
+              awayTeamName: 'B',
+              matchStatus: 'Ended',
+              setScore: '1-0',
+              estimateStartTime: 1,
+            },
+          ],
+        },
+      };
+    },
+  });
+  const [a, b, c] = await Promise.all([source.teamResults('t1', true), source.teamResults('t2', true), source.teamResults('t3', true)]);
+  assert.equal(a.ok, true);
+  assert.equal(b.ok, true);
+  assert.equal(c.ok, true);
+  assert.equal(calls.length, 3);
+  assert.equal(peak, 3);
+  const again = await source.teamResults('t1', false);
+  assert.equal(again.fromCache, true);
+  assert.equal(calls.length, 3);
+});

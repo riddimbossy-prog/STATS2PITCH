@@ -12,6 +12,7 @@ import { combinedOdds, marketSettled, settleSlip } from './settlement';
 import { assessSquad } from './squad';
 import { assessVar } from './var';
 import { groupMatchesByLeague, leagueTitle } from './view';
+import { mapPool } from './pool';
 import type { Match } from '../domain';
 
 const row = (goalsFor: number, goalsAgainst: number, venue: 'home' | 'away' = 'home'): ResultRow => ({
@@ -452,4 +453,18 @@ test('today\'s games group by league and keep the match count', () => {
 test('a competition name that already includes the country is not prefixed twice', () => {
   assert.equal(leagueTitle(matchOf('1', 'cdr', 'Spain - Copa del Rey', 'Spain')), 'Spain - Copa del Rey');
   assert.equal(leagueTitle(matchOf('2', 'pl', 'Premier League', 'Premier League')), 'Premier League');
+});
+
+
+test('mapPool keeps a limited number of jobs in flight and preserves order', async () => {
+  const active = { now: 0, peak: 0 };
+  const rows = await mapPool([1, 2, 3, 4, 5], 2, async (item) => {
+    active.now += 1;
+    active.peak = Math.max(active.peak, active.now);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    active.now -= 1;
+    return item * 10;
+  });
+  assert.deepEqual(rows, [10, 20, 30, 40, 50]);
+  assert.equal(active.peak, 2);
 });
