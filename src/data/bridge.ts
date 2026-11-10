@@ -1,0 +1,183 @@
+export type BridgeStatus = 'starting' | 'live' | 'challenge' | 'offline';
+
+export interface BridgeSnapshot {
+  status: BridgeStatus;
+  lastError: string | null;
+}
+
+export interface BridgeRequest {
+  id: string;
+  path: string;
+  headerSet?: 'plain' | 'web';
+}
+
+export interface BridgeResult {
+  status: number;
+  body: string;
+}
+
+export interface BridgeTransport {
+  send(request: BridgeRequest): void;
+  reload(): void;
+}
+
+type Waiter = {
+  id: string;
+  path: string;
+  headerSet: 'plain' | 'web';
+  resolve: (result: BridgeResult) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+  challengeRetries: number;
+};
+
+const listeners = new Set<(snapshot: BridgeSnapshot) => void>();
+let snapshot: BridgeSnapshot = { status: 'starting', lastError: null };
+
+export function getBridgeSnapshot(): BridgeSnapshot {
+  return snapshot;
+}
+
+export function publishBridge(next: BridgeSnapshot) {
+  snapshot = next;
+  for (const listener of listeners) listener(snapshot);
+}
+
+export function subscribeBridge(listener: (snapshot: BridgeSnapshot) => void) {
+  listeners.add(listener);
+  listener(snapshot);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function isChallengeBody(body: string): boolean {
+  return /"reason"\s*:\s*"challenge"/i.test(body) || /challenge/i.test(body);
+}
+
+/**
+ * Queues SportyBet reads until the hidden page says it is ready.
+ * A 403 challenge reloads the page once, then retries that request.
+ */
+export class SofaBridge {
+  private ready = false;
+  private seq = 0;
+  private readonly waiters = new Map<string, Waiter>();
+  private queue: BridgeRequest[] = [];
+  private readonly timeoutMs: number;
+
+  constructor(private readonly transport: BridgeTransport, timeoutMs = 20_000) {
+    this.timeoutMs = timeoutMs;
+  }
+
+  snapshot(): BridgeSnapshot {
+    return getBridgeSnapshot();
+  }
+
+  enqueue(path: string, headerSet: 'plain' | 'web' = 'plain'): Promise<BridgeResult> {
+    const id = `s${++this.seq}`;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.finish(id, () => {
+          this.publish('offline', "Couldn't load matches");
+          reject(new Error("Couldn't load matches"));
+        });
+      }, this.timeoutMs);
+      const request: BridgeRequest = { id, path, headerSet };
+      this.waiters.set(id, { id, path, headerSet, resolve, reject, timer, challengeRetries: 0 });
+      if (this.ready) this.transport.send(request);
+      else this.queue.push(request);
+    });
+  }
+
+  noteChallenge() {
+    this.ready = false;
+    this.publish('challenge', 'Blocked');
+  }
+
+  markOffline(detail: string) {
+    this.ready = false;
+    this.publish('offline', detail);
+    for (const waiter of [...this.waiters.values()]) {
+      this.finish(waiter.id, () => waiter.reject(new Error(detail)));
+    }
+  }
+
+  markReady() {
+    this.ready = true;
+    this.publish('live', null);
+    const pending = this.queue.splice(0);
+    for (const request of pending) {
+      if (this.waiters.has(request.id)) this.transport.send(request);
+    }
+  }
+
+  receive(message: { id: string; status: number; body: string; error?: string }) {
+    const waiter = this.waiters.get(message.id);
+    if (!waiter) return;
+    if (message.error) {
+      this.finish(message.id, () => {
+        this.publish('offline', message.error ?? "Couldn't load matches");
+        waiter.reject(new Error(message.error));
+      });
+      return;
+    }
+    if (message.status === 403 && waiter.challengeRetries < 1) {
+      waiter.challengeRetries += 1;
+      this.ready = false;
+      this.publish('challenge', 'Blocked');
+      this.queue.push({ id: waiter.id, path: waiter.path, headerSet: waiter.headerSet });
+      this.transport.reload();
+      return;
+    }
+    if (message.status === 403) {
+      this.finish(message.id, () => {
+        this.publish('challenge', 'Blocked');
+        waiter.reject(new Error("Couldn't load matches"));
+      });
+      return;
+    }
+    if (message.status < 200 || message.status >= 300) {
+      this.finish(message.id, () => {
+        this.publish(this.ready ? 'live' : 'offline', "Couldn't load matches");
+        waiter.resolve({ status: message.status, body: message.body });
+      });
+      return;
+    }
+    this.finish(message.id, () => {
+      this.publish('live', null);
+      waiter.resolve({ status: message.status, body: message.body });
+    });
+  }
+
+  private finish(id: string, done: () => void) {
+    const waiter = this.waiters.get(id);
+    if (!waiter) return;
+    clearTimeout(waiter.timer);
+    this.waiters.delete(id);
+    this.queue = this.queue.filter((item) => item.id !== id);
+    done();
+  }
+
+  private publish(status: BridgeStatus, lastError: string | null) {
+    publishBridge({ status, lastError });
+  }
+}
+
+export function buildPageFetchScript(request: BridgeRequest): string {
+  const id = JSON.stringify(request.id);
+  const path = JSON.stringify(request.path);
+  const headers =
+    request.headerSet === 'web'
+      ? "{Accept:'application/json',clientid:'web',platform:'web',operid:'2'}"
+      : "{Accept:'application/json'}";
+  return `(function(){var id=${id};var path=${path};fetch(path,{credentials:'include',headers:${headers}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:res.status,body:body}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
+}
+
+export function buildProbeScript(): string {
+  return `(function(){fetch('/api/gh/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1%2C18%2C10%2C29&pageSize=1&pageNum=1&option=1',{credentials:'include',headers:{Accept:'application/json'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:res.status,body:body.slice(0,500)}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
+}
+
+export const SPORTY_PAGE = 'https://www.sportybet.com/gh/';
+export const SPORTY_MOBILE_UA =
+  'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
