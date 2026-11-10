@@ -54,11 +54,11 @@ export default function MatchScreen() {
         ) : null}
       </Card>
       <Section title="Squad" />
-      <T dim>SportyBet's public feed does not publish recent starting XIs, so rotation and squad strength stay unknown unless this event includes a lineup.</T>
+      <T dim>Squad strength stays unknown until a lineup is published for this match.</T>
       <SquadCard name={match.home.name} report={homeSquad} />
       <SquadCard name={match.away.name} report={awaySquad} />
       <Section title="Events" />
-      {events.length === 0 ? <Empty title="No events yet" body="A new score is held as VAR until it sticks. Cards appear when SportyBet sends a timeline." /> : null}
+      {events.length === 0 ? <Empty title="No events yet" body="A new score is held as VAR until it sticks." /> : null}
       {events.map((event) => (
         <Card key={event.id}>
           <View style={styles.event}>

@@ -108,7 +108,8 @@ test('scheduled and live reads use the factsCenter paths and fall back to a stal
   const liveUrl = calls.find((url) => url.includes('liveOrPrematchEvents')) ?? '';
   assert.equal(liveUrl.includes('sportId=sr%3Asport%3A1&marketId=1%2C18%2C29&pageSize=100&pageNum=1&productId=1'), true);
   assert.doesNotMatch(liveUrl, /timeline|todayGames/);
-  assert.match(live.notice ?? '', /liveOrPrematchEvents/);
+  assert.equal(live.notice ?? '', '');
+  assert.doesNotMatch(`${live.notice ?? ''} ${live.error ?? ''}`, /SportyBet|factsCenter|pcUpcoming|liveOrPrematch|bizCode|HTTP/);
   fail = true;
   const stale = await source.live(true);
   assert.equal(stale.ok, false);
@@ -252,7 +253,8 @@ test('tomorrow is kept from the upcoming list without a todayGames query', async
   const day = await source.scheduled(localDate(), true);
   assert.equal(day.ok, true);
   assert.equal(day.data?.[0]?.id, 'sr:match:5');
-  assert.match(day.notice ?? '', /showing the next days/);
+  assert.equal(day.notice ?? '', '');
+  assert.doesNotMatch(`${day.notice ?? ''} ${day.error ?? ''}`, /SportyBet|factsCenter|pcUpcoming|bizCode|HTTP/);
   assert.equal(calls.length, 1);
   assert.doesNotMatch(calls[0] ?? '', /timeline|todayGames/);
 });
@@ -270,7 +272,8 @@ test('a 422 on the plain request is kept in the ladder and the web headers can s
   const day = await source.scheduled(localDate(new Date(KICK)), true);
   assert.equal(day.ok, true);
   assert.equal(day.data?.[0]?.id, 'sr:match:100');
-  assert.match(day.notice ?? '', /SportyBet OK/);
+  assert.equal(day.notice ?? '', '');
+  assert.doesNotMatch(`${day.notice ?? ''} ${day.error ?? ''}`, /SportyBet|factsCenter|pcUpcoming|bizCode|HTTP/);
   assert.match(day.copy ?? '', /direct\/plain HTTP 422/);
   assert.match(day.copy ?? '', /headers: Accept, User-Agent/);
   assert.match(day.copy ?? '', /body: rejected params/);
@@ -332,9 +335,10 @@ test('a live-endpoint 422 still shows past-kickoff upcoming games', async () => 
   assert.equal(live.ok, true);
   assert.equal(live.data?.[0]?.id, 'sr:match:55');
   assert.equal(live.data?.[0]?.status, 'live');
-  assert.match(live.notice ?? '', /upcoming fallback/);
-  assert.match(live.notice ?? '', /HTTP 422/);
-  assert.match(live.copy ?? '', /liveOrPrematchEvents/);
+  assert.equal(live.notice ?? '', '');
+  assert.doesNotMatch(`${live.notice ?? ''} ${live.error ?? ''}`, /SportyBet|factsCenter|pcUpcoming|liveOrPrematch|bizCode|HTTP/);
+  assert.match(live.copy ?? '', /422/);
+  assert.match(live.copy ?? '', /upcoming fallback/);
   const upcoming = calls.find((url) => url.includes('pcUpcomingEvents')) ?? '';
   assert.match(upcoming, /marketId=1%2C18%2C10%2C29/);
   assert.doesNotMatch(upcoming, /timeline|todayGames/);
@@ -348,7 +352,45 @@ test('a refused bizCode is the visible error', async () => {
   });
   const day = await source.scheduled(localDate(), true);
   assert.equal(day.ok, false);
-  assert.match(day.error ?? '', /bizCode 19000 on pcUpcomingEvents/);
+  assert.equal(day.error, "Couldn't load matches");
+  assert.doesNotMatch(day.error ?? '', /SportyBet|factsCenter|pcUpcoming|bizCode|HTTP/);
+});
+
+test('the first page is ready before later pages finish', async () => {
+  let release = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let page2Started = false;
+  const kick = Date.parse('2026-11-10T16:00:00.000Z');
+  const events = Array.from({ length: 100 }, (_, index) => ({
+    eventId: `sr:match:${index + 1}`,
+    homeTeamId: 'h',
+    awayTeamId: 'a',
+    homeTeamName: 'Home',
+    awayTeamName: 'Away',
+    estimateStartTime: kick,
+    matchStatus: 'Not start',
+  }));
+  const source = createSportyBetSource({
+    gapMs: 0,
+    fetchJson: async (url) => {
+      if (url.includes('pageNum=2')) {
+        page2Started = true;
+        await gate;
+        return { bizCode: 10000, data: { tournaments: [{ events: [] }], totalNum: 200 } };
+      }
+      return { bizCode: 10000, data: { tournaments: [{ events }], totalNum: 200 } };
+    },
+  });
+  const day = await Promise.race([
+    source.scheduled(localDate(new Date(kick)), true),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('waited for a later page')), 400)),
+  ]);
+  assert.equal(day.data?.length, 100);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(page2Started, true);
+  release();
 });
 
 test('team results become home and away rows', () => {

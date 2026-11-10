@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Share, View } from 'react-native';
+import { View } from 'react-native';
 import { MatchCard } from '../../components/MatchCard';
 import { SourceStatus } from '../../components/SourceStatus';
-import { Banner, Button, Empty, Loading, Screen, Segment, T } from '../../components/ui';
+import { Button, Empty, Loading, Screen, Segment, T } from '../../components/ui';
 import { useBoard } from '../../src/state/board';
 
 export default function MatchesScreen() {
@@ -11,17 +11,11 @@ export default function MatchesScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<'live' | 'today'>('today');
   const rows = board.matches.filter((match) => (filter === 'live' ? match.status === 'live' : true));
-  const blocked = !board.sample && (board.phase === 'error' || (board.phase === 'ready' && board.matches.length === 0));
-  const banner = board.sample
-    ? 'Sample board. These fixtures are not from SportyBet. Live data is still the only real source.'
-    : blocked
-      ? null
-      : board.error;
+  const banner = board.sample ? 'Sample board. These fixtures are saved on this phone.' : null;
 
   return (
     <Screen onRefresh={board.refresh} refreshing={board.refreshing} banner={banner}>
       <SourceStatus />
-      {board.diagnostic && !blocked ? <T dim>{board.diagnostic}</T> : null}
       <Segment
         value={filter}
         onChange={setFilter}
@@ -30,30 +24,21 @@ export default function MatchesScreen() {
           { value: 'live', label: 'Live' },
         ]}
       />
-      {board.phase === 'loading' ? <Loading label="Asking SportyBet for today's matches" /> : null}
-      {blocked ? (
+      {board.phase === 'loading' ? <Loading label="Loading matches" /> : null}
+      {board.phase === 'error' && !board.sample ? (
         <View style={{ gap: 10 }}>
-          <Banner>{board.diagnostic || board.error || 'SportyBet returned no matches.'}</Banner>
+          <Empty title="Couldn't load matches" body="Check the connection and try again." />
           <Button label="Retry" onPress={board.refresh} />
-          <Button
-            label="Copy diagnostics"
-            tone="ghost"
-            onPress={() => {
-              void Share.share({ message: board.diagnosticCopy || board.diagnostic || board.error || 'No SportyBet diagnostics yet.' });
-            }}
-          />
           <Button label="Preview the sample board" tone="ghost" onPress={board.openSample} />
         </View>
       ) : null}
-      {board.phase === 'ready' && rows.length === 0 && board.matches.length > 0 ? (
-        <Empty title="No live matches" body="Today's card is still on the Today chip." />
+      {board.phase === 'ready' && rows.length === 0 ? (
+        <Empty title={filter === 'live' ? 'No live matches' : 'No matches right now'} body="Pull to refresh." />
       ) : null}
       {rows.map((match, index) => (
         <MatchCard key={match.id} index={index} match={match} detail={board.details[match.id]} onPress={() => router.push(`/match/${match.id}`)} />
       ))}
-      {board.phase === 'ready' && rows.length > 0 ? (
-        <T dim>{rows.length} shown{board.sample ? ' · sample' : ''}</T>
-      ) : null}
+      {board.phase === 'ready' && rows.length > 0 ? <T dim>{rows.length} shown{board.sample ? ' · sample' : ''}</T> : null}
     </Screen>
   );
 }

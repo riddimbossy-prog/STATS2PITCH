@@ -15,7 +15,7 @@ export default function SlipsScreen() {
   const drafted = board.visiblePicks.filter((pick) => board.draftIds.includes(pick.id));
   const price = combinedOdds(drafted.map((pick) => pick.odds));
   const stake = Number(board.stake);
-  const banner = board.sample ? 'Sample slips settle on this board. Booking still needs a SportyBet event id.' : null;
+  const banner = board.sample ? 'Sample slips settle on this board.' : null;
 
   return (
     <Screen onRefresh={board.refresh} refreshing={board.refreshing} banner={banner}>

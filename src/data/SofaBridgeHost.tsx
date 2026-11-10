@@ -120,7 +120,7 @@ export function SofaBridgeHost() {
         }}
         onMessage={onMessage}
         onError={() => {
-          bridgeRef.current?.markOffline('SportyBet page failed to load');
+          bridgeRef.current?.markOffline("Couldn't load matches");
         }}
       />
     </View>

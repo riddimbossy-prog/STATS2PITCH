@@ -121,16 +121,8 @@ export function sportyLine(input: {
   kept: number;
   scope: ScheduleScope;
 }): string {
-  const name = endpointName(input.path);
-  if (input.httpStatus >= 400) return `SportyBet: HTTP ${input.httpStatus} on ${name}`;
-  if (input.bizCode != null && input.bizCode !== 10000) {
-    const detail = input.message ? ` (${input.message})` : '';
-    return `SportyBet: bizCode ${input.bizCode} on ${name}${detail}`;
-  }
-  const base = `SportyBet OK: ${input.events} events parsed from ${input.tournaments} tournaments`;
-  if (input.scope === 'next' && input.kept) return `${base}, showing the next days (${input.kept})`;
-  if (input.scope === 'upcoming' && input.kept && input.kept !== input.events) return `${base}, showing upcoming (${input.kept})`;
-  return base;
+  if (input.httpStatus >= 400 || (input.bizCode != null && input.bizCode !== 10000)) return "Couldn't load matches";
+  return '';
 }
 
 export interface AttemptRecord {

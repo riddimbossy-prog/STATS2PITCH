@@ -1,4 +1,6 @@
 import type { Lineup, LineupPlayer, Match, MatchDetail, MatchStatus, RawIncident, ResultRow, TeamRef } from '../domain';
+import { localDate } from '../format';
+import { getBridgeSnapshot } from './bridge';
 import { stepScore, type HoldState } from './var-hold';
 import {
   chooseSchedule,
@@ -146,8 +148,13 @@ function parseBody(text: string): unknown {
 
 class RequestGate {
   private chain: Promise<void> = Promise.resolve();
+  private started = false;
   constructor(private readonly gapMs: number) {}
   wait(): Promise<void> {
+    if (!this.started) {
+      this.started = true;
+      return Promise.resolve();
+    }
     const job = this.chain.then(() => sleep(this.gapMs));
     this.chain = job.then(
       () => undefined,
@@ -163,6 +170,8 @@ export function createSportyBetSource(options?: {
   now?: () => number;
   baseUrl?: string;
   gapMs?: number;
+  onSchedule?: (matches: Match[]) => void;
+  onLive?: (matches: Match[]) => void;
 }): DataSource {
   const fetchJson = options?.fetchJson;
   const cache = options?.cache ?? memoryCache();
@@ -267,10 +276,8 @@ export function createSportyBetSource(options?: {
     via: string;
   }> {
     const attempts: Array<AttemptRecord & { body: unknown }> = [];
-    const steps: Array<['page' | 'direct', HeaderSet]> = [];
-    if (bridgeFetch && !fetchJson) steps.push(['page', 'plain'], ['page', 'web']);
-    steps.push(['direct', 'plain'], ['direct', 'web']);
-    for (const [via, headerSet] of steps) {
+    const via: 'page' | 'direct' = !fetchJson && bridgeFetch && getBridgeSnapshot().status === 'live' ? 'page' : 'direct';
+    for (const headerSet of ['plain', 'web'] as const) {
       const row = await attempt(path, via, headerSet);
       attempts.push(row);
       if (row.httpStatus === 200 && row.bizCode === 10000) {
@@ -315,7 +322,13 @@ export function createSportyBetSource(options?: {
     return new ReadError(line, copy);
   }
 
-  async function loadPages(): Promise<{
+  let scheduleToken = 0;
+
+  function mapped(events: Record<string, unknown>[]): Match[] {
+    return events.map((event) => mapSportyEvent(event)).filter((event): event is Match => event != null);
+  }
+
+  async function loadPages(date: string): Promise<{
     matches: Match[];
     path: string;
     status: number;
@@ -326,35 +339,47 @@ export function createSportyBetSource(options?: {
     events: number;
     attempts: AttemptRecord[];
   }> {
-    const matches: Match[] = [];
-    const attempts: AttemptRecord[] = [];
-    let path = upcomingPath(1);
-    let status = 200;
-    let via = 'direct/plain';
-    let bizCode: number | null = 10000;
-    let message: string | null = null;
-    let tournaments = 0;
-    let events = 0;
-    for (let page = 1; page <= 8; page += 1) {
-      path = upcomingPath(page);
-      const result = await ladder(path);
-      attempts.push(...result.attempts);
-      status = result.status;
-      via = result.via;
-      bizCode = result.bizCode;
-      message = result.message;
-      if (!result.ok) throw failure(path, { ...result, attempts }, tournaments, events);
-      const info = inspectSporty(result.body);
-      tournaments += info.tournaments;
-      events += info.events.length;
-      matches.push(...info.events.map((event) => mapSportyEvent(event)).filter((event): event is Match => event != null));
-      if (!morePages(page, info.events.length, listTotal(result.body))) break;
+    const path = upcomingPath(1);
+    const result = await ladder(path);
+    if (!result.ok) throw failure(path, result);
+    const info = inspectSporty(result.body);
+    const matches = mapped(info.events);
+    const total = listTotal(result.body);
+    if (morePages(1, info.events.length, total)) {
+      const token = ++scheduleToken;
+      void extendSchedule(token, date, matches, info.events.length, info.tournaments, total);
     }
-    return { matches, path, status, via, bizCode, message, tournaments, events, attempts };
+    return {
+      matches,
+      path,
+      status: result.status,
+      via: result.via,
+      bizCode: result.bizCode,
+      message: result.message,
+      tournaments: info.tournaments,
+      events: info.events.length,
+      attempts: result.attempts,
+    };
+  }
+
+  async function extendSchedule(token: number, date: string, seed: Match[], events: number, tournaments: number, total: number | null) {
+    let matches = seed;
+    let seen = events;
+    for (let page = 2; page <= 8; page += 1) {
+      if (token !== scheduleToken) return;
+      const result = await ladder(upcomingPath(page));
+      if (token !== scheduleToken || !result.ok) return;
+      const info = inspectSporty(result.body);
+      seen = info.events.length;
+      tournaments += info.tournaments;
+      matches = matches.concat(mapped(info.events));
+      options?.onSchedule?.(chooseSchedule(matches, date, now()).matches);
+      if (!morePages(page, seen, listTotal(result.body) ?? total)) return;
+    }
   }
 
   async function loadSchedule(date: string): Promise<PackedList> {
-    const bag = await loadPages();
+    const bag = await loadPages(date);
     const chosen = chooseSchedule(bag.matches, date, now());
     const facts = {
       httpStatus: bag.status,
@@ -405,40 +430,21 @@ export function createSportyBetSource(options?: {
       if (!morePages(page, info.events.length, listTotal(result.body))) break;
     }
     if (!failed) {
-      const notice = `liveOrPrematchEvents · HTTP ${status} · bizCode ${bizCode ?? 'none'} · ${events} events, ${matches.length} live`;
       const facts = { httpStatus: status, path, bizCode, message, tournaments, events, kept: matches.length, scope: 'today' as const, via, attempts };
-      return { matches, notice, copy: `${notice}\n${sportyCopy(facts)}` };
+      const copy = `live list · HTTP ${status} · code ${bizCode ?? 'none'} · ${events} events, ${matches.length} live\n${sportyCopy(facts)}`;
+      return { matches, notice: '', copy };
     }
 
     let bag: Awaited<ReturnType<typeof loadPages>>;
     try {
-      bag = await loadPages();
+      bag = await loadPages(localDate(new Date(now())));
     } catch (error) {
-      const line = `liveOrPrematchEvents · HTTP ${status} · bizCode ${bizCode ?? 'none'}`;
-      const detail = error instanceof Error ? error.message : 'SportyBet upcoming failed';
-      const copy = error instanceof ReadError ? error.copy : detail;
-      throw new ReadError(`${line}\n${detail}`, `${line}\n${copy}`);
+      const copy = error instanceof ReadError ? error.copy : "Couldn't load matches";
+      throw new ReadError("Couldn't load matches", `live list HTTP ${status}\n${copy}`);
     }
-    const candidates = bag.matches.filter(
-      (match) => match.kickoff > 0 && match.kickoff <= now() && match.status !== 'finished' && match.status !== 'cancelled' && match.status !== 'postponed',
-    );
-    const fallbackAttempts = [...attempts, ...bag.attempts];
-    const fallback: Match[] = [];
-    for (const candidate of candidates) {
-      let detailed: Match | null = null;
-      let awarded = false;
-      for (const product of ['1', '3'] as const) {
-        const result = await ladder(eventPath(candidate.id, product));
-        fallbackAttempts.push(...result.attempts);
-        if (!result.ok) continue;
-        detailed = mapSportyEvents(result.body)[0] ?? null;
-        awarded = varAwarded(result.body, candidate.id);
-        if (detailed) break;
-      }
-      const row = detailed ?? candidate;
-      fallback.push(applyHold({ ...row, status: 'live' }, awarded));
-    }
-    const notice = `upcoming fallback · liveOrPrematchEvents HTTP ${status} bizCode ${bizCode ?? 'none'} · ${bag.events} upcoming, ${fallback.length} live`;
+    const fallback = bag.matches
+      .filter((match) => match.kickoff > 0 && match.kickoff <= now() && match.status !== 'finished' && match.status !== 'cancelled' && match.status !== 'postponed')
+      .map((match) => applyHold({ ...match, status: 'live' }, false));
     const facts = {
       httpStatus: status,
       path,
@@ -449,9 +455,10 @@ export function createSportyBetSource(options?: {
       kept: fallback.length,
       scope: 'today' as const,
       via,
-      attempts: fallbackAttempts,
+      attempts: [...attempts, ...bag.attempts],
     };
-    return { matches: fallback, notice, copy: `${notice}\n${sportyCopy(facts)}` };
+    const copy = `upcoming fallback · live list HTTP ${status} · code ${bizCode ?? 'none'} · ${bag.events} upcoming, ${fallback.length} live\n${sportyCopy(facts)}`;
+    return { matches: fallback, notice: '', copy };
   }
 
   return {

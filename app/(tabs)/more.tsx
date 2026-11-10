@@ -1,9 +1,8 @@
 import { useRouter } from 'expo-router';
+import { Pressable, Share, StyleSheet } from 'react-native';
 import { SourceStatus } from '../../components/SourceStatus';
-import { Card, Screen, Section, T } from '../../components/ui';
-import { colors } from '../../src/theme';
+import { Button, Card, Screen, Section, T } from '../../components/ui';
 import { useBoard } from '../../src/state/board';
-import { Pressable, StyleSheet } from 'react-native';
 
 export default function MoreScreen() {
   const board = useBoard();
@@ -11,13 +10,10 @@ export default function MoreScreen() {
   return (
     <Screen onRefresh={board.refresh} refreshing={board.refreshing}>
       <Card>
-        <T style={styles.title}>Source</T>
+        <T style={styles.title}>Matches</T>
         <SourceStatus />
-        <T dim>SportyBet Ghana is the only data source. Reads go through the sportybet.com page when it is open, then the phone's own request.</T>
-        <T>Last request: {board.diagnostic ?? 'none yet'}</T>
         <T dim>Storage: {board.storage === 'sqlite' ? 'SQLite on this device' : board.storage === 'document' ? 'On-device document' : 'Opening…'}</T>
-        {board.fetchedAt ? <T dim>Last read {new Date(board.fetchedAt).toLocaleTimeString()}</T> : null}
-        {board.error ? <T style={{ color: colors.warn }}>{board.error}</T> : null}
+        {board.fetchedAt ? <T dim>Updated {new Date(board.fetchedAt).toLocaleTimeString()}</T> : null}
       </Card>
       <Section title="Your book" />
       <LinkCard title="Suggestions" body={`${board.suggestions.length} picks look like ones you already tracked`} onPress={() => router.push('/suggestions')} />
@@ -26,8 +22,15 @@ export default function MoreScreen() {
       <Card>
         <T>A trend is the last 10 matches. Form is the last 5, and it can tip early as a head start.</T>
         <T dim>Both need 80% from at least five matches. Confidence then moves with the opponent: a team's over 2.5 counts for more when the other side's matches also clear 2.5.</T>
-        <T dim>A new goal shows as VAR for about 45 seconds. It counts only if the score sticks, or if SportyBet marks the incident VAR confirmed. A score that falls back is not awarded.</T>
+        <T dim>A new goal shows as VAR for about 45 seconds. It counts only if the score sticks. A score that falls back is not awarded.</T>
       </Card>
+      {board.dev ? (
+        <Card>
+          <T style={styles.title}>Diagnostics</T>
+          <T dim>{board.diagnosticCopy || 'No request yet.'}</T>
+          <Button label="Copy" tone="ghost" onPress={() => void Share.share({ message: board.diagnosticCopy || 'No request yet.' })} />
+        </Card>
+      ) : null}
     </Screen>
   );
 }

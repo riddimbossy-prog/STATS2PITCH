@@ -22,6 +22,8 @@ interface BoardContextValue {
   error: string | null;
   diagnostic: string | null;
   diagnosticCopy: string;
+  dev: boolean;
+  toggleDev: () => void;
   sample: boolean;
   storage: 'sqlite' | 'document' | null;
   fetchedAt: number | null;
@@ -82,6 +84,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [diagnostic, setDiagnostic] = useState<string | null>(null);
   const [diagnosticCopy, setDiagnosticCopy] = useState('');
+  const [dev, setDev] = useState(false);
   const [sample, setSample] = useState(false);
   const [storage, setStorage] = useState<'sqlite' | 'document' | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
@@ -105,7 +108,12 @@ export function BoardProvider({ children }: { children: ReactNode }) {
       const repo = await getRepo();
       if (cancelled) return;
       repoRef.current = repo;
-      sourceRef.current = createSportyBetSource({ cache: cacheFromRepo(repo) });
+      sourceRef.current = createSportyBetSource({
+        cache: cacheFromRepo(repo),
+        onSchedule: (scheduled) => {
+          setMatches((current) => mergeMatches(scheduled, current.filter((match) => match.status === 'live')));
+        },
+      });
       const [storedLists, storedTracked, storedSlips] = await Promise.all([repo.lists(), repo.tracked(), repo.slips()]);
       if (cancelled) return;
       setLists(storedLists);
@@ -229,14 +237,13 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     setDiagnostic(note || null);
     setDiagnosticCopy(copy || note);
     if (!scheduled.data && !live.data) {
-      const message = note || scheduled.error || live.error || 'SportyBet did not respond.';
-      setError(message);
+      setError("Couldn't load matches");
       setPhase('error');
       if (process.env.EXPO_PUBLIC_OPEN_SAMPLE === '1') applySample();
       return;
     }
     setMatches(rows);
-    setError(rows.length === 0 ? note || scheduled.error || live.error || 'SportyBet returned no matches.' : scheduled.error || live.error || null);
+    setError(null);
     setFetchedAt(Date.now());
     setPhase('ready');
     await loadHistories(rows, fresh);
@@ -253,13 +260,13 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     setDiagnostic(note || null);
     setDiagnosticCopy(copy || note);
     if (!scheduled.data && !live.data) {
-      setError(note || scheduled.error || live.error || 'SportyBet did not respond.');
+      setError("Couldn't load matches");
       return;
     }
     const rows = mergeMatches(scheduled.data ?? [], live.data ?? []);
     setMatches(rows);
     setFetchedAt(Date.now());
-    setError(rows.length === 0 ? note || scheduled.error || live.error || 'SportyBet returned no matches.' : scheduled.error || live.error || null);
+    setError(null);
     const interesting = rows.filter((match) => match.status === 'live').slice(0, 6);
     await Promise.all(interesting.map((match) => loadMatchRef.current(match.id, true)));
   }
@@ -526,6 +533,8 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     error,
     diagnostic,
     diagnosticCopy,
+    dev,
+    toggleDev: () => setDev((current) => !current),
     sample,
     storage,
     fetchedAt,

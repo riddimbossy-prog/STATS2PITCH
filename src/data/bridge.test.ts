@@ -32,9 +32,9 @@ test('a request waits until the page is ready, then it is sent', async () => {
 
 test('a request times out while the page is still starting', async () => {
   const { bridge } = harness(30);
-  await assert.rejects(bridge.enqueue('/sport/football/events/live'), /timed out/);
+  await assert.rejects(bridge.enqueue('/sport/football/events/live'), /Couldn't load matches/);
   assert.equal(bridge.snapshot().status, 'offline');
-  assert.match(bridge.snapshot().lastError ?? '', /timed out/);
+  assert.match(bridge.snapshot().lastError ?? '', /Couldn't load matches/);
 });
 
 test('a 403 challenge reloads the page once and retries', async () => {
@@ -66,7 +66,7 @@ test('a second 403 challenge rejects instead of reloading forever', async () => 
   bridge.receive({ id: sent[0]!.id, status: 403, body: challenge });
   bridge.markReady();
   bridge.receive({ id: sent[1]!.id, status: 403, body: challenge });
-  await assert.rejects(pending, /403 challenge/);
+  await assert.rejects(pending, /Couldn't load matches/);
   assert.equal(reloads(), 1);
   assert.equal(bridge.snapshot().status, 'challenge');
 });

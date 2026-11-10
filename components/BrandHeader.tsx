@@ -1,22 +1,23 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useBoard } from '../src/state/board';
 import { colors } from '../src/theme';
 import { BlurLayer } from './atmosphere';
 
 export function BrandHeader() {
+  const board = useBoard();
   return (
     <View style={styles.wrap}>
       <BlurLayer intensity={48} style={styles.fill} />
       <View pointerEvents="none" style={styles.wash} />
       <View style={styles.row}>
-        <View style={styles.markGlow}>
+        <Pressable accessibilityLabel="Stats2Pitch" delayLongPress={700} onLongPress={board.toggleDev} style={styles.markGlow}>
           <Image
             source={require('../assets/brand/s2p-pitch-mark.png')}
             style={styles.mark}
             contentFit="contain"
-            accessibilityLabel="Stats2Pitch"
           />
-        </View>
+        </Pressable>
         <View>
           <Text style={styles.title}>Stats2Pitch</Text>
           <Text style={styles.tag}>Live scores · 80% tips</Text>

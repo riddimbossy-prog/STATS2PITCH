@@ -79,8 +79,8 @@ export class SofaBridge {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.finish(id, () => {
-          this.publish('offline', 'SportyBet bridge timed out');
-          reject(new Error('SportyBet bridge timed out'));
+          this.publish('offline', "Couldn't load matches");
+          reject(new Error("Couldn't load matches"));
         });
       }, this.timeoutMs);
       const request: BridgeRequest = { id, path, headerSet };
@@ -117,7 +117,7 @@ export class SofaBridge {
     if (!waiter) return;
     if (message.error) {
       this.finish(message.id, () => {
-        this.publish('offline', message.error ?? 'SportyBet bridge failed');
+        this.publish('offline', message.error ?? "Couldn't load matches");
         waiter.reject(new Error(message.error));
       });
       return;
@@ -133,13 +133,13 @@ export class SofaBridge {
     if (message.status === 403) {
       this.finish(message.id, () => {
         this.publish('challenge', 'Blocked');
-        waiter.reject(new Error('SportyBet refused the request (403 challenge).'));
+        waiter.reject(new Error("Couldn't load matches"));
       });
       return;
     }
     if (message.status < 200 || message.status >= 300) {
       this.finish(message.id, () => {
-        this.publish(this.ready ? 'live' : 'offline', `SportyBet ${message.status}`);
+        this.publish(this.ready ? 'live' : 'offline', "Couldn't load matches");
         waiter.resolve({ status: message.status, body: message.body });
       });
       return;

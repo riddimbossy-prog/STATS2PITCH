@@ -70,14 +70,15 @@ test('reads tournaments, a bare event list, and todayGames', () => {
   });
   assert.equal(tournaments.tournaments, 2);
   assert.equal(tournaments.events.length, 1);
-  assert.equal(sportyLine({ httpStatus: 200, path: '/factsCenter/pcUpcomingEvents', bizCode: 10000, message: null, tournaments: 2, events: 1, kept: 1, scope: 'today' }), 'SportyBet OK: 1 events parsed from 2 tournaments');
+  assert.equal(sportyLine({ httpStatus: 200, path: '/factsCenter/pcUpcomingEvents', bizCode: 10000, message: null, tournaments: 2, events: 1, kept: 1, scope: 'today' }), '');
+  assert.doesNotMatch(sportyLine({ httpStatus: 200, path: '/factsCenter/pcUpcomingEvents', bizCode: 10000, message: null, tournaments: 2, events: 1, kept: 1, scope: 'today' }), /SportyBet|factsCenter|pcUpcoming|bizCode|HTTP/);
 
   const empty = inspectSporty({ bizCode: 10000, data: { tournaments: Array.from({ length: 12 }, () => ({ events: [] })) } });
   assert.equal(empty.tournaments, 12);
   assert.equal(empty.events.length, 0);
   assert.equal(
     sportyLine({ httpStatus: 200, path: '/factsCenter/pcUpcomingEvents?pageNum=1', bizCode: 10000, message: null, tournaments: 12, events: 0, kept: 0, scope: 'upcoming' }),
-    'SportyBet OK: 0 events parsed from 12 tournaments',
+    '',
   );
 
   const listed = inspectSporty({ data: { events: [{ eventId: 'sr:match:9', homeTeamName: 'A', awayTeamName: 'B' }] } });
@@ -98,8 +99,9 @@ test('a refused bizCode is named in the status line', () => {
     kept: 0,
     scope: 'today',
   });
-  assert.equal(line, 'SportyBet: bizCode 19000 on pcUpcomingEvents (invalid)');
-  assert.equal(sportyLine({ httpStatus: 403, path: '/factsCenter/pcUpcomingEvents', bizCode: null, message: null, tournaments: 0, events: 0, kept: 0, scope: 'today' }), 'SportyBet: HTTP 403 on pcUpcomingEvents');
+  assert.equal(line, "Couldn't load matches");
+  assert.doesNotMatch(line, /SportyBet|factsCenter|pcUpcoming|bizCode|HTTP/);
+  assert.equal(sportyLine({ httpStatus: 403, path: '/factsCenter/pcUpcomingEvents', bizCode: null, message: null, tournaments: 0, events: 0, kept: 0, scope: 'today' }), "Couldn't load matches");
 });
 
 function localMs(isoDay: string, hours: number, dayOffset = 0): number {
