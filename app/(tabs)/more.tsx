@@ -13,7 +13,8 @@ export default function MoreScreen() {
       <Card>
         <T style={styles.title}>Source</T>
         <SourceStatus />
-        <T dim>SportyBet Ghana is the only data source. A blocked network retries once inside a hidden SportyBet page.</T>
+        <T dim>SportyBet Ghana is the only data source. Reads go through the sportybet.com page when it is open, then the phone's own request.</T>
+        <T>Last request: {board.diagnostic ?? 'none yet'}</T>
         <T dim>Storage: {board.storage === 'sqlite' ? 'SQLite on this device' : board.storage === 'document' ? 'On-device document' : 'Opening…'}</T>
         {board.fetchedAt ? <T dim>Last read {new Date(board.fetchedAt).toLocaleTimeString()}</T> : null}
         {board.error ? <T style={{ color: colors.warn }}>{board.error}</T> : null}

@@ -46,6 +46,7 @@ export interface PickToBook {
 
 const UA = 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
 const JSON_HEADERS = { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': UA };
+const SPORTY_HEADERS = { ...JSON_HEADERS, clientid: 'web', platform: 'web', operid: '2' };
 
 const SPORTY = 'https://www.sportybet.com/api/gh/orders/share';
 const FOOTBALL = 'https://www.football.com/api/gh/orders/share';
@@ -90,8 +91,8 @@ export async function loadSportyFixtures(client: JsonClient): Promise<SportyFixt
   for (let page = 1; page <= 4; page += 1) {
     const payload = await client.request({
       method: 'GET',
-      url: `https://www.sportybet.com/api/gh/factsCenter/pcUpcomingEvents?sportId=${encodeURIComponent('sr:sport:1')}&marketId=1,18,29&pageSize=100&pageNum=${page}&option=1`,
-      headers: JSON_HEADERS,
+      url: `https://www.sportybet.com/api/gh/factsCenter/pcUpcomingEvents?sportId=${encodeURIComponent('sr:sport:1')}&marketId=1,18,10,29,11,26,36,14,60100&pageSize=100&pageNum=${page}&option=1&timeline=0`,
+      headers: SPORTY_HEADERS,
     });
     const batch = fixturesFromSporty(payload);
     fixtures.push(...batch);
@@ -129,7 +130,7 @@ export function picksToLegs(picks: PickToBook[], fixtures: SportyFixture[]): { l
 }
 
 async function postSporty(client: JsonClient, legs: BetradarLeg[]): Promise<string> {
-  const payload = await client.request({ method: 'POST', url: SPORTY, body: sportyBody(legs), headers: JSON_HEADERS });
+  const payload = await client.request({ method: 'POST', url: SPORTY, body: sportyBody(legs), headers: SPORTY_HEADERS });
   const posted = parseSportyPost(payload);
   if (!posted.code) throw new Error(posted.reason || 'SportyBet did not book');
   return posted.code;
@@ -139,7 +140,7 @@ export async function readSportyCode(client: JsonClient, code: string): Promise<
   const payload = await client.request({
     method: 'GET',
     url: `${SPORTY}/${encodeURIComponent(code.trim())}`,
-    headers: JSON_HEADERS,
+    headers: SPORTY_HEADERS,
   });
   const parsed = parseSportyShare(payload);
   if (!parsed.legs.length) throw new Error(parsed.reason || 'That SportyBet code has no legs');

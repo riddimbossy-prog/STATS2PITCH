@@ -1,6 +1,16 @@
 import type { Lineup, LineupPlayer, Match, MatchDetail, MatchStatus, RawIncident, ResultRow, TeamRef } from '../domain';
-import { localDate } from '../format';
 import { stepScore, type HoldState } from './var-hold';
+import {
+  chooseSchedule,
+  inspectSporty,
+  kickoffMs,
+  livePath,
+  SPORTY_HEADERS,
+  sportyCopy,
+  sportyLine,
+  upcomingPath,
+  type ScheduleScope,
+} from './sporty-read';
 
 /**
  * The only module allowed to talk to SportyBet.
@@ -15,13 +25,7 @@ const SCHEDULE_TTL = 120_000;
 const EVENT_TTL = 30_000;
 const TEAM_TTL = 6 * 60 * 60_000;
 
-const HEADERS: Record<string, string> = {
-  Accept: 'application/json',
-  'User-Agent':
-    'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
-  Referer: 'https://www.sportybet.com/gh/',
-  Origin: 'https://www.sportybet.com',
-};
+const HEADERS = SPORTY_HEADERS;
 
 export interface CacheRow {
   payload: string;
@@ -38,9 +42,17 @@ export interface SourceResult<T> {
   ok: boolean;
   data: T | null;
   error?: string;
+  notice?: string;
+  copy?: string;
   fromCache: boolean;
   stale: boolean;
   fetchedAt: number | null;
+}
+
+interface PackedList {
+  matches: Match[];
+  notice: string;
+  copy: string;
 }
 
 export interface DataSource {
@@ -91,14 +103,19 @@ export function sportyPath(url: string): string | null {
 }
 
 export async function defaultFetchJson(url: string): Promise<unknown> {
-  try {
-    return await directFetchJson(url);
-  } catch (directError) {
-    const path = sportyPath(url);
-    const blocked = directError instanceof Error && /403/.test(directError.message);
-    if (bridgeFetch && path && blocked) return bridgeFetch(path);
-    throw directError;
+  const path = sportyPath(url);
+  if (bridgeFetch && path) {
+    try {
+      const body = await bridgeFetch(path);
+      const inspected = inspectSporty(body);
+      if (inspected.bizCode == null || inspected.bizCode === 10000) {
+        return { __sportyHttp: true, status: 200, via: 'page', body };
+      }
+    } catch {
+      // The hidden page missed. The phone's own request is the next try.
+    }
   }
+  return directFetchJson(url);
 }
 
 async function directFetchJson(url: string): Promise<unknown> {
@@ -120,7 +137,7 @@ async function directFetchJson(url: string): Promise<unknown> {
             : `SportyBet ${response.status}`,
         );
       }
-      return await response.json();
+      return { __sportyHttp: true, status: response.status, via: 'direct', body: await response.json() };
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('SportyBet')) throw error;
       last = error instanceof Error ? error.message : last;
@@ -201,32 +218,111 @@ export function createSportyBetSource(options?: {
     return { ...match, feedScore: step.state.confirmed, varPending: step.varPending };
   }
 
+  async function read(path: string): Promise<{ status: number; via: string; body: unknown }> {
+    try {
+      const raw = await pull(path);
+      return unwrapHttp(raw);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'SportyBet request failed';
+      const status = /403/.test(message) ? 403 : Number(message.match(/SportyBet (\d+)/)?.[1] ?? 0);
+      if (status) {
+        throw new Error(sportyLine({ httpStatus: status, path, bizCode: null, message: null, tournaments: 0, events: 0, kept: 0, scope: 'today' }));
+      }
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }
+
+  async function loadPages(todayGames: boolean): Promise<{
+    matches: Match[];
+    path: string;
+    status: number;
+    via: string;
+    bizCode: number | null;
+    message: string | null;
+    tournaments: number;
+    events: number;
+  }> {
+    const matches: Match[] = [];
+    let path = upcomingPath(1, todayGames);
+    let status = 200;
+    let via = 'direct';
+    let bizCode: number | null = null;
+    let message: string | null = null;
+    let tournaments = 0;
+    let events = 0;
+    for (let page = 1; page <= 4; page += 1) {
+      path = upcomingPath(page, todayGames);
+      const http = await read(path);
+      const info = inspectSporty(http.body);
+      status = http.status;
+      via = http.via;
+      bizCode = info.bizCode;
+      message = info.message;
+      if (http.status >= 400) throw new Error(sportyLine({ httpStatus: http.status, path, bizCode, message, tournaments, events, kept: 0, scope: 'today' }));
+      if (info.bizCode != null && info.bizCode !== 10000) {
+        throw new Error(sportyLine({ httpStatus: http.status || 200, path, bizCode: info.bizCode, message: info.message, tournaments: info.tournaments, events: info.events.length, kept: 0, scope: 'today' }));
+      }
+      tournaments += info.tournaments;
+      events += info.events.length;
+      matches.push(...info.events.map((event) => mapSportyEvent(event)).filter((event): event is Match => event != null));
+      if (info.events.length < 100) break;
+    }
+    return { matches, path, status, via, bizCode, message, tournaments, events };
+  }
+
+  async function loadSchedule(date: string): Promise<PackedList> {
+    let bag = await loadPages(true);
+    let chosen = chooseSchedule(bag.matches, date, now());
+    if (bag.events === 0 || chosen.matches.length === 0) {
+      const wider = await loadPages(false);
+      const widerChosen = chooseSchedule(wider.matches, date, now());
+      if (widerChosen.matches.length >= chosen.matches.length) {
+        bag = wider;
+        chosen = widerChosen;
+      }
+    }
+    const facts = { httpStatus: bag.status, path: bag.path, bizCode: bag.bizCode, message: bag.message, tournaments: bag.tournaments, events: bag.events, kept: chosen.matches.length, scope: chosen.scope };
+    return { matches: chosen.matches, notice: sportyLine(facts), copy: sportyCopy({ ...facts, via: bag.via }) };
+  }
+
+  async function loadLive(): Promise<PackedList> {
+    const paths = [livePath('liveOrPrematchEvents'), livePath('configurableLiveOrPrematchEvents')];
+    let last = 'SportyBet live request failed';
+    for (const path of paths) {
+      try {
+        const http = await read(path);
+        const info = inspectSporty(http.body);
+        if (http.status >= 400) throw new Error(sportyLine({ httpStatus: http.status, path, bizCode: info.bizCode, message: info.message, tournaments: info.tournaments, events: info.events.length, kept: 0, scope: 'today' }));
+        if (info.bizCode != null && info.bizCode !== 10000) {
+          throw new Error(sportyLine({ httpStatus: http.status || 200, path, bizCode: info.bizCode, message: info.message, tournaments: info.tournaments, events: info.events.length, kept: 0, scope: 'today' }));
+        }
+        const matches = info.events
+          .map((event) => mapSportyEvent(event))
+          .filter((event): event is Match => event != null)
+          .map((match) => applyHold(match, varAwarded(http.body, match.id)))
+          .filter((match) => match.status === 'live');
+        const scope: ScheduleScope = 'today';
+        const facts = { httpStatus: http.status, path, bizCode: info.bizCode, message: info.message, tournaments: info.tournaments, events: info.events.length, kept: matches.length, scope };
+        return { matches, notice: sportyLine(facts), copy: sportyCopy({ ...facts, via: http.via }) };
+      } catch (error) {
+        last = error instanceof Error ? error.message : last;
+      }
+    }
+    throw new Error(last);
+  }
+
   return {
     id: 'sportybet',
-    scheduled(date, fresh) {
-      return cached(`scheduled:${date}`, SCHEDULE_TTL, fresh, async () => {
-        const matches: Match[] = [];
-        for (let page = 1; page <= 3; page += 1) {
-          const payload = await pull(
-            `/factsCenter/pcUpcomingEvents?sportId=${encodeURIComponent('sr:sport:1')}&marketId=1,18,29,10&pageSize=100&pageNum=${page}&option=1`,
-          );
-          const batch = mapSportyEvents(payload);
-          matches.push(...batch);
-          if (batch.length < 100) break;
-        }
-        return matches.filter((match) => match.kickoff > 0 && localDate(new Date(match.kickoff)) === date);
-      });
+    async scheduled(date, fresh) {
+      const result = await cached(`scheduled:${date}`, SCHEDULE_TTL, fresh, () => loadSchedule(date));
+      return unpack(result);
     },
-    live(fresh) {
-      return cached('live', LIVE_TTL, fresh, async () => {
-        const payload = await pull(
-          `/factsCenter/liveOrPrematchEvents?sportId=${encodeURIComponent('sr:sport:1')}&marketId=1,18,29&pageSize=100&pageNum=1&productId=1`,
-        );
-        const matches = mapSportyEvents(payload).map((match) => applyHold(match, varAwarded(payload, match.id)));
-        liveIds.clear();
-        for (const match of matches) if (match.status === 'live') liveIds.add(match.id);
-        return matches.filter((match) => match.status === 'live');
-      });
+    async live(fresh) {
+      const result = await cached('live', LIVE_TTL, fresh, () => loadLive());
+      const unpacked = unpack(result);
+      liveIds.clear();
+      for (const match of unpacked.data ?? []) if (match.status === 'live') liveIds.add(match.id);
+      return unpacked;
     },
     async match(id, fresh) {
       const product = liveIds.has(id) ? '1' : '3';
@@ -258,6 +354,27 @@ export function createSportyBetSource(options?: {
       return Promise.resolve({ ok: true, data: [], fromCache: false, stale: false, fetchedAt: now() });
     },
   };
+}
+
+function unpack(result: SourceResult<PackedList>): SourceResult<Match[]> {
+  return {
+    ...result,
+    data: result.data?.matches ?? null,
+    notice: result.error ?? result.data?.notice,
+    copy: result.data?.copy ?? result.error,
+  };
+}
+
+function unwrapHttp(raw: unknown): { status: number; via: string; body: unknown } {
+  const row = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+  if (row && row.__sportyHttp === true) {
+    return {
+      status: typeof row.status === 'number' ? row.status : 200,
+      via: row.via === 'page' ? 'page' : 'direct',
+      body: row.body,
+    };
+  }
+  return { status: 200, via: 'mock', body: raw };
 }
 
 function holdIncidents(state: HoldState | undefined): RawIncident[] {
@@ -308,31 +425,7 @@ function asNumber(value: unknown): number | null {
 }
 
 export function sportyEvents(payload: unknown): Record<string, unknown>[] {
-  const root = asRecord(payload);
-  const data = asRecord(root?.data) ?? root;
-  if (!data) return [];
-  const direct = asArray(data.events ?? data.list ?? data.eventList);
-  if (direct.length) {
-    return direct.map(asRecord).filter((row): row is Record<string, unknown> => row != null);
-  }
-  const tournaments = asArray(data.tournaments);
-  if (tournaments.length) {
-    const rows: Record<string, unknown>[] = [];
-    for (const tournament of tournaments) {
-      const row = asRecord(tournament);
-      if (!row) continue;
-      const league = asString(asRecord(row.tournament)?.name) ?? asString(row.name);
-      const country = asString(asRecord(row.category)?.name);
-      for (const event of asArray(row.events)) {
-        const item = asRecord(event);
-        if (!item) continue;
-        rows.push({ ...item, _league: league, _country: country });
-      }
-    }
-    return rows;
-  }
-  if (asString(data.eventId) || asString(data.homeTeamName)) return [data];
-  return [];
+  return inspectSporty(payload).events;
 }
 
 export function mapSportyStatus(status: string | null): MatchStatus {
@@ -373,7 +466,7 @@ export function mapSportyEvent(event: Record<string, unknown>): Match | null {
   const competitionId = asString(tournament?.id) ?? competitionName;
   const leagueName = asString(category?.name) ?? asString(event._country) ?? competitionName;
   const leagueId = asString(category?.id) ?? leagueName;
-  const kickoff = asNumber(event.estimateStartTime) ?? asNumber(event.startTime) ?? 0;
+  const kickoff = kickoffMs(event.estimateStartTime) || kickoffMs(event.startTime);
   const score = parseSetScore(event.setScore) ?? parseSetScore(asArray(event.gameScore).at(-1));
   return {
     id,

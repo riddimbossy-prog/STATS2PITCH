@@ -16,8 +16,8 @@ import {
   type TextProps,
   type ViewStyle,
 } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../src/theme';
 import { BlurLayer } from './atmosphere';
 import { BrandHeader } from './BrandHeader';
@@ -61,6 +61,7 @@ export function Screen({
   refreshing?: boolean;
   banner?: string | null;
 }) {
+  const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const progress = useSharedValue(0);
   useEffect(() => {
@@ -86,7 +87,7 @@ export function Screen({
       <Animated.View style={[styles.flex, enter]}>
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}
           refreshControl={
             onRefresh ? (
               <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.lime} colors={[colors.lime]} progressBackgroundColor="#102018" />
@@ -178,30 +179,17 @@ export function Segment<TValue extends string>({
   options: { value: TValue; label: string }[];
   onChange: (value: TValue) => void;
 }) {
-  const [width, setWidth] = useState(0);
-  const index = Math.max(0, options.findIndex((option) => option.value === value));
-  const x = useSharedValue(0);
-  useEffect(() => {
-    if (!width) return;
-    const item = (width - 8) / options.length;
-    x.value = withSpring(4 + index * item, { damping: 18, stiffness: 190 });
-  }, [index, options.length, width, x]);
-  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
-  const itemWidth = width ? (width - 8) / options.length : 0;
   return (
-    <Glass intensity={26} style={styles.segment}>
-      <View style={styles.segmentRow} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-        {itemWidth > 0 ? <Animated.View style={[styles.segmentThumb, { width: itemWidth }, thumb]} /> : null}
-        {options.map((option) => {
-          const active = option.value === value;
-          return (
-            <Pressable key={option.value} onPress={() => onChange(option.value)} style={styles.segmentItem}>
-              <T style={[styles.segmentText, active && styles.segmentTextOn]}>{option.label}</T>
-            </Pressable>
-          );
-        })}
-      </View>
-    </Glass>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <Pressable key={option.value} onPress={() => onChange(option.value)} style={[styles.chip, active && styles.chipOn]}>
+            <T style={[styles.segmentText, active && styles.segmentTextOn]}>{option.label}</T>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
   );
 }
 
@@ -235,7 +223,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Platform.OS === 'web' ? '#000' : 'transparent' },
   flex: { flex: 1, backgroundColor: 'transparent' },
   stadiumHint: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0.1 },
-  content: { padding: 16, paddingBottom: 120, gap: 12 },
+  content: { padding: 16, gap: 12 },
   glass: {
     borderRadius: 22,
     borderWidth: 1,
@@ -270,19 +258,19 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.ink, fontWeight: '800' },
   buttonTextLight: { color: colors.text },
   disabled: { opacity: 0.45 },
-  segment: { padding: 0 },
-  segmentRow: { flexDirection: 'row', minHeight: 44, alignItems: 'center' },
-  segmentThumb: {
-    position: 'absolute',
-    top: 4,
-    bottom: 4,
-    borderRadius: 14,
-    backgroundColor: colors.lime,
-    shadowColor: colors.lime,
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+  chips: { gap: 8, paddingVertical: 2, alignItems: 'center' },
+  chip: {
+    minHeight: 48,
+    minWidth: 96,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(12,12,12,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
-  segmentItem: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  chipOn: { backgroundColor: colors.lime, borderColor: colors.lime },
   segmentText: { color: colors.muted, fontWeight: '700', fontSize: 13 },
   segmentTextOn: { color: colors.ink },
   field: {

@@ -63,7 +63,7 @@ src/state/board.tsx      board, polling, slips, lists
 
 SportyBet event ids are Betradar ids (`sr:match:N`). Booking uses that id directly. A pasted SportyBet share code is read back and rebooked on the other Ghana books.
 
-Live scores refresh about every 10 seconds. The list comes from `factsCenter/liveOrPrematchEvents`. Today's card comes from `factsCenter/pcUpcomingEvents`. Match detail, markets and the final score come from `factsCenter/event`. Team form comes from `factsCenter/teamEventList`.
+Live scores refresh about every 10 seconds. The list comes from `factsCenter/liveOrPrematchEvents` (then `configurableLiveOrPrematchEvents` if that fails). Today's card comes from `factsCenter/pcUpcomingEvents` with `todayGames=true`, `timeline=0`, and the web client's market list. Headers are `clientid: web`, `platform: web`, `operid: 2`. On Android the hidden sportybet.com page makes the request first so its cookies apply. If today has no kickoffs, the next days are shown, then the whole upcoming list. An empty or refused read stays on screen as `SportyBet: HTTP 403 on pcUpcomingEvents` or `SportyBet OK: 0 events parsed from 12 tournaments`, with Retry and Copy diagnostics. Match detail, markets and the final score come from `factsCenter/event`. Team form comes from `factsCenter/teamEventList`.
 
 ### What SportyBet does not send
 

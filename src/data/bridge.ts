@@ -165,11 +165,11 @@ export class SofaBridge {
 export function buildPageFetchScript(request: BridgeRequest): string {
   const id = JSON.stringify(request.id);
   const path = JSON.stringify(request.path);
-  return `(function(){var id=${id};var path=${path};fetch(path,{credentials:'include',headers:{Accept:'application/json'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:res.status,body:body}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
+  return `(function(){var id=${id};var path=${path};fetch(path,{credentials:'include',headers:{Accept:'application/json','Content-Type':'application/json',clientid:'web',platform:'web',operid:'2'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:res.status,body:body}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'result',id:id,status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
 }
 
 export function buildProbeScript(): string {
-  return `(function(){fetch('/api/gh/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1&pageSize=1&pageNum=1&option=1',{credentials:'include',headers:{Accept:'application/json'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:res.status,body:body.slice(0,500)}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
+  return `(function(){fetch('/api/gh/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1%2C18&pageSize=1&pageNum=1&option=1&timeline=0',{credentials:'include',headers:{Accept:'application/json','Content-Type':'application/json',clientid:'web',platform:'web',operid:'2'}}).then(function(res){return res.text().then(function(body){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:res.status,body:body.slice(0,500)}));});}).catch(function(err){window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',status:0,body:'',error:String(err&&err.message||err)}));});})();true;`;
 }
 
 export const SPORTY_PAGE = 'https://www.sportybet.com/gh/';

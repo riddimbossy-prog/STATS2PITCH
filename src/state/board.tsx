@@ -20,6 +20,8 @@ export interface Toast {
 interface BoardContextValue {
   phase: 'loading' | 'ready' | 'error';
   error: string | null;
+  diagnostic: string | null;
+  diagnosticCopy: string;
   sample: boolean;
   storage: 'sqlite' | 'document' | null;
   fetchedAt: number | null;
@@ -78,6 +80,8 @@ export function BoardProvider({ children }: { children: ReactNode }) {
   const [booted, setBooted] = useState(false);
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
+  const [diagnostic, setDiagnostic] = useState<string | null>(null);
+  const [diagnosticCopy, setDiagnosticCopy] = useState('');
   const [sample, setSample] = useState(false);
   const [storage, setStorage] = useState<'sqlite' | 'document' | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
@@ -220,15 +224,19 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     const [scheduled, live] = await Promise.all([source.scheduled(date, fresh), source.live(fresh)]);
     if (sampleRef.current) return;
     const rows = mergeMatches(scheduled.data ?? [], live.data ?? []);
+    const note = [scheduled.notice, live.notice].filter(Boolean).join('\n');
+    const copy = [scheduled.copy, live.copy].filter(Boolean).join('\n\n');
+    setDiagnostic(note || null);
+    setDiagnosticCopy(copy || note);
     if (!scheduled.data && !live.data) {
-      const message = scheduled.error || live.error || 'SportyBet did not respond.';
+      const message = note || scheduled.error || live.error || 'SportyBet did not respond.';
       setError(message);
       setPhase('error');
       if (process.env.EXPO_PUBLIC_OPEN_SAMPLE === '1') applySample();
       return;
     }
     setMatches(rows);
-    setError(scheduled.error || live.error || null);
+    setError(rows.length === 0 ? note || scheduled.error || live.error || 'SportyBet returned no matches.' : scheduled.error || live.error || null);
     setFetchedAt(Date.now());
     setPhase('ready');
     await loadHistories(rows, fresh);
@@ -240,14 +248,18 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     const date = localDate();
     const [scheduled, live] = await Promise.all([source.scheduled(date, true), source.live(true)]);
     if (sampleRef.current) return;
+    const note = [scheduled.notice, live.notice].filter(Boolean).join('\n');
+    const copy = [scheduled.copy, live.copy].filter(Boolean).join('\n\n');
+    setDiagnostic(note || null);
+    setDiagnosticCopy(copy || note);
     if (!scheduled.data && !live.data) {
-      setError(scheduled.error || live.error || 'SportyBet did not respond.');
+      setError(note || scheduled.error || live.error || 'SportyBet did not respond.');
       return;
     }
     const rows = mergeMatches(scheduled.data ?? [], live.data ?? []);
     setMatches(rows);
     setFetchedAt(Date.now());
-    setError(scheduled.error || live.error || null);
+    setError(rows.length === 0 ? note || scheduled.error || live.error || 'SportyBet returned no matches.' : scheduled.error || live.error || null);
     const interesting = rows.filter((match) => match.status === 'live').slice(0, 6);
     await Promise.all(interesting.map((match) => loadMatchRef.current(match.id, true)));
   }
@@ -512,6 +524,8 @@ export function BoardProvider({ children }: { children: ReactNode }) {
   const value: BoardContextValue = {
     phase,
     error,
+    diagnostic,
+    diagnosticCopy,
     sample,
     storage,
     fetchedAt,

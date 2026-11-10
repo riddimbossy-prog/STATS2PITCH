@@ -226,6 +226,59 @@ test('event detail maps score, markets and lineups when SportyBet sends them', a
   assert.deepEqual(lineups.data, []);
 });
 
+test('an empty todayGames list falls back to the all-upcoming feed', async () => {
+  const calls: string[] = [];
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(18, 0, 0, 0);
+  const source = createSportyBetSource({
+    gapMs: 0,
+    fetchJson: async (url) => {
+      calls.push(url);
+      if (url.includes('todayGames=true')) {
+        return { bizCode: 10000, data: { tournaments: Array.from({ length: 12 }, () => ({ events: [] })) } };
+      }
+      return {
+        bizCode: 10000,
+        data: {
+          tournaments: [
+            {
+              name: 'Premier League',
+              events: [
+                {
+                  eventId: 'sr:match:5',
+                  homeTeamId: 'h',
+                  awayTeamId: 'a',
+                  homeTeamName: 'Arsenal',
+                  awayTeamName: 'Chelsea',
+                  estimateStartTime: tomorrow.getTime(),
+                  matchStatus: 'Not start',
+                },
+              ],
+            },
+          ],
+        },
+      };
+    },
+  });
+  const day = await source.scheduled(localDate(), true);
+  assert.equal(day.ok, true);
+  assert.equal(day.data?.[0]?.id, 'sr:match:5');
+  assert.match(day.notice ?? '', /showing the next days/);
+  assert.match(calls[0] ?? '', /todayGames=true/);
+  assert.equal(calls.some((url) => url.includes('pcUpcomingEvents') && !url.includes('todayGames=true')), true);
+});
+
+test('a refused bizCode is the visible error', async () => {
+  const source = createSportyBetSource({
+    gapMs: 0,
+    fetchJson: async () => ({ bizCode: 19000, message: 'invalid', data: {} }),
+  });
+  const day = await source.scheduled(localDate(), true);
+  assert.equal(day.ok, false);
+  assert.match(day.error ?? '', /bizCode 19000 on pcUpcomingEvents/);
+});
+
 test('team results become home and away rows', () => {
   const rows = mapTeamResults(
     {

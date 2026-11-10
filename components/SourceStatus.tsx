@@ -22,19 +22,19 @@ export function SourceStatus() {
     );
   }
 
-  const blocked = /403|blocked|challenge/i.test(`${board.error ?? ''} ${bridge.lastError ?? ''}`) || bridge.status === 'challenge';
-  const label = board.phase === 'ready' && !board.error
+  const detail = board.diagnostic || bridge.lastError || board.error;
+  const blocked = /HTTP 403|blocked|challenge|bizCode/i.test(`${detail ?? ''}`) || bridge.status === 'challenge';
+  const label = board.phase === 'ready' && board.matches.length > 0 && !blocked
     ? 'Live from SportyBet'
     : blocked
       ? 'Blocked'
       : board.phase === 'loading' || bridge.status === 'starting'
         ? 'Opening SportyBet…'
         : 'Offline';
-  const detail = bridge.lastError || board.error;
   return (
     <T dim style={label === 'Blocked' || label === 'Offline' ? { color: colors.warn } : undefined}>
       {label}
-      {detail && label !== 'Live from SportyBet' ? ` · ${detail}` : ''}
+      {detail ? ` · ${detail}` : ''}
     </T>
   );
 }
