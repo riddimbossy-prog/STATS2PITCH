@@ -46,10 +46,17 @@ export function Atmosphere({ children }: { children: ReactNode }) {
   return (
     <BlurTargetContext.Provider value={target}>
       <View style={styles.root}>
-        <BlurTargetView ref={target} style={styles.fill} collapsable={false} pointerEvents="none">
-          <Image source={require('../assets/brand/stadium-user-bg-v3.webp')} style={styles.fill} contentFit="cover" />
-          <View style={styles.blackout} />
-        </BlurTargetView>
+        {Platform.OS === 'ios' ? (
+          <BlurTargetView ref={target} style={styles.fill} collapsable={false} pointerEvents="none">
+            <Image source={require('../assets/brand/stadium-user-bg-v3.webp')} style={styles.fill} contentFit="cover" />
+            <View style={styles.blackout} />
+          </BlurTargetView>
+        ) : (
+          <View style={styles.fill} pointerEvents="none">
+            <Image source={require('../assets/brand/stadium-user-bg-v3.webp')} style={styles.fill} contentFit="cover" />
+            <View style={styles.blackout} />
+          </View>
+        )}
         {children}
       </View>
     </BlurTargetContext.Provider>
