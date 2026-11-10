@@ -1,5 +1,5 @@
 export const colors = {
-  bg: '#070d0a',
+  bg: '#000000',
   elev: '#0c1410',
   card: '#121c17',
   line: 'rgba(244,247,245,0.1)',

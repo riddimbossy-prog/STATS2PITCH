@@ -23,7 +23,7 @@ export default function RootLayout() {
             screenOptions={{
               headerShown: false,
               animation: 'fade_from_bottom',
-              contentStyle: { backgroundColor: 'transparent' },
+              contentStyle: { backgroundColor: '#000' },
             }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="match/[id]" />

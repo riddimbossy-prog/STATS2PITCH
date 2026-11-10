@@ -29,7 +29,7 @@ export function BrandHeader() {
 const styles = StyleSheet.create({
   wrap: { height: 74, justifyContent: 'flex-end', overflow: 'hidden', borderBottomWidth: 1, borderBottomColor: 'rgba(244,247,245,0.12)' },
   fill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  wash: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(7,13,10,0.5)' },
+  wash: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.55)' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 10 },
   markGlow: {
     width: 46,

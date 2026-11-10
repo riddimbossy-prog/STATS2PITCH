@@ -1,7 +1,9 @@
+import { Image } from 'expo-image';
 import { useIsFocused } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -71,10 +73,19 @@ export function Screen({
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {Platform.OS === 'web' ? (
+        <Image
+          pointerEvents="none"
+          source={require('../assets/brand/stadium-user-bg-v3.webp')}
+          contentFit="cover"
+          style={styles.stadiumHint}
+        />
+      ) : null}
       <BrandHeader />
       <RefreshMark active={!!refreshing} />
       <Animated.View style={[styles.flex, enter]}>
         <ScrollView
+          style={styles.flex}
           contentContainerStyle={styles.content}
           refreshControl={
             onRefresh ? (
@@ -221,14 +232,15 @@ export function GlassTabBackground() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
-  flex: { flex: 1 },
+  safe: { flex: 1, backgroundColor: Platform.OS === 'web' ? '#000' : 'transparent' },
+  flex: { flex: 1, backgroundColor: 'transparent' },
+  stadiumHint: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0.1 },
   content: { padding: 16, paddingBottom: 120, gap: 12 },
   glass: {
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(244,247,245,0.16)',
-    backgroundColor: 'rgba(8, 16, 12, 0.4)',
+    borderColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(12,12,12,0.72)',
     overflow: 'hidden',
     padding: 14,
     gap: 8,
@@ -238,8 +250,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
   },
   glassClip: { borderRadius: 22 },
-  wash: { backgroundColor: 'rgba(0, 0, 0, 0.18)' },
-  sheen: { position: 'absolute', top: 0, left: 12, right: 12, height: 1, backgroundColor: 'rgba(255,255,255,0.28)' },
+  wash: { backgroundColor: 'rgba(0,0,0,0.28)' },
+  sheen: { position: 'absolute', top: 0, left: 12, right: 12, height: 1, backgroundColor: 'rgba(255,255,255,0.34)' },
   bannerText: { color: colors.warn, lineHeight: 20 },
   section: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 },
   sectionTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted },
@@ -278,7 +290,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(244,247,245,0.16)',
-    backgroundColor: 'rgba(8,16,12,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     color: colors.text,
     paddingHorizontal: 14,
     fontSize: 16,
