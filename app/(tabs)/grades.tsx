@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { GradeReveal } from '../../components/motion';
 import { Card, Empty, Pill, Screen, Section, Segment, T } from '../../components/ui';
 import type { GradePeriod } from '../../src/domain';
 import { gradePeriod, type GradeRow } from '../../src/engine';
@@ -49,7 +50,7 @@ export default function GradesScreen() {
       <Card>
         <T dim>Your tips this {period}</T>
         <View style={styles.overall}>
-          <T style={styles.letter}>{report.overall.grade}</T>
+          <GradeReveal grade={report.overall.grade} period={period} />
           <View style={{ flex: 1 }}>
             <T style={styles.record}>
               {report.overall.wins} landed · {report.overall.losses} bust

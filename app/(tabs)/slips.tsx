@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Settle } from '../../components/motion';
 import { Button, Card, Empty, Field, Pill, Screen, Section, T } from '../../components/ui';
 import { BOOKIES } from '../../src/bookies/stub';
 import { combinedOdds } from '../../src/engine';
@@ -46,8 +47,9 @@ export default function SlipsScreen() {
       </Card>
       <Section title="Booked" action={String(board.slips.length)} />
       {board.slips.length === 0 ? <Empty title="No booking codes yet" body="A code stays open until every leg lands, or it busts as soon as one leg loses." /> : null}
-      {board.slips.map((slip) => (
-        <Card key={slip.id}>
+      {board.slips.map((slip, index) => (
+        <Settle key={slip.id} status={slip.status}>
+        <Card index={index}>
           <View style={styles.leg}>
             <T style={styles.code}>{slip.code}</T>
             <Pill label={slip.status} tone={slip.status === 'won' ? 'lime' : slip.status === 'lost' ? 'danger' : 'muted'} />
@@ -63,6 +65,7 @@ export default function SlipsScreen() {
             </View>
           ))}
         </Card>
+        </Settle>
       ))}
     </Screen>
   );

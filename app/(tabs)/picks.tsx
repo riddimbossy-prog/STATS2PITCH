@@ -38,9 +38,10 @@ export default function PicksScreen() {
       ) : null}
       {groups.map((group) => (
         <ViewGroup key={group.key} title={group.title} count={group.picks.length}>
-          {group.picks.map((pick) => (
+          {group.picks.map((pick, index) => (
             <PickCard
               key={pick.id}
+              index={index}
               pick={pick}
               tracked={board.isTracked(pick.id)}
               drafted={board.draftIds.includes(pick.id)}

@@ -4,28 +4,18 @@ Android-first football live scores and betting insight. The app reads Sofascore 
 
 Web can be run from the same Expo project. A Play Store build is configured as an AAB; the preview profile builds an APK.
 
-## Preserved brand files
+## Brand
 
-The previous app was removed. These files were kept and now live in `assets/brand/`:
+The only logo is the pitch mark.
 
 | File | Used for |
 | --- | --- |
-| `s2p-pitch-mark.png` | App icon, Android adaptive icon, in-app mark |
-| `s2p-pitch-mark.svg` | Preserved vector of the same mark |
-| `s2p-boot.jpg` | Splash screen |
-| `s2p-boot.mp4` | Preserved boot motion |
-| `stats2pitch-logo-v2.png` | Header wordmark |
-| `stats2pitch-logo.png` | Earlier wordmark, kept |
-| `stats2pitch-favicon.png` | Notification icon |
-| `stats2pitch-favicon-v2.png` | Preserved favicon |
-| `stats2pitch-favicon-v3.png` | Web favicon |
-| `stats2pitch-apple.png` | Preserved Apple touch icon |
-| `brand-mark.png` | Preserved wide pitch mark |
-| `football-real.svg` | Preserved ball illustration |
-| `stadium-user-bg.webp` | Preserved stadium background |
-| `stadium-user-bg-v2.webp` | Preserved stadium background |
-| `stadium-user-bg-v3.webp` | Header background |
-| `fox-kicking-ball.mp4` | Preserved brand motion |
+| `assets/brand/s2p-pitch-mark.png` | App icon, adaptive icon, splash, header, notification icon, web favicon |
+| `assets/brand/s2p-pitch-mark.svg` | Vector of the same mark |
+| `assets/brand/stadium-user-bg*.webp` | Glass background |
+| `assets/brand/s2p-boot.jpg`, `s2p-boot.mp4`, `football-real.svg`, `fox-kicking-ball.mp4` | Kept on disk, not used as logos |
+
+Wordmarks and the old favicon set (`stats2pitch-logo*.png`, `brand-mark.png`, `stats2pitch-favicon*.png`, `stats2pitch-apple.png`) are removed.
 
 ## Setup
 

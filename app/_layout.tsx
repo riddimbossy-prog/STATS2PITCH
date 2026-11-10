@@ -1,11 +1,10 @@
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Atmosphere } from '../components/atmosphere';
 import { ToastHost } from '../components/ToastHost';
 import { BoardProvider } from '../src/state/board';
-import { colors } from '../src/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -19,11 +18,12 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <BoardProvider>
-        <View style={styles.root}>
+        <Atmosphere>
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: colors.bg },
+              animation: 'fade_from_bottom',
+              contentStyle: { backgroundColor: 'transparent' },
             }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="match/[id]" />
@@ -31,12 +31,8 @@ export default function RootLayout() {
             <Stack.Screen name="suggestions" />
           </Stack>
           <ToastHost />
-        </View>
+        </Atmosphere>
       </BoardProvider>
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-});

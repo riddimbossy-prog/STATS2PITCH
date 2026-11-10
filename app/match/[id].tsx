@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { PickCard } from '../../components/PickCard';
+import { AnimatedScore, VarShimmer } from '../../components/motion';
 import { Button, Card, Empty, Pill, Screen, Section, T } from '../../components/ui';
 import { assessSquad, confirmedBoard, strengthLabel } from '../../src/engine';
 import { assessVar } from '../../src/engine/var';
@@ -47,6 +48,7 @@ export default function MatchScreen() {
           {match.status === 'live' ? <Pill label={match.minute || match.statusText || 'LIVE'} tone="live" /> : <Pill label={match.statusText} />}
           {boardState.varPending ? <Pill label="VAR" tone="warn" /> : null}
         </View>
+        {boardState.varPending ? <VarShimmer /> : null}
         {board.sample && boardState.varPending ? (
           <Button label="Sample: confirm the VAR goal" onPress={() => board.confirmSampleVar(match.id)} />
         ) : null}
@@ -72,9 +74,10 @@ export default function MatchScreen() {
       {detail?.lineups.away ? <LineupBlock name={match.away.name} players={detail.lineups.away.starters.map((player) => player.name)} missing={awaySquad.missing} /> : null}
       <Section title="Tips in this match" action={String(picks.length)} />
       {picks.length === 0 ? <Empty title="No 80% tip in this match" body="The trend and the last-five form both sit under 80%." /> : null}
-      {picks.map((pick) => (
-        <PickCard
+      {picks.map((pick, index) => (
+          <PickCard
           key={pick.id}
+          index={index}
           pick={pick}
           tracked={board.isTracked(pick.id)}
           drafted={board.draftIds.includes(pick.id)}
@@ -91,7 +94,7 @@ function Score({ name, score }: { name: string; score: string }) {
   return (
     <View style={styles.scoreRow}>
       <T style={styles.team}>{name}</T>
-      <T style={styles.score}>{score}</T>
+      <AnimatedScore value={score} style={styles.score} />
     </View>
   );
 }

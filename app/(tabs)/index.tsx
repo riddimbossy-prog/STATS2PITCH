@@ -38,8 +38,8 @@ export default function MatchesScreen() {
       {board.phase === 'ready' && rows.length === 0 ? (
         <Empty title={filter === 'live' ? 'No live matches' : 'No matches today'} body="Pull to refresh. Kickoffs show up as Sofascore publishes them." />
       ) : null}
-      {rows.map((match) => (
-        <MatchCard key={match.id} match={match} detail={board.details[match.id]} onPress={() => router.push(`/match/${match.id}`)} />
+      {rows.map((match, index) => (
+        <MatchCard key={match.id} index={index} match={match} detail={board.details[match.id]} onPress={() => router.push(`/match/${match.id}`)} />
       ))}
       {board.phase === 'ready' ? (
         <T dim>{rows.length} shown{board.sample ? ' · sample' : ''}</T>

@@ -23,14 +23,14 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/brand/stats2pitch-favicon-v3.png"
+      "favicon": "./assets/brand/s2p-pitch-mark.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/brand/s2p-boot.jpg",
+          "image": "./assets/brand/s2p-pitch-mark.png",
           "resizeMode": "contain",
           "backgroundColor": "#070d0a"
         }
@@ -40,7 +40,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/brand/stats2pitch-favicon.png",
+          "icon": "./assets/brand/s2p-pitch-mark.png",
           "color": "#070d0a"
         }
       ]
