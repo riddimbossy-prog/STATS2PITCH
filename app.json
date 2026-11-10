@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stats2Pitch",
     "slug": "stats2pitch",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/brand/s2p-pitch-mark.png",
     "scheme": "stats2pitch",
@@ -12,7 +12,7 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 6,
+      "versionCode": 7,
       "package": "com.stats2pitch.app",
       "permissions": ["android.permission.POST_NOTIFICATIONS", "android.permission.VIBRATE"],
       "predictiveBackGestureEnabled": false,
