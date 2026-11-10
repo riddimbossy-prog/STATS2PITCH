@@ -11,6 +11,8 @@ import { suggestSimilar } from './similarity';
 import { combinedOdds, marketSettled, settleSlip } from './settlement';
 import { assessSquad } from './squad';
 import { assessVar } from './var';
+import { groupMatchesByLeague, leagueTitle } from './view';
+import type { Match } from '../domain';
 
 const row = (goalsFor: number, goalsAgainst: number, venue: 'home' | 'away' = 'home'): ResultRow => ({
   goalsFor,
@@ -415,3 +417,39 @@ function rec(
 ) {
   return { id, label: id, market, teamId, teamName, competitionId, competitionName, status, settledAt };
 }
+
+
+function matchOf(id: string, competitionId: string, competitionName: string, leagueName: string, kickoff = 1): Match {
+  return {
+    id,
+    home: team('h', 'Home'),
+    away: team('a', 'Away'),
+    competition: { id: competitionId, name: competitionName },
+    league: { id: leagueName.toLowerCase(), name: leagueName },
+    kickoff,
+    status: 'scheduled',
+    statusText: 'Not started',
+    minute: null,
+    feedScore: null,
+    varPending: false,
+  };
+}
+
+test('today\'s games group by league and keep the match count', () => {
+  const groups = groupMatchesByLeague([
+    matchOf('1', 'pl', 'Premier League', 'England', 3),
+    matchOf('2', 'sa', 'Serie A', 'Italy', 2),
+    matchOf('3', 'pl', 'Premier League', 'England', 1),
+  ]);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0]?.title, 'England - Premier League');
+  assert.equal(groups[0]?.matches.length, 2);
+  assert.equal(groups[0]?.matches[0]?.id, '3');
+  assert.equal(groups[1]?.title, 'Italy - Serie A');
+  assert.equal(groups[1]?.matches.length, 1);
+});
+
+test('a competition name that already includes the country is not prefixed twice', () => {
+  assert.equal(leagueTitle(matchOf('1', 'cdr', 'Spain - Copa del Rey', 'Spain')), 'Spain - Copa del Rey');
+  assert.equal(leagueTitle(matchOf('2', 'pl', 'Premier League', 'Premier League')), 'Premier League');
+});

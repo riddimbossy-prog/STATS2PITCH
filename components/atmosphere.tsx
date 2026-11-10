@@ -14,7 +14,9 @@ export function useBlurTarget() {
 
 export function BlurLayer({ intensity = 40, style }: { intensity?: number; style?: ViewStyle }) {
   const target = useBlurTarget();
-  if (Platform.OS === 'web') {
+  // Android dimezis BlurView was closing the app when switching tabs.
+  // Keep a dark glass wash on Android; use BlurView only on iOS.
+  if (Platform.OS !== 'ios') {
     return <View pointerEvents="none" style={[style, webGlass(intensity)]} />;
   }
   return (
