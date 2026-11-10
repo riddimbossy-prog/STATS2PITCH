@@ -17,13 +17,13 @@ const ICONS: Record<string, string> = {
 interface BarProps {
   state: { index: number; routes: { key: string; name: string }[] };
   descriptors: Record<string, { options: { title?: string } }>;
-  navigation: {
+  emitter: {
     emit: (event: { type: 'tabPress'; target: string; canPreventDefault: true }) => { defaultPrevented: boolean };
-    navigate: (name: string) => void;
   };
+  navigateToTab: (routeKey: string) => void;
 }
 
-function Bar({ state, descriptors, navigation }: BarProps) {
+function Bar({ state, descriptors, emitter, navigateToTab }: BarProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const bottom = Math.max(insets.bottom, 10);
@@ -51,8 +51,8 @@ function Bar({ state, descriptors, navigation }: BarProps) {
               accessibilityRole="button"
               accessibilityState={focused ? { selected: true } : {}}
               onPress={() => {
-                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-                if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+                const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+                if (!focused && !event.defaultPrevented) navigateToTab(route.key);
               }}
               style={styles.tab}>
               <Text style={[styles.icon, { color: focused ? colors.lime : colors.muted }]}>{ICONS[route.name] ?? '•'}</Text>
