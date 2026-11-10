@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { SourceStatus } from '../../components/SourceStatus';
 import { Card, Screen, Section, T } from '../../components/ui';
 import { colors } from '../../src/theme';
 import { useBoard } from '../../src/state/board';
@@ -11,7 +12,8 @@ export default function MoreScreen() {
     <Screen onRefresh={board.refresh} refreshing={board.refreshing}>
       <Card>
         <T style={styles.title}>Source</T>
-        <T dim>{board.sample ? 'Showing the sample board.' : 'Sofascore is the only data source.'}</T>
+        <SourceStatus />
+        <T dim>Sofascore is the only data source. On Android the read goes through a hidden Sofascore page.</T>
         <T dim>Storage: {board.storage === 'sqlite' ? 'SQLite on this device' : board.storage === 'document' ? 'On-device document' : 'Opening…'}</T>
         {board.fetchedAt ? <T dim>Last read {new Date(board.fetchedAt).toLocaleTimeString()}</T> : null}
         {board.error ? <T style={{ color: colors.warn }}>{board.error}</T> : null}

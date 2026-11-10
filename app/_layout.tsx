@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Atmosphere } from '../components/atmosphere';
 import { ToastHost } from '../components/ToastHost';
+import { SofaBridgeHost } from '../src/data/SofaBridgeHost';
 import { BoardProvider } from '../src/state/board';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -18,6 +19,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <BoardProvider>
+        <SofaBridgeHost />
         <Atmosphere>
           <Stack
             screenOptions={{

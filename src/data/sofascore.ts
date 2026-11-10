@@ -72,7 +72,38 @@ export function sofascoreBaseUrl(): string {
   return (configured && configured.replace(/\/$/, '')) || DEFAULT_BASE;
 }
 
+let bridgeFetch: ((path: string) => Promise<unknown>) | null = null;
+
+/** Native installs this so reads go through the hidden Sofascore page. Web leaves it unset. */
+export function registerSofaBridge(fetchPath: ((path: string) => Promise<unknown>) | null) {
+  bridgeFetch = fetchPath;
+}
+
+export function sofaApiPath(url: string): string | null {
+  const marker = '/api/v1';
+  const index = url.indexOf(marker);
+  if (index === -1) return null;
+  return url.slice(index + marker.length);
+}
+
 export async function defaultFetchJson(url: string): Promise<unknown> {
+  const path = sofaApiPath(url);
+  if (bridgeFetch && path) {
+    try {
+      return await bridgeFetch(path);
+    } catch (bridgeError) {
+      try {
+        return await directFetchJson(url);
+      } catch (directError) {
+        if (bridgeError instanceof Error && bridgeError.message.includes('403 challenge')) throw bridgeError;
+        throw directError;
+      }
+    }
+  }
+  return directFetchJson(url);
+}
+
+async function directFetchJson(url: string): Promise<unknown> {
   let last = 'Sofascore request failed';
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const controller = new AbortController();

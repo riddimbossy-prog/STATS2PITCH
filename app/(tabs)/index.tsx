@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { MatchCard } from '../../components/MatchCard';
+import { SourceStatus } from '../../components/SourceStatus';
 import { Button, Empty, Loading, Screen, Segment, T } from '../../components/ui';
 import { useBoard } from '../../src/state/board';
 
@@ -16,6 +17,7 @@ export default function MatchesScreen() {
 
   return (
     <Screen onRefresh={board.refresh} refreshing={board.refreshing} banner={banner}>
+      <SourceStatus />
       <Segment
         value={filter}
         onChange={setFilter}
