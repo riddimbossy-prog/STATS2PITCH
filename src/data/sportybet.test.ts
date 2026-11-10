@@ -91,11 +91,8 @@ test('scheduled and live reads use the factsCenter paths and fall back to a stal
     fetchJson: async (url) => {
       calls.push(url);
       if (fail) throw new Error('SportyBet 403');
-      if (url.includes('pcUpcomingEvents')) {
-        return url.includes('pageNum=1') && calls.filter((item) => item.includes('pcUpcomingEvents')).length === 1
-          ? UPCOMING
-          : { bizCode: 10000, data: { tournaments: [{ events: [liveEvent] }], totalNum: 1 } };
-      }
+      if (url.includes('liveOrPrematchEvents')) return { bizCode: 10000, data: { tournaments: [{ events: [liveEvent] }], totalNum: 1 } };
+      if (url.includes('pcUpcomingEvents')) return UPCOMING;
       if (url.includes('/event?')) return { bizCode: 10000, data: liveEvent };
       throw new Error(`unexpected ${url}`);
     },
@@ -108,7 +105,10 @@ test('scheduled and live reads use the factsCenter paths and fall back to a stal
   const live = await source.live(true);
   assert.equal(live.data?.[0]?.minute, "23'");
   assert.equal(live.data?.[0]?.feedScore?.home, 1);
-  assert.match(calls.find((url) => url.includes('/event?')) ?? '', /productId=1/);
+  const liveUrl = calls.find((url) => url.includes('liveOrPrematchEvents')) ?? '';
+  assert.equal(liveUrl.includes('sportId=sr%3Asport%3A1&marketId=1%2C18%2C29&pageSize=100&pageNum=1&productId=1'), true);
+  assert.doesNotMatch(liveUrl, /timeline|todayGames/);
+  assert.match(live.notice ?? '', /liveOrPrematchEvents/);
   fail = true;
   const stale = await source.live(true);
   assert.equal(stale.ok, false);
@@ -134,7 +134,9 @@ test('a new live goal is held, then confirmed when the score sticks', async () =
         playedSeconds: '70:00',
         setScore: score,
       };
-      if (url.includes('pcUpcomingEvents')) return { bizCode: 10000, data: { tournaments: [{ events: [event] }], totalNum: 1 } };
+      if (url.includes('liveOrPrematchEvents') || url.includes('pcUpcomingEvents')) {
+        return { bizCode: 10000, data: { tournaments: [{ events: [event] }], totalNum: 1 } };
+      }
       if (url.includes('/event?')) return { bizCode: 10000, data: event };
       throw new Error(url);
     },
@@ -169,7 +171,9 @@ test('a VAR-awarded timeline row confirms the new score immediately', async () =
         setScore: score,
         comments: [{ type: 'var', text: 'VAR confirmed goal', confirmed: true }],
       };
-      if (url.includes('pcUpcomingEvents')) return { bizCode: 10000, data: { tournaments: [{ events: [event] }], totalNum: 1 } };
+      if (url.includes('liveOrPrematchEvents') || url.includes('pcUpcomingEvents')) {
+        return { bizCode: 10000, data: { tournaments: [{ events: [event] }], totalNum: 1 } };
+      }
       return { bizCode: 10000, data: event };
     },
   });
@@ -271,6 +275,70 @@ test('a 422 on the plain request is kept in the ladder and the web headers can s
   assert.match(day.copy ?? '', /headers: Accept, User-Agent/);
   assert.match(day.copy ?? '', /body: rejected params/);
   assert.match(day.copy ?? '', /direct\/web HTTP 200/);
+});
+
+test('a live-endpoint 422 still shows past-kickoff upcoming games', async () => {
+  const calls: string[] = [];
+  const kickoff = Date.parse('2026-11-10T12:00:00.000Z');
+  const source = createSportyBetSource({
+    gapMs: 0,
+    now: () => kickoff + 30 * 60 * 1000,
+    fetchJson: async (url) => {
+      calls.push(url);
+      if (url.includes('liveOrPrematchEvents')) {
+        return { __sportyHttp: true, status: 422, via: 'direct', body: 'rejected', snippet: 'rejected live' };
+      }
+      if (url.includes('pcUpcomingEvents')) {
+        return {
+          bizCode: 10000,
+          data: {
+            totalNum: 1,
+            tournaments: [
+              {
+                events: [
+                  {
+                    eventId: 'sr:match:55',
+                    homeTeamId: 'h',
+                    awayTeamId: 'a',
+                    homeTeamName: 'Arsenal',
+                    awayTeamName: 'Chelsea',
+                    estimateStartTime: kickoff,
+                    matchStatus: 'Not start',
+                  },
+                ],
+              },
+            ],
+          },
+        };
+      }
+      if (url.includes('/event?')) {
+        return {
+          bizCode: 10000,
+          data: {
+            eventId: 'sr:match:55',
+            homeTeamName: 'Arsenal',
+            awayTeamName: 'Chelsea',
+            homeTeamId: 'h',
+            awayTeamId: 'a',
+            estimateStartTime: kickoff,
+            matchStatus: 'Not start',
+          },
+        };
+      }
+      throw new Error(url);
+    },
+  });
+  const live = await source.live(true);
+  assert.equal(live.ok, true);
+  assert.equal(live.data?.[0]?.id, 'sr:match:55');
+  assert.equal(live.data?.[0]?.status, 'live');
+  assert.match(live.notice ?? '', /upcoming fallback/);
+  assert.match(live.notice ?? '', /HTTP 422/);
+  assert.match(live.copy ?? '', /liveOrPrematchEvents/);
+  const upcoming = calls.find((url) => url.includes('pcUpcomingEvents')) ?? '';
+  assert.match(upcoming, /marketId=1%2C18%2C10%2C29/);
+  assert.doesNotMatch(upcoming, /timeline|todayGames/);
+  assert.doesNotMatch(calls.find((url) => url.includes('liveOrPrematchEvents')) ?? '', /timeline|todayGames/);
 });
 
 test('a refused bizCode is the visible error', async () => {

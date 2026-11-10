@@ -4,6 +4,7 @@ import {
   chooseSchedule,
   eventPath,
   headerNames,
+  liveListPath,
   headersFor,
   inspectSporty,
   kickoffMs,
@@ -371,40 +372,86 @@ export function createSportyBetSource(options?: {
   }
 
   async function loadLive(): Promise<PackedList> {
-    const bag = await loadPages();
-    const candidates = bag.matches
-      .filter((match) => match.status === 'live' || (match.kickoff > 0 && match.kickoff <= now() && match.status !== 'finished' && match.status !== 'cancelled' && match.status !== 'postponed'))
-      .slice(0, 8);
-    const attempts = [...bag.attempts];
+    const attempts: AttemptRecord[] = [];
     const matches: Match[] = [];
+    let path = liveListPath(1);
+    let status = 0;
+    let bizCode: number | null = null;
+    let message: string | null = null;
+    let via = 'direct/plain';
+    let tournaments = 0;
+    let events = 0;
+    let failed = false;
+    for (let page = 1; page <= 8; page += 1) {
+      path = liveListPath(page);
+      const result = await ladder(path);
+      attempts.push(...result.attempts);
+      status = result.status;
+      bizCode = result.bizCode;
+      message = result.message;
+      via = result.via;
+      if (!result.ok) {
+        failed = page === 1;
+        break;
+      }
+      const info = inspectSporty(result.body);
+      tournaments += info.tournaments;
+      events += info.events.length;
+      for (const event of info.events) {
+        const match = mapSportyEvent(event);
+        if (!match || match.status !== 'live') continue;
+        matches.push(applyHold(match, varAwarded(result.body, match.id)));
+      }
+      if (!morePages(page, info.events.length, listTotal(result.body))) break;
+    }
+    if (!failed) {
+      const notice = `liveOrPrematchEvents · HTTP ${status} · bizCode ${bizCode ?? 'none'} · ${events} events, ${matches.length} live`;
+      const facts = { httpStatus: status, path, bizCode, message, tournaments, events, kept: matches.length, scope: 'today' as const, via, attempts };
+      return { matches, notice, copy: `${notice}\n${sportyCopy(facts)}` };
+    }
+
+    let bag: Awaited<ReturnType<typeof loadPages>>;
+    try {
+      bag = await loadPages();
+    } catch (error) {
+      const line = `liveOrPrematchEvents · HTTP ${status} · bizCode ${bizCode ?? 'none'}`;
+      const detail = error instanceof Error ? error.message : 'SportyBet upcoming failed';
+      const copy = error instanceof ReadError ? error.copy : detail;
+      throw new ReadError(`${line}\n${detail}`, `${line}\n${copy}`);
+    }
+    const candidates = bag.matches.filter(
+      (match) => match.kickoff > 0 && match.kickoff <= now() && match.status !== 'finished' && match.status !== 'cancelled' && match.status !== 'postponed',
+    );
+    const fallbackAttempts = [...attempts, ...bag.attempts];
+    const fallback: Match[] = [];
     for (const candidate of candidates) {
       let detailed: Match | null = null;
       let awarded = false;
       for (const product of ['1', '3'] as const) {
-        const path = eventPath(candidate.id, product);
-        const result = await ladder(path);
-        attempts.push(...result.attempts);
+        const result = await ladder(eventPath(candidate.id, product));
+        fallbackAttempts.push(...result.attempts);
         if (!result.ok) continue;
         detailed = mapSportyEvents(result.body)[0] ?? null;
         awarded = varAwarded(result.body, candidate.id);
         if (detailed) break;
       }
       const row = detailed ?? candidate;
-      if (row.status === 'live' || candidate.status === 'live') matches.push(applyHold({ ...row, status: row.status === 'scheduled' ? 'live' : row.status }, awarded));
+      fallback.push(applyHold({ ...row, status: 'live' }, awarded));
     }
+    const notice = `upcoming fallback · liveOrPrematchEvents HTTP ${status} bizCode ${bizCode ?? 'none'} · ${bag.events} upcoming, ${fallback.length} live`;
     const facts = {
-      httpStatus: bag.status,
-      path: bag.path,
-      bizCode: bag.bizCode,
-      message: bag.message,
+      httpStatus: status,
+      path,
+      bizCode,
+      message,
       tournaments: bag.tournaments,
       events: bag.events,
-      kept: matches.length,
+      kept: fallback.length,
       scope: 'today' as const,
-      via: bag.via,
-      attempts,
+      via,
+      attempts: fallbackAttempts,
     };
-    return { matches, notice: sportyLine(facts), copy: sportyCopy(facts) };
+    return { matches: fallback, notice, copy: `${notice}\n${sportyCopy(facts)}` };
   }
 
   return {

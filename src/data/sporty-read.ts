@@ -41,6 +41,11 @@ export function eventPath(eventId: string, productId: '1' | '3'): string {
   return `/factsCenter/event?eventId=${encodeURIComponent(eventId)}&productId=${productId}`;
 }
 
+/** In-play list. Market ids stay short: 1, 18 and 29. No timeline and no todayGames. */
+export function liveListPath(page: number): string {
+  return `/factsCenter/liveOrPrematchEvents?sportId=${encodeURIComponent('sr:sport:1')}&marketId=${encodeURIComponent('1,18,29')}&pageSize=100&pageNum=${page}&productId=1`;
+}
+
 /** Stop paging once this page covers totalNum, or the page itself is short. */
 export function morePages(page: number, pageEvents: number, total: number | null): boolean {
   if (pageEvents < 100) return false;
